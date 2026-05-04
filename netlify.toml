@@ -1,0 +1,113 @@
+[build]
+  functions = "netlify/functions"
+  publish   = "."
+
+[[redirects]]
+  from   = "/defiligne"
+  to     = "/defiligne.html"
+  status = 200
+
+[[redirects]]
+  from   = "/tech"
+  to     = "/tech.html"
+  status = 200
+
+[[redirects]]
+  from   = "/api/kizeo"
+  to     = "/.netlify/functions/kizeo"
+  status = 200
+
+[[redirects]]
+  from   = "/api/notion"
+  to     = "/.netlify/functions/notion"
+  status = 200
+
+[[redirects]]
+  from   = "/api/config"
+  to     = "/.netlify/functions/config"
+  status = 200
+
+[[redirects]]
+  from   = "/api/agent"
+  to     = "/.netlify/functions/agent"
+  status = 200
+
+[[redirects]]
+  from   = "/api/route-chat"
+  to     = "/.netlify/functions/route-chat"
+  status = 200
+
+[[redirects]]
+  from   = "/api/agent-master"
+  to     = "/.netlify/functions/agent-master"
+  status = 200
+
+[[redirects]]
+  from   = "/api/optimize-route"
+  to     = "/.netlify/functions/optimize-route"
+  status = 200
+
+[[redirects]]
+  from   = "/api/settings"
+  to     = "/.netlify/functions/settings"
+  status = 200
+
+[[redirects]]
+  from   = "/api/geocode"
+  to     = "/.netlify/functions/geocode"
+  status = 200
+
+[[redirects]]
+  from   = "/api/cluster"
+  to     = "/.netlify/functions/cluster"
+  status = 200
+
+[[redirects]]
+  from   = "/api/validate-day"
+  to     = "/.netlify/functions/validate-day"
+  status = 200
+
+[[redirects]]
+  from   = "/api/plan-day"
+  to     = "/.netlify/functions/plan-day"
+  status = 200
+
+[[redirects]]
+  from   = "/api/agent-planning"
+  to     = "/.netlify/functions/agent-planning"
+  status = 200
+
+[[redirects]]
+  from   = "/api/agent-validateur"
+  to     = "/.netlify/functions/agent-validateur"
+  status = 200
+
+[[redirects]]
+  from   = "/api/agent-logistique"
+  to     = "/.netlify/functions/agent-logistique"
+  status = 200
+
+[[redirects]]
+  from   = "/api/agent-optimiseur"
+  to     = "/.netlify/functions/agent-optimiseur"
+  status = 200
+
+[[redirects]]
+  from   = "/api/agent-orchestrateur-planning"
+  to     = "/.netlify/functions/agent-orchestrateur-planning"
+  status = 200
+
+[[redirects]]
+  from   = "/api/agent-optimiseur-vroom"
+  to     = "/.netlify/functions/agent-optimiseur-vroom"
+  status = 200
+
+[[redirects]]
+  from   = "/api/rapport-planning"
+  to     = "/.netlify/functions/rapport-planning"
+  status = 200
+
+[[redirects]]
+  from   = "/api/traiter-planning"
+  to     = "/.netlify/functions/traiter-planning"
+  status = 200

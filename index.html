@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>OptiQ — Gestion technicien DEA</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',sans-serif;background:#080C15;color:#fff;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 20px}
+.logo{display:flex;align-items:center;gap:14px;margin-bottom:40px}
+.logo-name{font-size:32px;font-weight:800;letter-spacing:-.04em}
+.logo-name b{color:#1D6FFF}
+.sub{font-size:16px;color:#94A3B8;margin-bottom:48px;line-height:1.7;max-width:480px}
+.cards{display:flex;gap:16px;flex-wrap:wrap;justify-content:center}
+.card{background:#111827;border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:32px 40px;text-decoration:none;color:#fff;transition:all .2s;min-width:200px}
+.card:hover{border-color:#1D6FFF;transform:translateY(-4px)}
+.card .ico{font-size:40px;margin-bottom:12px}
+.card h2{font-size:18px;font-weight:700;margin-bottom:6px}
+.card p{font-size:13px;color:#94A3B8}
+</style>
+</head>
+<body>
+<div class="logo">
+  <svg width="44" height="44" viewBox="0 0 36 36" fill="none">
+    <circle cx="15.5" cy="15.5" r="10.5" stroke="#1D6FFF" stroke-width="3.2" fill="none"/>
+    <line x1="22" y1="22" x2="33" y2="33" stroke="#1D6FFF" stroke-width="3.2" stroke-linecap="round"/>
+    <circle cx="15.5" cy="15.5" r="3" fill="#1D6FFF" opacity=".4"/>
+    <line x1="15.5" y1="9" x2="15.5" y2="11" stroke="#1D6FFF" stroke-width="2" stroke-linecap="round"/>
+    <line x1="15.5" y1="20" x2="15.5" y2="22" stroke="#1D6FFF" stroke-width="2" stroke-linecap="round"/>
+    <line x1="9" y1="15.5" x2="11" y2="15.5" stroke="#1D6FFF" stroke-width="2" stroke-linecap="round"/>
+    <line x1="20" y1="15.5" x2="22" y2="15.5" stroke="#1D6FFF" stroke-width="2" stroke-linecap="round"/>
+  </svg>
+  <span class="logo-name">Optique · <b>OptiQ</b></span>
+</div>
+<p class="sub">Plateforme de gestion et planification de tournées techniciens DEA</p>
+<div class="cards">
+  <a href="/defiligne.html" class="card">
+    <div class="ico">📊</div>
+    <h2>Espace Admin</h2>
+    <p>Planning, dispatch,<br>analyse, paramètres</p>
+  </a>
+  <a href="/tech.html" class="card">
+    <div class="ico">🔧</div>
+    <h2>App Technicien</h2>
+    <p>Tournée, carte,<br>validation terrain</p>
+  </a>
+</div>
+</body>
+</html>

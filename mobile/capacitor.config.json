@@ -1,0 +1,21 @@
+{
+  "appId": "fr.defiligne.optiq.tech",
+  "appName": "OptiQ Tech",
+  "webDir": "www",
+  "server": {
+    "url": "https://friendly-jelly-a45a1d.netlify.app/tech",
+    "cleartext": false
+  },
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#1A237E",
+    "overScrollMode": "never"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "backgroundColor": "#1A237E",
+      "showSpinner": false
+    }
+  }
+}

@@ -1,0 +1,12 @@
+.env
+node_modules/
+
+# Local Netlify folder
+.netlify
+
+# Electron build artifacts
+desktop/dist/
+desktop/node_modules/
+
+# Claude Code local settings
+.claude/settings.local.json

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">OptiQ Tech</string>
+    <string name="title_activity_main">OptiQ Tech</string>
+    <string name="package_name">fr.defiligne.optiq.tech</string>
+    <string name="custom_url_scheme">fr.defiligne.optiq.tech</string>
+</resources>

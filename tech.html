@@ -1,0 +1,1748 @@
+﻿<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>OptiQ Tech — Technicien</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --blue:#1565C0;--blueDk:#0D47A1;--blueLt:#E3F2FD;
+  --green:#2E7D32;--greenLt:#E8F5E9;
+  --orange:#E65100;--red:#C62828;--purple:#6A1B9A;
+  --gray:#757575;--border:#E0E0E0;--bg:#F5F5F5;--dark:#212121;
+  --tab:68px;--top:58px;
+}
+html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--dark)}
+#app{display:flex;flex-direction:column;height:100vh;height:100dvh}
+
+/* ── TOPBAR ── */
+#topbar{height:var(--top);background:var(--blueDk);display:flex;align-items:center;padding:0 14px;gap:10px;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+#top-logo{height:32px;background:#fff;border-radius:6px;padding:3px 6px;object-fit:contain}
+#top-logo-fb{display:none;font-size:24px}
+#top-info{flex:1;overflow:hidden}
+#top-title{color:#fff;font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#top-sub{color:rgba(255,255,255,.65);font-size:11px}
+#btn-tech{background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:20px;padding:6px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap}
+#btn-gps-all{background:#2E7D32;color:#fff;border:none;border-radius:20px;padding:6px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:none}
+
+/* ── CONTENT + TABS ── */
+#content{flex:1;overflow:hidden;position:relative}
+.view{display:none;position:absolute;inset:0}
+.view.on{display:flex;flex-direction:column}
+#tabs{height:var(--tab);background:#fff;border-top:2px solid var(--border);display:flex;flex-shrink:0}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:none;background:transparent;cursor:pointer;position:relative;transition:background .1s}
+.tab:active{background:var(--blueLt)}
+.tab .ti{font-size:24px}
+.tab .tl{font-size:10px;font-weight:600;color:var(--gray)}
+.tab.on .tl{color:var(--blue)}
+.tab.on::after{content:'';position:absolute;top:0;left:15%;right:15%;height:3px;background:var(--blue);border-radius:0 0 3px 3px}
+.tbadge{position:absolute;top:5px;right:calc(50% - 18px);background:var(--red);color:#fff;border-radius:10px;font-size:10px;font-weight:800;padding:1px 5px;min-width:18px;text-align:center;display:none}
+
+/* ── DÉPART : SPLIT ── */
+#dep-bar{padding:8px 12px;background:#fff;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#dep-split{flex:1;display:flex;overflow:hidden;min-height:0}
+/* Carte */
+#dep-map-col{flex:1;min-width:0;position:relative;background:#e8e8e8}
+#dep-map{width:100%;height:100%}
+#dep-prog{position:absolute;bottom:0;left:0;right:0;background:rgba(255,255,255,.95);padding:8px 14px;display:none}
+#dep-prog-bar{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin-top:4px}
+#dep-prog-fill{height:100%;background:var(--blue);border-radius:3px;width:0;transition:width .3s}
+/* Liste clients */
+#dep-list-col{width:310px;flex-shrink:0;display:flex;flex-direction:column;border-left:1px solid var(--border);background:#fff;overflow:hidden}
+#dep-list-head{background:var(--blueDk);color:#fff;padding:8px 12px;font-size:12px;font-weight:700;flex-shrink:0;display:flex;justify-content:space-between;align-items:center}
+#dep-list-scroll{flex:1;overflow-y:auto;overflow-x:hidden}
+/* Stats bandeau */
+#dep-stats-bar{display:none;flex-shrink:0;background:var(--dark);color:#fff;padding:6px 14px;display:none;gap:16px;align-items:center;font-size:12px}
+
+/* ── CARTES CLIENT DÉPART ── */
+.dc{border-left:5px solid var(--border);background:#fff;margin:0;border-bottom:1px solid var(--bg);cursor:pointer;transition:background .1s}
+.dc:active,.dc.sel{background:var(--blueLt)}
+.dc.vdone{border-left-color:var(--green);opacity:.7}
+.dc.vfail{border-left-color:var(--red);opacity:.7}
+.dc.drag-over{background:#E3F2FD;border-left-color:var(--blue)}
+.dc-drag{color:#bbb;font-size:16px;cursor:grab;flex-shrink:0;user-select:none;-webkit-user-select:none;padding:0 2px;line-height:1}
+.dc-top{padding:10px 10px 6px;display:flex;align-items:center;gap:8px}
+.dc-num{width:30px;height:30px;border-radius:50%;background:var(--blue);color:#fff;font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.dc-info{flex:1;min-width:0}
+.dc-client{font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dc-addr{font-size:11px;color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dc-tags{display:flex;gap:4px;padding:0 10px 4px;flex-wrap:wrap}
+.dc-detail{display:none;padding:6px 10px 8px;border-top:1px solid var(--bg)}
+.dc.open .dc-detail{display:block}
+/* Boutons val/echec TOUJOURS visibles */
+.dc-btns{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:4px 10px 8px}
+.vbtn{border:none;border-radius:9px;padding:9px 6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:4px;transition:all .15s}
+.vbtn:active{transform:scale(.95)}
+.vbtn-v{background:var(--greenLt);color:var(--green)}
+.vbtn-v.active{background:var(--green);color:#fff}
+.vbtn-f{background:#FFEBEE;color:var(--red)}
+.vbtn-f.active{background:var(--red);color:#fff}
+
+/* ── CARTES GENERIQUES ── */
+.card{background:#fff;border-radius:14px;padding:14px;margin:8px 12px;box-shadow:0 1px 6px rgba(0,0,0,.06)}
+.tag{display:inline-block;font-size:11px;font-weight:600;padding:3px 9px;border-radius:100px;white-space:nowrap}
+.tag-warn{background:#FFF3E0;color:var(--orange)}
+.tag-ok{background:var(--greenLt);color:var(--green)}
+.tag-info{background:var(--blueLt);color:var(--blue)}
+.tag-err{background:#FFEBEE;color:var(--red)}
+
+/* ── PLANNING ── */
+.wstrip{display:flex;gap:5px;padding:10px 12px;background:#fff;border-bottom:1px solid var(--border);overflow-x:auto;flex-shrink:0}
+.wstrip::-webkit-scrollbar{display:none}
+.wpill{min-width:52px;height:64px;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;background:var(--bg);border:2px solid transparent;flex-shrink:0}
+.wpill.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+.wpill.today{border-color:var(--blue)}
+.wpill .pn{font-size:20px;font-weight:800;line-height:1}
+.wpill .pl{font-size:10px;font-weight:600}
+.wpill .pc{font-size:9px;font-weight:700;background:var(--blue);color:#fff;border-radius:6px;padding:1px 5px}
+.wpill.on .pc{background:rgba(255,255,255,.3)}
+
+/* ── MATERIEL ── */
+.mat-row{display:flex;align-items:center;gap:14px;padding:14px;background:#fff;border-radius:12px;margin:6px 12px;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.mat-ico{font-size:32px}
+.mat-n{font-size:28px;font-weight:800;color:var(--blue)}
+
+/* ── BOUTONS ── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:none;border-radius:10px;font-family:inherit;font-weight:600;cursor:pointer;transition:all .12s}
+.btn:active{transform:scale(.96)}
+.btn-sm{padding:8px 16px;font-size:13px}
+.btn-md{padding:11px 20px;font-size:14px}
+.btn-blue{background:var(--blue);color:#fff}
+.btn-gray{background:var(--bg);color:var(--dark);border:1.5px solid var(--border)}
+.btn-green{background:var(--green);color:#fff}
+
+/* ── TECH SELECTOR ── */
+#tech-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:600;align-items:center;justify-content:center;padding:20px}
+#tech-overlay.open{display:flex}
+#tech-sheet{background:#fff;border-radius:18px;padding:20px;width:100%;max-width:480px}
+.tech-opt{display:flex;align-items:center;gap:14px;padding:14px;border-radius:12px;cursor:pointer;border:2px solid var(--border);margin-bottom:10px}
+.tech-opt.on,.tech-opt:active{background:var(--blueLt);border-color:var(--blue)}
+.tech-av{width:48px;height:48px;border-radius:50%;background:var(--blueLt);color:var(--blue);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px}
+
+/* ── CONTACT EDIT MODAL ── */
+#contact-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:700;align-items:center;justify-content:center;padding:20px}
+#contact-modal.open{display:flex}
+#contact-sheet{background:#fff;border-radius:18px;padding:20px;width:100%;max-width:440px}
+.inp{width:100%;padding:11px 12px;border:1.5px solid var(--border);border-radius:9px;font-size:14px;font-family:inherit;margin-bottom:10px}
+.inp:focus{outline:none;border-color:var(--blue)}
+
+/* ── TOAST ── */
+#toast{position:fixed;bottom:calc(var(--tab) + 16px);left:50%;transform:translateX(-50%);background:var(--dark);color:#fff;padding:11px 22px;border-radius:100px;font-size:13px;font-weight:600;z-index:999;box-shadow:0 4px 20px rgba(0,0,0,.25);white-space:nowrap;opacity:0;transition:opacity .3s;pointer-events:none}
+#toast.show{opacity:1}
+
+/* ── KIZEO SYNC STATUS ── */
+.sync-tag{font-size:11px;padding:3px 8px;border-radius:6px;font-weight:600}
+.sync-ok{background:#E8F5E9;color:#2E7D32}
+.sync-demo{background:#FFF3E0;color:#E65100}
+
+/* ═══════════════════════════════════════════
+   RESPONSIVE — Téléphone (< 640px)
+   ═══════════════════════════════════════════ */
+@media (max-width:639px){
+  :root{--tab:62px;--top:54px}
+
+  /* Topbar compact */
+  #topbar{padding:0 10px;gap:7px}
+  #top-title{font-size:15px}
+  #top-sub{font-size:10px}
+  #btn-tech{padding:5px 10px;font-size:12px}
+  #btn-gps-all{padding:5px 10px;font-size:12px}
+
+  /* Départ : carte masquée par défaut, liste pleine hauteur */
+  #dep-split{flex-direction:column}
+  #dep-map-col{flex:0 0 0;height:0;overflow:hidden;transition:flex .28s,height .28s;min-height:0}
+  #dep-split.map-on #dep-map-col{flex:0 0 48vh;height:48vh}
+  #dep-list-col{width:100%;flex:1;border-left:none;border-top:1px solid var(--border);min-height:0}
+  #dep-split.map-on #dep-list-col{flex:0 0 auto;max-height:38vh}
+
+  /* Barre actions */
+  #dep-bar{padding:7px 10px;gap:6px}
+  #dep-bar input[type=date]{font-size:13px;padding:6px 8px;flex:1;min-width:0}
+  #btn-map-toggle{display:flex !important}
+
+  /* Cartes client — touch friendly */
+  .dc-top{padding:14px 12px 8px}
+  .dc-num{width:38px;height:38px;font-size:16px;flex-shrink:0}
+  .dc-client{font-size:14px}
+  .dc-addr{font-size:12px}
+  .dc-btns{gap:8px;padding:8px 12px 12px}
+  .vbtn{padding:15px 8px;font-size:14px;font-weight:700;border-radius:12px}
+  .dc-tags{padding:0 12px 6px;gap:5px}
+  .tag{font-size:12px;padding:4px 10px}
+
+  /* Planning : navigation plus grande */
+  #v-planning>div:first-child{padding:8px 10px;gap:6px}
+  #v-planning>div:first-child .btn-sm{padding:9px 12px;font-size:13px}
+  .wpill{min-width:56px;height:70px;border-radius:14px}
+  .wpill .pn{font-size:22px}
+  .wpill .pl{font-size:11px}
+
+  /* Tabs plus hauts */
+  .tab .ti{font-size:26px}
+  .tab .tl{font-size:11px}
+
+  /* Profil — cartes plein écran */
+  .card{margin:8px 8px;padding:16px}
+
+  /* Modales pleine largeur */
+  #tech-sheet{border-radius:18px}
+  #contact-sheet{border-radius:18px}
+}
+
+/* ═══════════════════════════════════════════
+   RESPONSIVE — Tablette (640px – 1024px)
+   ═══════════════════════════════════════════ */
+@media (min-width:640px){
+  #btn-map-toggle{display:none !important}
+  #dep-list-col{width:340px}
+  .vbtn{padding:11px 8px;font-size:13px}
+}
+@media (min-width:640px) and (max-width:1023px){
+  #dep-list-col{width:300px}
+  .vbtn{padding:13px 8px;font-size:13px;border-radius:11px}
+  .dc-top{padding:12px 12px 8px}
+  .dc-num{width:34px;height:34px}
+  .dc-client{font-size:14px}
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- TOPBAR -->
+  <div id="topbar">
+    <img id="top-logo" src="https://defiligne.fr/wp-content/uploads/2016/03/logo-defiligne.jpg" alt="DL"
+      onerror="this.style.display='none';document.getElementById('top-logo-fb').style.display='block'"/>
+    <span id="top-logo-fb">DL</span>
+    <div id="top-info">
+      <div id="top-title">OptiQ Tech</div>
+      <div id="top-sub"></div>
+    </div>
+    <button id="btn-gps-all" onclick="openGPSAll()">📍 GPS tournée</button>
+    <button id="btn-tech" onclick="openTechSelect()">👤 —</button>
+  </div>
+
+  <!-- CONTENT -->
+  <div id="content">
+
+    <!-- ═══ DÉPART DU JOUR ═══ -->
+    <div id="v-depart" class="view on">
+      <!-- Barre date + actions -->
+      <div id="dep-bar">
+        <input type="date" id="dep-date" style="font-size:14px;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit" onchange="onDepDateChange()"/>
+        <input type="time" id="dep-time" value="08:00" title="Heure de départ du dépôt" style="font-size:14px;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit" onchange="techCfg.startTime=this.value;saveCfg()"/>
+        <button class="btn btn-blue btn-sm" onclick="calcMap()">🗺️ Itinéraire</button>
+        <button id="btn-map-toggle" class="btn btn-gray btn-sm" style="display:none" onclick="toggleDepMap()">📋 Liste</button>
+        <button id="btn-notion-pull" class="btn btn-sm" style="background:#F3E5F5;color:#6A1B9A;border:1.5px solid #CE93D8" onclick="showNotionPanelTech()">🔄 Notion</button>
+        <div id="dep-kpi" style="display:none;margin-left:auto;gap:14px;font-size:13px">
+          <span><strong id="dep-km" style="color:var(--blue)">—</strong> km</span>
+          <span><strong id="dep-dur" style="color:var(--purple)">—</strong> trajet</span>
+          <span><strong id="dep-done" style="color:var(--green)">0/0</strong> ✓</span>
+        </div>
+      </div>
+
+      <!-- Avertissement créneau impossible -->
+      <div id="dep-conflict-warn" style="display:none;background:#FFF3E0;color:#E65100;padding:6px 14px;font-size:12px;font-weight:600;border-bottom:1px solid #FFCC80"></div>
+
+      <!-- SPLIT CARTE + LISTE -->
+      <div id="dep-split">
+
+        <!-- Carte -->
+        <div id="dep-map-col">
+          <div id="dep-map"></div>
+          <!-- Progress bar pendant chargement -->
+          <div id="dep-prog">
+            <div style="display:flex;justify-content:space-between;font-size:12px">
+              <span id="dep-prog-msg">Calcul...</span>
+              <span id="dep-prog-pct">0%</span>
+            </div>
+            <div id="dep-prog-bar"><div id="dep-prog-fill"></div></div>
+          </div>
+          <!-- Indicateur client focalisé -->
+          <div id="dep-focus-tag" style="display:none;position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:var(--blue);color:#fff;padding:7px 18px;border-radius:20px;font-size:13px;font-weight:700;box-shadow:0 2px 12px rgba(0,0,0,.3);z-index:400;pointer-events:none;max-width:85%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+          <!-- Message initial -->
+          <div id="dep-init-msg" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#f0f4f8;flex-direction:column;gap:12px">
+            <div style="font-size:40px">🗺️</div>
+            <div style="font-size:15px;color:var(--gray);text-align:center;padding:0 20px">Choisissez une date et appuyez<br>sur <strong>Calculer itinéraire</strong></div>
+          </div>
+        </div>
+
+        <!-- Liste clients — droite fixe 300px -->
+        <div id="dep-list-col">
+          <div id="dep-list-head">
+            <span id="dep-list-hd">Clients du jour</span>
+            <span id="dep-list-badge" style="background:rgba(255,255,255,.2);border-radius:8px;padding:2px 8px;font-size:11px"></span>
+          </div>
+          <div id="dep-list-scroll">
+            <div id="dep-list-empty" style="padding:32px 12px;text-align:center;color:var(--gray);font-size:14px">
+              Aucune intervention ce jour
+            </div>
+            <div id="dep-list"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ PLANNING SEMAINE ═══ -->
+    <div id="v-planning" class="view">
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#fff;border-bottom:1px solid var(--border);flex-shrink:0">
+        <button class="btn btn-gray btn-sm" style="padding:7px 12px" onclick="shiftPlanWeek(-7)">◀</button>
+        <input type="date" id="plan-date-pick" style="flex:1;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit" onchange="planSel=this.value;renderPlanning()"/>
+        <button class="btn btn-gray btn-sm" style="padding:7px 12px" onclick="shiftPlanWeek(7)">▶</button>
+        <button class="btn btn-blue btn-sm" onclick="planSel=TODAY();renderPlanning()">Auj.</button>
+        <button id="btn-notion-plan" class="btn btn-sm" style="background:#F3E5F5;color:#6A1B9A;border:1.5px solid #CE93D8;padding:7px 12px" onclick="showNotionPanelTech()">🔄</button>
+      </div>
+      <div class="wstrip" id="wstrip"></div>
+      <div style="padding:10px 14px 4px;font-size:13px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px" id="plan-title"></div>
+      <div style="flex:1;overflow-y:auto" id="plan-list"></div>
+    </div>
+
+    <!-- ═══ MATÉRIEL ═══ -->
+    <div id="v-materiel" class="view">
+      <div style="padding:12px 14px 4px;font-size:13px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px" id="mat-title"></div>
+      <div id="mat-alert" style="display:none;margin:6px 12px;padding:10px 14px;background:#FFF3E0;border-left:4px solid var(--orange);border-radius:10px;font-size:14px;color:var(--orange);font-weight:600"></div>
+      <div style="flex:1;overflow-y:auto">
+        <div id="mat-totaux"></div>
+        <div style="padding:10px 14px 2px;font-size:12px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px">Détail par client</div>
+        <div id="mat-detail"></div>
+        <div style="height:16px"></div>
+      </div>
+    </div>
+
+    <!-- ═══ PROFIL ═══ -->
+    <div id="v-profil" class="view" style="overflow-y:auto">
+      <div style="padding:14px 14px 0">
+        <div class="card" style="margin:0 0 12px;padding:16px">
+          <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
+            <div id="prof-av" style="width:56px;height:56px;border-radius:50%;background:var(--blueLt);color:var(--blue);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800"></div>
+            <div>
+              <div id="prof-name" style="font-size:18px;font-weight:800"></div>
+              <div id="prof-veh" style="font-size:12px;color:var(--gray)"></div>
+              <div id="prof-sync-status" style="margin-top:3px"></div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding-top:12px;border-top:1px solid var(--bg)">
+            <div style="text-align:center"><div id="prof-mois" style="font-size:24px;font-weight:800;color:var(--blue)">—</div><div style="font-size:10px;color:var(--gray)">Ce mois</div></div>
+            <div style="text-align:center"><div id="prof-sem" style="font-size:24px;font-weight:800;color:var(--purple)">—</div><div style="font-size:10px;color:var(--gray)">Semaine</div></div>
+            <div style="text-align:center"><div id="prof-rend" style="font-size:24px;font-weight:800;color:var(--green)">—</div><div style="font-size:10px;color:var(--gray)">Rendement</div></div>
+          </div>
+        </div>
+
+        <!-- Config Kizeo -->
+        <div class="card" style="margin:0 0 12px">
+          <div style="font-size:14px;font-weight:700;margin-bottom:12px">🔗 Kizeo Forms</div>
+          <div style="margin-bottom:8px">
+            <div style="font-size:12px;color:var(--gray);margin-bottom:4px">Token API</div>
+            <input class="inp" type="password" id="cfg-token" placeholder="Token Kizeo..." oninput="techCfg.token=this.value;saveCfg()"/>
+          </div>
+          <div style="margin-bottom:8px">
+            <div style="font-size:12px;color:var(--gray);margin-bottom:4px">ID Formulaire</div>
+            <input class="inp" id="cfg-form" placeholder="Ex: 12345" oninput="techCfg.formId=this.value;saveCfg()"/>
+          </div>
+          <div style="margin-bottom:12px">
+            <div style="font-size:12px;color:var(--gray);margin-bottom:4px">Mon ID utilisateur Kizeo</div>
+            <input class="inp" id="cfg-uid" placeholder="Ex: 42" oninput="techCfg.userId=this.value;saveCfg()"/>
+          </div>
+          <button class="btn btn-blue btn-sm" style="width:100%" onclick="syncKizeo()">🔄 Synchroniser les fiches</button>
+          <div id="sync-result" style="margin-top:8px;font-size:12px;color:var(--gray)"></div>
+        </div>
+
+        <!-- Config Notion -->
+        <div class="card" style="margin:0 0 12px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="14" height="14" rx="2" fill="#fff" stroke="#000"/><path d="M3 4.5C3 4.22 3.22 4 3.5 4h4.25l4.25 5.5V11.5c0 .28-.22.5-.5.5H3.5A.5.5 0 0 1 3 11.5v-7z" fill="#000"/></svg>
+            <span style="font-size:14px;font-weight:700">Notion</span>
+          </div>
+          <div id="notion-profil-status" style="padding:8px 12px;background:#F5F5F5;border-radius:8px;font-size:12px;color:#616161;margin-bottom:12px">Prêt à synchroniser</div>
+          <button class="btn btn-sm" style="width:100%;background:#000;color:#fff;border-radius:10px;padding:10px;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px" onclick="showNotionPanelTech()">
+            🔗 Synchroniser avec Notion
+          </button>
+        </div>
+
+        <!-- Export -->
+        <div class="card" style="margin:0 0 20px">
+          <div style="font-size:14px;font-weight:700;margin-bottom:10px">📤 Exporter</div>
+          <button class="btn btn-gray btn-sm" style="width:100%" onclick="exportJournee()">Exporter ma journée (.txt)</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+
+  <!-- TABS -->
+  <div id="tabs">
+    <button class="tab on" onclick="goTab('depart')" id="tab-depart">
+      <span class="ti">🚀</span><span class="tl">Départ</span>
+      <span class="tbadge" id="badge-dep"></span>
+    </button>
+    <button class="tab" onclick="goTab('planning')" id="tab-planning">
+      <span class="ti">📅</span><span class="tl">Planning</span>
+    </button>
+    <button class="tab" onclick="goTab('materiel')" id="tab-materiel">
+      <span class="ti">📦</span><span class="tl">Matériel</span>
+      <span class="tbadge" id="badge-mat"></span>
+    </button>
+    <button class="tab" onclick="goTab('profil')" id="tab-profil">
+      <span class="ti">👤</span><span class="tl">Profil</span>
+    </button>
+  </div>
+</div><!-- /app -->
+
+<!-- TECH SELECTOR -->
+<div id="tech-overlay" onclick="if(event.target===this)closeTechSelect()">
+  <div id="tech-sheet">
+    <div style="font-size:17px;font-weight:800;margin-bottom:16px">Qui êtes-vous ?</div>
+    <div id="tech-opts"></div>
+  </div>
+</div>
+
+<!-- CONTACT EDIT MODAL -->
+<div id="contact-modal">
+  <div id="contact-sheet">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-size:16px;font-weight:800">✏️ Modifier le contact</div>
+      <button onclick="closeContactModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--gray)">✕</button>
+    </div>
+    <div id="contact-modal-client" style="font-size:13px;color:var(--gray);margin-bottom:14px"></div>
+    <div style="font-size:12px;color:var(--gray);margin-bottom:4px">Nom du contact</div>
+    <input class="inp" id="cm-contact" placeholder="Prénom NOM"/>
+    <div style="font-size:12px;color:var(--gray);margin-bottom:4px">Téléphone</div>
+    <input class="inp" id="cm-phone" type="tel" placeholder="06 xx xx xx xx"/>
+    <div style="font-size:12px;color:var(--gray);margin-bottom:4px">Email</div>
+    <input class="inp" id="cm-email" type="email" placeholder="contact@client.fr"/>
+    <div style="font-size:12px;color:var(--gray);margin-bottom:4px">Notes terrain</div>
+    <textarea class="inp" id="cm-notes" rows="3" placeholder="Observations de l'intervention..."></textarea>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="btn btn-gray btn-sm" style="flex:1" onclick="closeContactModal()">Annuler</button>
+      <button class="btn btn-blue btn-sm" style="flex:2" onclick="saveContactModal()">✅ Enregistrer & sync</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════
+// DONNÉES — synchronisées avec l'app admin
+// ════════════════════════════════════════════
+const TECHS_DEFAULT=[
+  {id:1,name:"Cindy",     init:"CI",vehicle:"Renault Trafic", conso:7.5,avail:true, color:"#1565C0",depotAddr:"7 rue des entrepreneurs, 78540 Vernouillet"},
+  {id:2,name:"Priscillia",init:"PR",vehicle:"Citroën Jumpy",  conso:7.0,avail:true, color:"#7B1FA2",depotAddr:"7 rue des entrepreneurs, 78540 Vernouillet"},
+  {id:3,name:"Yaniss",    init:"YA",vehicle:"Peugeot Expert", conso:6.8,avail:true, color:"#00695C",depotAddr:"7 rue des entrepreneurs, 78540 Vernouillet"},
+  {id:4,name:"Nathan",    init:"NA",vehicle:"—",              conso:7.0,avail:true, color:"#B71C1C",depotAddr:"7 rue des entrepreneurs, 78540 Vernouillet"},
+  {id:5,name:"Johann",    init:"JO",vehicle:"—",              conso:7.0,avail:true, color:"#E65100",depotAddr:"7 rue des entrepreneurs, 78540 Vernouillet"},
+]
+let TECHS=TECHS_DEFAULT
+try{
+  const s=localStorage.getItem("tech_depots")
+  if(s){
+    const saved=JSON.parse(s)
+    if(Array.isArray(saved)&&saved.length){
+      // Fusion : on garde les valeurs par défaut pour les champs manquants (ex: avail)
+      TECHS=saved.map(d=>{
+        const def=TECHS_DEFAULT.find(t=>t.id===d.id)||{}
+        return {...def,...d,avail:d.avail!==undefined?d.avail:true}
+      })
+      // Techs ajoutés dans l'admin mais absents des defaults
+      saved.forEach(d=>{if(!TECHS_DEFAULT.find(t=>t.id===d.id)&&!TECHS.find(t=>t.id===d.id))TECHS.push({avail:true,...d})})
+    }
+  }
+}catch(e){}
+const TYPES={
+  maintenance_simple:{label:"Maintenance",dur:15,color:"#1565C0"},
+  maintenance_complex:{label:"Maintenance+",dur:25,color:"#6A1B9A"},
+  installation:{label:"Installation",dur:35,color:"#2E7D32"},
+}
+// Interventions — clé partagée avec l'app admin (optiq_ivs_data)
+let ivs=[]
+try{const s=localStorage.getItem("optiq_ivs_data");if(s){const p=JSON.parse(s);if(Array.isArray(p))ivs=p}}catch(e){}
+function saveIvs(){try{localStorage.setItem("optiq_ivs_data",JSON.stringify(ivs))}catch(e){}}
+
+// ════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════
+let curTech=1, curTab="depart", planSel=TODAY(), gCache={}, mapObj=null, mapRoute=null
+let mapMarkers={}, building=false, cmEditId=null, techRouteOrder={}, _dragId=null
+let validated={}, failed={}
+let techETAs={}  // { [ivId]: {eta:"08:32", leave:"08:47"} }
+function syncVFFromIvs(){
+  validated={};failed={}
+  ivs.forEach(i=>{if(i.status==="completed")validated[i.id]=true;else if(i.status==="not_responded")failed[i.id]=true})
+}
+syncVFFromIvs()
+let techCfg={token:"",formId:"",userId:""}
+try{const s=localStorage.getItem("techCfg2");if(s)Object.assign(techCfg,JSON.parse(s))}catch(e){}
+
+// ════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════
+function TODAY(){return new Date().toISOString().split("T")[0]}
+function addDays(d,n){const dt=new Date(d+"T12:00:00");dt.setDate(dt.getDate()+n);return dt.toISOString().split("T")[0]}
+function addYears(d,n){const dt=new Date(d+"T12:00:00");dt.setFullYear(dt.getFullYear()+n);return dt.toISOString().split("T")[0]}
+const MS=["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"]
+const DS=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"]
+function fd(d){if(!d)return "";const dt=new Date(d+"T12:00:00");return dt.getDate()+" "+MS[dt.getMonth()]}
+function fdl(d){if(!d)return "";const dt=new Date(d+"T12:00:00");return DS[dt.getDay()]+" "+dt.getDate()+" "+MS[dt.getMonth()]}
+function fmin(m){if(m<60)return m+"min";return Math.floor(m/60)+"h"+(m%60>0?String(m%60).padStart(2,"0"):"")}
+function dur(t,f){return TYPES[t].dur+(f?10:0)}
+function TB(id){return TECHS.find(t=>t.id===id)||TECHS[0]}
+function addMinToTime(hhmm,mins){const[h,m]=hhmm.split(':').map(Number);const t=h*60+m+mins;return`${String(Math.floor(t/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`}
+function depStartTime(){return document.getElementById('dep-time')?.value||techCfg.startTime||'08:00'}
+function myIvs(date){return ivs.filter(i=>i.date===date&&i.techId===curTech)}
+function saveCfg(){try{localStorage.setItem("techCfg2",JSON.stringify(techCfg))}catch(e){}}
+function saveVF(){saveIvs()} // état dérivé de iv.status, persisté via saveIvs
+
+// ── Ordre de tournée partagé admin ↔ tech ──
+function saveRouteOrder(date){
+  try{
+    const stored=JSON.parse(localStorage.getItem("optiq_route_order")||"{}")
+    stored[`${curTech}_${date}`]=techRouteOrder[date]||[]
+    localStorage.setItem("optiq_route_order",JSON.stringify(stored))
+  }catch(e){}
+}
+function loadRouteOrder(date){
+  try{
+    const stored=JSON.parse(localStorage.getItem("optiq_route_order")||"{}")
+    const ids=stored[`${curTech}_${date}`]
+    if(ids?.length) techRouteOrder[date]=ids
+  }catch(e){}
+}
+function dropCard(targetId){
+  if(_dragId===null||_dragId===targetId){_dragId=null;return}
+  const date=depDate()
+  const base=myIvs(date).map(i=>i.id)
+  const order=[...(techRouteOrder[date]||base)]
+  const fi=order.indexOf(_dragId),ti=order.indexOf(targetId)
+  if(fi===-1||ti===-1){_dragId=null;return}
+  order.splice(fi,1);order.splice(ti,0,_dragId)
+  techRouteOrder[date]=order
+  saveRouteOrder(date)
+  _dragId=null
+  renderDepart()
+  // Mettre à jour les numéros sur la carte
+  order.forEach((id,idx)=>{
+    if(mapMarkers[id]){
+      const iv=ivs.find(i=>i.id===id)
+      const done=validated[id],fail=failed[id]
+      const col=done?"#2E7D32":fail?"#C62828":TYPES[iv?.type||"maintenance_simple"].color
+      mapMarkers[id].setIcon(mkIcon(done?"✓":fail?"✗":(idx+1),col))
+    }
+  })
+}
+
+let toastTimer
+function toast(msg,col="#212121",dur=2800){
+  const el=document.getElementById("toast")
+  el.textContent=msg;el.style.background=col;el.classList.add("show")
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove("show"),dur)
+}
+
+// ════════════════════════════════════════════
+// NAVIGATION
+// ════════════════════════════════════════════
+function goTab(tab){
+  curTab=tab
+  document.querySelectorAll(".view").forEach(v=>v.classList.remove("on"))
+  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("on"))
+  document.getElementById("v-"+tab).classList.add("on")
+  document.getElementById("tab-"+tab).classList.add("on")
+  document.getElementById("btn-gps-all").style.display=tab==="depart"?"block":"none"
+  if(tab==="depart")renderDepart()
+  else if(tab==="planning")renderPlanning()
+  else if(tab==="materiel")renderMateriel()
+  else if(tab==="profil")renderProfil()
+}
+
+// ════════════════════════════════════════════
+// SÉLECTION TECH
+// ════════════════════════════════════════════
+function openTechSelect(){
+  document.getElementById("tech-opts").innerHTML=TECHS.filter(t=>t.avail!==false).map(t=>{
+    const myCount=ivs.filter(i=>i.techId===t.id&&i.date>=TODAY()&&i.status==="pending").length
+    return `<div class="tech-opt ${t.id===curTech?"on":""}" onclick="selectTech(${t.id})">
+      <div class="tech-av" style="background:${t.color||"var(--blue)"}20;color:${t.color||"var(--blue)"}">${t.init}</div>
+      <div style="flex:1">
+        <div style="font-size:16px;font-weight:700">${t.name}</div>
+        <div style="font-size:12px;color:var(--gray)">${t.vehicle} · ${t.conso}L/100</div>
+        <div style="font-size:11px;color:var(--blue);margin-top:2px">${myCount} intervention${myCount>1?"s":""} à venir</div>
+      </div>
+      ${t.id===curTech?`<span style="font-size:22px;color:${t.color||"var(--blue)"}">✓</span>`:""}
+    </div>`}).join("")
+  document.getElementById("tech-overlay").classList.add("open")
+}
+function closeTechSelect(){document.getElementById("tech-overlay").classList.remove("open")}
+function selectTech(id){
+  curTech=id;closeTechSelect()
+  try{localStorage.setItem("tech_id",id)}catch(e){}
+  updateTopbar();updateBadges();goTab(curTab)
+}
+function updateTopbar(syncMsg){
+  const tc=TB(curTech)
+  const btn=document.getElementById("btn-tech")
+  if(btn){
+    btn.textContent="👤 "+tc.name
+    btn.style.background=tc.color||"rgba(255,255,255,.18)"
+  }
+  const sub=document.getElementById("top-sub")
+  const dateStr=new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})
+  if(sub) sub.textContent=syncMsg ? syncMsg : tc.vehicle+" · "+dateStr
+}
+function setTopbarSync(msg){ updateTopbar(msg) }
+
+// ════════════════════════════════════════════
+// BADGES
+// ════════════════════════════════════════════
+function updateBadges(){
+  const ti=myIvs(depDate())
+  const rem=ti.filter(i=>!validated[i.id]&&!failed[i.id]).length
+  const bd=document.getElementById("badge-dep")
+  if(bd){bd.textContent=rem;bd.style.display=rem>0?"block":"none"}
+  const pp=ivs.filter(i=>i.techId===curTech&&i.date===depDate()&&i.padPak)
+  const bm=document.getElementById("badge-mat")
+  if(bm){bm.textContent="⚡";bm.style.display=pp.length?"block":"none"}
+}
+function depDate(){return document.getElementById("dep-date")?.value||TODAY()}
+function onDepDateChange(){renderDepart();updateBadges()}
+
+// ════════════════════════════════════════════
+// DÉPART DU JOUR
+// ════════════════════════════════════════════
+function renderDepart(){
+  const date=depDate()
+  if(!techRouteOrder[date]) loadRouteOrder(date)
+  const allIvs=myIvs(date)
+  const order=techRouteOrder[date]
+  const dayIvs=order?order.map(id=>allIvs.find(i=>i.id===id)).filter(Boolean):[...allIvs]
+  const doneN=dayIvs.filter(i=>validated[i.id]).length
+  const failN=dayIvs.filter(i=>failed[i.id]).length
+  document.getElementById("dep-list-hd").textContent=`${dayIvs.length} client${dayIvs.length>1?"s":""}`
+  document.getElementById("dep-list-badge").textContent=`✓${doneN} ✗${failN}`
+  document.getElementById("dep-done").textContent=doneN+"/"+dayIvs.length
+  const kpi=document.getElementById("dep-kpi")
+  if(kpi&&kpi.style.display!=="none") kpi.style.display=dayIvs.length?"flex":"none"
+
+  const empty=document.getElementById("dep-list-empty")
+  const list=document.getElementById("dep-list")
+  if(!dayIvs.length){if(empty)empty.style.display="block";if(list)list.innerHTML="";return}
+  if(empty)empty.style.display="none"
+
+  list.innerHTML=dayIvs.map((iv,idx)=>{
+    const done=validated[iv.id], fail=failed[iv.id]
+    const col=done?"#2E7D32":fail?"#C62828":TYPES[iv.type].color
+    const lbl=done?"✓":fail?"✗":(idx+1)
+    return `<div class="dc ${done?"vdone":fail?"vfail":""}" id="dc-${iv.id}"
+      draggable="true"
+      ondragstart="_dragId=${iv.id};event.dataTransfer.effectAllowed='move'"
+      ondragover="event.preventDefault();this.classList.add('drag-over')"
+      ondragleave="this.classList.remove('drag-over')"
+      ondrop="event.preventDefault();this.classList.remove('drag-over');dropCard(${iv.id})"
+      onclick="focusClient(${iv.id})">
+      <div class="dc-top">
+        <div class="dc-drag" onclick="event.stopPropagation()" title="Déplacer l'ordre">☰</div>
+        <div class="dc-num" style="background:${col}">${lbl}</div>
+        <div class="dc-info">
+          <div class="dc-client">${iv.client}</div>
+          <div class="dc-addr">📍 ${iv.addr}</div>
+          ${iv.contact?`<div style="font-size:11px;color:var(--blue);margin-top:2px">👤 ${iv.contact}${iv.cphone?` <a href="tel:${iv.cphone}" onclick="event.stopPropagation()" style="color:var(--blue)">📞</a>`:""}</div>`:""}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0" onclick="event.stopPropagation()">
+          <a href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(iv.addr)}"
+             target="_blank" style="text-decoration:none;font-size:20px;line-height:1;display:block;text-align:center" title="Google Maps">🗺️</a>
+          <a href="https://waze.com/ul?q=${encodeURIComponent(iv.addr)}&navigate=yes"
+             target="_blank" style="text-decoration:none;display:flex;align-items:center;justify-content:center;background:#05C8F7;color:#fff;border-radius:8px;padding:3px 6px;font-size:10px;font-weight:700;gap:3px" title="Waze">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M20.54 6.63C19.26 3.1 15.97 1 12.25 1 7.32 1 3.28 4.81 3.28 9.65c0 2.17.8 4.24 2.25 5.85l.12 3.55 3.36-1.49c1 .29 2.01.44 3.02.44.11 0 .22 0 .33-.01l.03.01c.67 0 1.33-.07 1.97-.2l3.62 1.61-.13-3.74c1.44-1.35 2.34-3.11 2.5-5.02.03-.35.05-.69.05-1.02 0-.67-.08-1.35-.22-2h-.02l-.64 2.5z"/></svg>
+            Waze
+          </a>
+        </div>
+      </div>
+      <div class="dc-tags">
+        <span class="tag tag-info">${TYPES[iv.type].label} · ${fmin(dur(iv.type,iv.form))}</span>
+        ${techETAs[iv.id]?`<span class="tag" style="background:#E8F5E9;color:#2E7D32;font-weight:600">🕐 ${techETAs[iv.id].eta} → ${techETAs[iv.id].leave}</span>`:""}
+        ${iv.padPak?`<span class="tag tag-warn">⚡ Pad Pak</span>`:""}
+        ${iv.form?`<span class="tag" style="background:#F3E5F5;color:#6A1B9A">+Formation</span>`:""}
+        ${done?`<span class="tag tag-ok">✅ Kizeo sync</span>`:""}
+        ${fail?`<span class="tag tag-err">✗ Échec</span>`:""}
+      </div>
+      ${iv.notes?`<div style="padding:2px 10px 5px;font-size:11px;color:var(--orange);background:#FFF8E1;margin:0 6px;border-radius:6px">📝 ${iv.notes}</div>`:""}
+      <!-- BOUTONS VALIDATION — toujours visibles -->
+      <div class="dc-btns" onclick="event.stopPropagation()">
+        <button class="vbtn vbtn-v ${done?"active":""}" onclick="validateIv(${iv.id})">
+          ${done?"✅ Validé":"✓ Valider"}
+        </button>
+        <button class="vbtn vbtn-f ${fail?"active":""}" onclick="failIv(${iv.id})">
+          ${fail?"❌ Échec":"✕ Échec"}
+        </button>
+      </div>
+      <!-- Détail dépliable -->
+      <div class="dc-detail" id="dcd-${iv.id}">
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${iv.cemail?`<a href="mailto:${iv.cemail}" style="font-size:12px;color:var(--blue)">✉️ ${iv.cemail}</a>`:""}
+          <button onclick="openContactModal(${iv.id})" class="btn btn-gray" style="padding:5px 10px;font-size:11px">✏️ Modifier contact</button>
+        </div>
+        ${iv.padPak&&iv.padPakDate?`<div style="margin-top:6px;font-size:12px;color:var(--orange)">⚡ Péremption Pad Pak : ${fd(iv.padPakDate)}</div>`:""}
+      </div>
+    </div>`
+  }).join("")
+  updateBadges()
+  // Rouvrir les éléments ouverts
+  document.querySelectorAll(".dc").forEach(el=>{
+    const det=el.querySelector(".dc-detail")
+    if(det) det.style.display="none"
+  })
+}
+
+function focusClient(id){
+  // Highlight dans la liste
+  document.querySelectorAll(".dc").forEach(el=>el.classList.remove("sel"))
+  const card=document.getElementById("dc-"+id)
+  if(card){
+    card.classList.add("sel")
+    card.scrollIntoView({block:"nearest",behavior:"smooth"})
+    // Toggle détail
+    const det=document.getElementById("dcd-"+id)
+    if(det) det.style.display=det.style.display==="block"?"none":"block"
+  }
+  // Focus carte
+  if(mapMarkers[id]&&mapObj){
+    mapObj.panTo(mapMarkers[id].getLatLng(),{animate:true})
+    mapMarkers[id].openPopup()
+    const iv=ivs.find(i=>i.id===id)
+    const tag=document.getElementById("dep-focus-tag")
+    if(tag&&iv){tag.textContent=iv.client;tag.style.display="block";setTimeout(()=>tag.style.display="none",3000)}
+  }
+}
+
+// ════════════════════════════════════════════
+// VALIDATION + KIZEO + PROCHAINE MAINTENANCE
+// ════════════════════════════════════════════
+function validateIv(id){
+  const wasValidated=validated[id]
+  validated[id]=!wasValidated
+  if(validated[id]){
+    failed[id]=false
+    updIvStatus(id,"completed")
+    autoNextMaintenance(id)
+    pushToKizeo(id,"completed")
+    pushStatusToNotion(id,"completed")
+    toast("✅ Validé — sync Kizeo + Notion","#2E7D32")
+  } else {
+    updIvStatus(id,"pending")
+  }
+  saveVF();updateMarkerCol(id);renderDepart()
+}
+
+function failIv(id){
+  const wasFailed=failed[id]
+  failed[id]=!wasFailed
+  if(failed[id]){
+    validated[id]=false
+    updIvStatus(id,"not_responded")
+    pushToKizeo(id,"not_responded")
+    pushStatusToNotion(id,"not_responded")
+    toast("Échec enregistré","#C62828")
+  } else {
+    updIvStatus(id,"pending")
+  }
+  saveVF();updateMarkerCol(id);renderDepart()
+}
+
+function updIvStatus(id,status){
+  ivs=ivs.map(i=>i.id===id?{...i,status}:i)
+  saveIvs()
+}
+
+// ① Créer automatiquement la prochaine maintenance (dans 1 an)
+function autoNextMaintenance(id){
+  const iv=ivs.find(i=>i.id===id)
+  if(!iv||iv.type==="installation") return
+  const nextDate=addYears(iv.date,1)
+  const already=ivs.find(i=>i.client===iv.client&&i.addr===iv.addr&&i.date===nextDate&&i.status!=="completed")
+  if(already) return
+  const newId=Math.max(0,...ivs.map(i=>i.id))+1
+  const needPadPak=iv.padPakDate?(new Date()-new Date(iv.padPakDate+"T12:00:00"))/(1000*60*60*24*365)>=1.5:false
+  ivs.push({
+    ...iv,
+    id:newId,
+    date:nextDate,
+    status:"pending",
+    type:"maintenance_simple",
+    padPak:needPadPak,
+    padPakDate:iv.padPakDate||"",
+    notes:"Maintenance annuelle — planifiée auto (tech validé le "+fd(iv.date)+")"
+  })
+  saveIvs()
+}
+
+// ② Push vers Kizeo (via proxy Netlify si disponible)
+async function pushToKizeo(id, statut){
+  const iv=ivs.find(i=>i.id===id)
+  if(!iv) return
+  if(!techCfg.token||!techCfg.formId||!techCfg.userId) return
+  const isLocal=location.protocol==="file:"||!location.hostname.includes("netlify")
+  if(isLocal){console.log("DEMO push Kizeo:",statut,iv.client);return}
+  try{
+    await fetch("/api/kizeo",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        action:"push_intervention",
+        token:techCfg.token,
+        formId:techCfg.formId,
+        data:{
+          recipientUserId:parseInt(techCfg.userId),
+          fields:{
+            "statut_intervention":  {value:statut==="completed"?"Terminé":"Échec / Non répondu"},
+            "societe":              {value:iv.client},
+            "adresse_site":         {value:iv.addr},
+            "date_intervention":    {value:iv.date},
+            "contact_site":         {value:iv.contact||""},
+            "telephone_site":       {value:iv.cphone||""},
+            "email_site":           {value:iv.cemail||""},
+            "observations":         {value:iv.notes||""},
+            "pad_pak_change":       {value:iv.padPak?"Oui":"Non"},
+            "date_peremption_pad":  {value:iv.padPakDate||""},
+            "prochaine_maintenance":{value:addYears(iv.date,1)},
+          }
+        }
+      })
+    })
+  }catch(e){console.warn("Push Kizeo:",e)}
+}
+
+// ════════════════════════════════════════════
+// MODIFICATION CONTACT (depuis tablette → sync admin)
+// ════════════════════════════════════════════
+function openContactModal(id){
+  const iv=ivs.find(i=>i.id===id)
+  if(!iv) return
+  cmEditId=id
+  document.getElementById("contact-modal-client").textContent=iv.client+" — "+iv.addr
+  document.getElementById("cm-contact").value=iv.contact||""
+  document.getElementById("cm-phone").value=iv.cphone||""
+  document.getElementById("cm-email").value=iv.cemail||""
+  document.getElementById("cm-notes").value=iv.notes||""
+  document.getElementById("contact-modal").classList.add("open")
+}
+function closeContactModal(){
+  document.getElementById("contact-modal").classList.remove("open")
+  cmEditId=null
+}
+function saveContactModal(){
+  if(!cmEditId) return
+  const contact=document.getElementById("cm-contact").value.trim()
+  const cphone=document.getElementById("cm-phone").value.trim()
+  const cemail=document.getElementById("cm-email").value.trim()
+  const notes=document.getElementById("cm-notes").value.trim()
+  // Mettre à jour dans le localStorage (partagé avec admin)
+  ivs=ivs.map(i=>i.id===cmEditId?{...i,contact,cphone,cemail,notes}:i)
+  saveIvs()
+  // Push vers Kizeo avec les nouvelles infos
+  pushToKizeo(cmEditId,ivs.find(i=>i.id===cmEditId)?.status||"pending")
+  toast("✅ Contact mis à jour — sync Kizeo","#1565C0")
+  closeContactModal()
+  renderDepart()
+}
+
+// ════════════════════════════════════════════
+// CARTE LEAFLET
+// ════════════════════════════════════════════
+const DEPOT="7 rue des entrepreneurs, 78540 Vernouillet"
+
+// ── Optimisation locale (fallback si API indisponible) ──
+function _localDist(a,b){return Math.hypot(a.lat-b.lat,a.lng-b.lng)}
+function _localRouteDist(depot,route){
+  if(!route.length) return 0
+  let d=_localDist(depot,route[0])
+  for(let i=1;i<route.length;i++) d+=_localDist(route[i-1],route[i])
+  return d+_localDist(route[route.length-1],depot)
+}
+function localOptimizeRoute(depot,pts){
+  if(pts.length<=1) return pts
+  const toStop=p=>({...p.c,_pt:p})
+  let best=null,bestD=Infinity
+  const starts=[-1,...pts.map((_,i)=>i)]
+  for(const si of starts){
+    const unvis=pts.map(toStop),route=[]
+    let cur=si===-1?depot:unvis[si]
+    if(si>=0){route.push(unvis[si]);unvis.splice(si,1)}
+    while(unvis.length){
+      let bi=0,bd=Infinity
+      for(let i=0;i<unvis.length;i++){const d=_localDist(cur,unvis[i]);if(d<bd){bd=d;bi=i}}
+      cur=unvis[bi];route.push(unvis[bi]);unvis.splice(bi,1)
+    }
+    const d=_localRouteDist(depot,route)
+    if(d<bestD){bestD=d;best=route}
+  }
+  return best.map(s=>s._pt)
+}
+function setProgress(pct,msg){
+  document.getElementById("dep-prog").style.display="block"
+  document.getElementById("dep-prog-fill").style.width=pct+"%"
+  document.getElementById("dep-prog-msg").textContent=msg
+  document.getElementById("dep-prog-pct").textContent=pct+"%"
+}
+function mkIcon(label,col){
+  return L.divIcon({
+    html:`<div style="width:34px;height:34px;background:${col};color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;border:3px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,.4)">${label}</div>`,
+    className:"",iconSize:[34,34],iconAnchor:[17,17],popupAnchor:[0,-20]
+  })
+}
+// ── Moteur 1 : API Adresse gouv.fr (meilleur pour adresses postales FR) ──────
+async function _geocodeAddok(q){
+  try{
+    const r=await fetch('https://api-adresse.data.gouv.fr/search/?q='+encodeURIComponent(q)+'&limit=1')
+    const d=await r.json()
+    if(d.features?.[0]){const[lng,lat]=d.features[0].geometry.coordinates;return{lat,lng}}
+  }catch(e){}
+  return null
+}
+
+// ── Moteur 2 : Photon / Komoot (meilleur pour noms d'entreprises) ────────────
+async function _geocodePhoton(q){
+  try{
+    await new Promise(r=>setTimeout(r,250))
+    const r=await fetch('https://photon.komoot.io/api/?q='+encodeURIComponent(q)+'&limit=1&lang=fr&bbox=-5.1,41.3,9.6,51.1')
+    const d=await r.json()
+    if(d.features?.[0]){const[lng,lat]=d.features[0].geometry.coordinates;return{lat,lng}}
+  }catch(e){}
+  return null
+}
+
+// ── Moteur 3 : Nominatim (dernier recours) ────────────────────────────────────
+async function _geocodeNominatim(q){
+  try{
+    await new Promise(r=>setTimeout(r,1100))
+    const r=await fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(q)+'&format=json&limit=1&countrycodes=fr')
+    const d=await r.json()
+    if(d[0]) return{lat:parseFloat(d[0].lat),lng:parseFloat(d[0].lon)}
+  }catch(e){}
+  return null
+}
+
+// ── Géocode principal : cascade sur 3 moteurs ─────────────────────────────────
+async function geocode(addr){
+  if(!addr||addr==='nan'||addr.length<5) return null
+  if(gCache[addr]) return gCache[addr]
+  let c=await _geocodeAddok(addr)
+  if(!c) c=await _geocodePhoton(addr)
+  if(!c) c=await _geocodeNominatim(addr)
+  if(c) gCache[addr]=c
+  return c||null
+}
+
+// ── Repli étendu : nom société + adresse siège + recherche libre ──────────────
+async function geocodeWithFallback(addr, client='', siege=''){
+  // 1. Adresse exacte (3 moteurs)
+  const c1=await geocode(addr)
+  if(c1) return c1
+  // 2. Nom société + code postal/ville extrait de l'adresse
+  if(client){
+    const m=(addr||'').match(/(\d{5})\s+([^\n,]+)/i)
+    if(m){
+      const q=`${client} ${m[2].trim()}`
+      const c2=(await _geocodeAddok(q))||(await _geocodePhoton(q))
+      if(c2){if(addr)gCache[addr]=c2;return c2}
+    }
+  }
+  // 3. Adresse du siège social
+  if(siege&&siege!=='nan'&&siege!==addr&&siege.length>5){
+    const c3=await geocode(siege)
+    if(c3){if(addr)gCache[addr]=c3;return c3}
+  }
+  // 4. Nom société seul
+  if(client&&client.length>3){
+    const c4=(await _geocodePhoton(client))||(await _geocodeNominatim(client+' France'))
+    if(c4){if(addr)gCache[addr]=c4;return c4}
+  }
+  return null
+}
+
+async function calcMap(){
+  if(building) return
+  building=true
+  const date=depDate()
+  const dayIvs=myIvs(date)
+  document.getElementById("dep-init-msg").style.display="none"
+  document.getElementById("btn-gps-all").style.display="block"
+  document.getElementById("dep-conflict-warn").style.display="none"
+  mapMarkers={}
+
+  if(!mapObj){
+    mapObj=L.map("dep-map",{center:[48.7,2.5],zoom:7,zoomControl:true})
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap",maxZoom:19}).addTo(mapObj)
+  } else {
+    mapObj.eachLayer(l=>{if(l instanceof L.Marker||l instanceof L.Polyline||l instanceof L.GeoJSON)mapObj.removeLayer(l)})
+    mapObj.invalidateSize()
+  }
+  if(!dayIvs.length){building=false;return}
+
+  // Dépôt propre au technicien
+  const tc=TB(curTech)
+  const depotAddr=tc.depotAddr||DEPOT
+  setProgress(5,"Dépôt...")
+  let dc=gCache[depotAddr]
+  if(!dc){
+    dc=(await _geocodeAddok(depotAddr))||(await _geocodeNominatim(depotAddr))||{lat:48.965,lng:1.967}
+    gCache[depotAddr]=dc
+  }
+  L.marker([dc.lat,dc.lng],{icon:mkIcon("D","#2E7D32")}).addTo(mapObj)
+    .bindPopup(`<strong>🏠 Dépôt ${tc.name||''}</strong><br><small>${depotAddr}</small>`)
+
+  // Géocoder toutes les interventions
+  const pts=[]
+  for(let i=0;i<dayIvs.length;i++){
+    setProgress(15+Math.round(i/dayIvs.length*50),"Client "+(i+1)+"/"+dayIvs.length)
+    const c=await geocodeWithFallback(dayIvs[i].addr, dayIvs[i].client, dayIvs[i].siege||'')
+    if(c) pts.push({iv:dayIvs[i],c})
+  }
+
+  // ── Optimisation de l'ordre de tournée ──
+  setProgress(68,"Optimisation...")
+  let orderedPts=pts
+  const[sh,sm]=depStartTime().split(':').map(Number)
+  if(pts.length>1){
+    let apiOk=false
+    try{
+      const payload={techs:[{
+        id:curTech,depot:dc,startH:sh,startMin:sm,
+        stops:pts.map(p=>({
+          id:p.iv.id,lat:p.c.lat,lng:p.c.lng,label:p.iv.client,
+          duration:dur(p.iv.type,p.iv.form),
+          timeWindow:(p.iv.timeStart||p.iv.timeEnd)?{start:p.iv.timeStart||"00:00",end:p.iv.timeEnd||"23:59"}:null
+        }))
+      }]}
+      const res=await fetch('/api/optimize-route',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+      if(res.ok){
+        const data=await res.json()
+        const r=data.results?.[curTech]
+        if(r?.orderedIds?.length){
+          const byId=Object.fromEntries(pts.map(p=>[p.iv.id,p]))
+          const reordered=r.orderedIds.map(id=>byId[id]).filter(Boolean)
+          if(reordered.length===pts.length){
+            orderedPts=reordered
+            apiOk=true
+            // Stocker les ETAs retournées par l'API
+            const arrs=r.estimatedArrivals||{}
+            techETAs={}
+            orderedPts.forEach(p=>{
+              const eta=arrs[p.iv.id]
+              if(eta) techETAs[p.iv.id]={eta,leave:addMinToTime(eta,dur(p.iv.type,p.iv.form))}
+            })
+            if(r.conflicts?.length){
+              const w=document.getElementById("dep-conflict-warn")
+              w.textContent="⚠️ Créneau difficile : "+r.conflicts.map(c=>c.label).join(", ")
+              w.style.display="block"
+            }
+          }
+        }
+      }
+    }catch(e){}
+    if(!apiOk){
+      orderedPts=localOptimizeRoute(dc,pts)
+      // Calcul local des ETAs (Haversine 50km/h ×1.3)
+      techETAs={}
+      let curMin=sh*60+sm,prev=dc
+      orderedPts.forEach(p=>{
+        const dLat=(p.c.lat-prev.lat)*Math.PI/180,dLng=(p.c.lng-prev.lng)*Math.PI/180
+        const a=Math.sin(dLat/2)**2+Math.cos(prev.lat*Math.PI/180)*Math.cos(p.c.lat*Math.PI/180)*Math.sin(dLng/2)**2
+        curMin+=Math.round(6371*2*Math.asin(Math.sqrt(a))*1.3/50*60)
+        const eta=`${String(Math.floor(curMin/60)).padStart(2,'0')}:${String(curMin%60).padStart(2,'0')}`
+        const workMin=dur(p.iv.type,p.iv.form)
+        techETAs[p.iv.id]={eta,leave:addMinToTime(eta,workMin)}
+        curMin+=workMin;prev=p.c
+      })
+    }
+  } else if(pts.length===1){
+    // Un seul stop : ETA simple
+    techETAs={}
+    const p=pts[0]
+    const dLat=(p.c.lat-dc.lat)*Math.PI/180,dLng=(p.c.lng-dc.lng)*Math.PI/180
+    const a=Math.sin(dLat/2)**2+Math.cos(dc.lat*Math.PI/180)*Math.cos(p.c.lat*Math.PI/180)*Math.sin(dLng/2)**2
+    const tMin=Math.round(6371*2*Math.asin(Math.sqrt(a))*1.3/50*60)
+    const eta=`${String(Math.floor((sh*60+sm+tMin)/60)).padStart(2,'0')}:${String((sh*60+sm+tMin)%60).padStart(2,'0')}`
+    techETAs[p.iv.id]={eta,leave:addMinToTime(eta,dur(p.iv.type,p.iv.form))}
+  }
+
+  // Stocker l'ordre et re-rendre la liste
+  techRouteOrder[date]=orderedPts.map(p=>p.iv.id)
+  saveRouteOrder(date)
+  renderDepart()
+
+  // Placer les marqueurs dans l'ordre optimisé
+  orderedPts.forEach((p,idx)=>{
+    const done=validated[p.iv.id],fail=failed[p.iv.id]
+    const col=done?"#2E7D32":fail?"#C62828":TYPES[p.iv.type].color
+    const lbl=done?"✓":fail?"✗":(idx+1)
+    const mk=L.marker([p.c.lat,p.c.lng],{icon:mkIcon(lbl,col)}).addTo(mapObj)
+    mk.bindPopup(`<strong>${idx+1}. ${p.iv.client}</strong><br><small>${p.iv.addr}</small>${p.iv.padPak?"<br><small style='color:#E65100'>⚡ Pad Pak à changer</small>":""}`)
+    mk.on("click",()=>focusClient(p.iv.id))
+    mapMarkers[p.iv.id]=mk
+  })
+
+  setProgress(80,"Itinéraire OSRM...")
+  if(orderedPts.length>0){
+    const all=[dc,...orderedPts.map(p=>p.c),dc]
+    try{
+      const cs=all.map(p=>p.lng+","+p.lat).join(";")
+      const res=await fetch("https://router.project-osrm.org/route/v1/driving/"+cs+"?overview=full&geometries=geojson")
+      const data=await res.json()
+      if(data.routes?.[0]){
+        const rt=data.routes[0]
+        const km=Math.round(rt.distance/1000)
+        const tmin=Math.round(rt.duration/60)
+        document.getElementById("dep-km").textContent=km
+        document.getElementById("dep-dur").textContent=fmin(tmin)
+        const kpiEl=document.getElementById("dep-kpi")
+        if(kpiEl) kpiEl.style.display="flex"
+        L.geoJSON(rt.geometry,{style:{color:"#1565C0",weight:5,opacity:.85}}).addTo(mapObj)
+        mapObj.fitBounds(L.geoJSON(rt.geometry).getBounds(),{padding:[40,40]})
+      }
+    }catch(e){
+      if(orderedPts.length) mapObj.fitBounds(L.latLngBounds(orderedPts.map(p=>[p.c.lat,p.c.lng])),{padding:[50,50]})
+    }
+  }
+  setProgress(100,"✓")
+  setTimeout(()=>document.getElementById("dep-prog").style.display="none",800)
+  building=false
+  if(window.innerWidth<640) showDepMap()
+}
+
+function showDepMap(){
+  const split=document.getElementById('dep-split')
+  const btn=document.getElementById('btn-map-toggle')
+  split.classList.add('map-on')
+  if(btn) btn.textContent='📋 Liste'
+  if(mapObj) setTimeout(()=>mapObj.invalidateSize(),300)
+}
+
+function toggleDepMap(){
+  const split=document.getElementById('dep-split')
+  const btn=document.getElementById('btn-map-toggle')
+  const on=split.classList.toggle('map-on')
+  if(btn) btn.textContent=on?'📋 Liste':'🗺️ Carte'
+  if(on&&mapObj) setTimeout(()=>mapObj.invalidateSize(),300)
+}
+
+function updateMarkerCol(id){
+  if(!mapMarkers[id]) return
+  const iv=ivs.find(i=>i.id===id)
+  const done=validated[id],fail=failed[id]
+  const col=done?"#2E7D32":fail?"#C62828":TYPES[iv?.type||"maintenance_simple"].color
+  const date=depDate()
+  const order=techRouteOrder[date]
+  const orderedIvs=order?order.map(oid=>ivs.find(i=>i.id===oid)).filter(Boolean):myIvs(date)
+  const idx=orderedIvs.findIndex(i=>i.id===id)
+  const lbl=done?"✓":fail?"✗":(idx+1)
+  mapMarkers[id].setIcon(mkIcon(lbl,col))
+}
+
+function openGPSAll(){
+  const date=depDate()
+  const allRem=myIvs(date).filter(i=>!validated[i.id])
+  const order=techRouteOrder[date]
+  const rem=order?order.map(id=>allRem.find(i=>i.id===id)).filter(Boolean):allRem
+  if(!rem.length){toast("Toutes validées 🎉","#2E7D32");return}
+  const tc=TB(curTech)
+  const depotAddr=tc.depotAddr||DEPOT
+  const pts=[depotAddr,...rem.map(i=>i.addr)].map(a=>encodeURIComponent(a))
+  window.open("https://www.google.com/maps/dir/"+pts.join("/"),"_blank")
+}
+
+// ════════════════════════════════════════════
+// PLANNING SEMAINE
+// ════════════════════════════════════════════
+function renderPlanning(){
+  const d=new Date(planSel+"T12:00:00"),wd=d.getDay()
+  const mon=new Date(d);mon.setDate(d.getDate()-(wd===0?6:wd-1))
+  const week=Array.from({length:7},(_,i)=>{const x=new Date(mon);x.setDate(mon.getDate()+i);return x.toISOString().split("T")[0]})
+  const today=TODAY()
+  const dp=document.getElementById("plan-date-pick");if(dp)dp.value=planSel
+  document.getElementById("wstrip").innerHTML=week.map(date=>{
+    const n=myIvs(date).length,done=myIvs(date).filter(i=>validated[i.id]).length
+    const isSel=date===planSel,isT=date===today
+    return `<div class="wpill ${isSel?"on":isT?"today":""}" onclick="planSel='${date}';renderPlanning()">
+      <div class="pl">${DS[new Date(date+"T12:00:00").getDay()]}</div>
+      <div class="pn">${date.split("-")[2]}</div>
+      ${n?`<span class="pc">${done}/${n}</span>`:""}
+    </div>`
+  }).join("")
+  document.getElementById("plan-title").textContent=fdl(planSel)
+  const dayIvs=myIvs(planSel)
+  document.getElementById("plan-list").innerHTML=!dayIvs.length
+    ?`<div style="padding:40px;text-align:center;color:var(--gray)">Aucune intervention</div>`
+    :dayIvs.map((iv,idx)=>{
+      const done=validated[iv.id],fail=failed[iv.id]
+      const col=done?"#2E7D32":fail?"#C62828":TYPES[iv.type].color
+      return `<div class="dc ${done?"vdone":fail?"vfail":""}" style="margin-bottom:1px">
+        <div class="dc-top" onclick="">
+          <div class="dc-num" style="background:${col}">${done?"✓":fail?"✗":(idx+1)}</div>
+          <div class="dc-info">
+            <div class="dc-client">${iv.client}</div>
+            <div class="dc-addr">📍 ${iv.addr}</div>
+            ${iv.contact?`<div style="font-size:11px;color:var(--blue);margin-top:2px">👤 ${iv.contact}${iv.cphone?` — <a href="tel:${iv.cphone}" style="color:var(--blue)">${iv.cphone}</a>`:""}</div>`:""}
+          </div>
+          <a href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(iv.addr)}" target="_blank" style="text-decoration:none;font-size:22px;padding:4px">🗺️</a>
+        </div>
+        ${iv.padPak?`<div class="dc-tags"><span class="tag tag-warn">⚡ Pad Pak</span></div>`:""}
+        ${iv.notes?`<div style="padding:2px 10px 5px;font-size:11px;color:var(--orange)">📝 ${iv.notes}</div>`:""}
+        <div class="dc-btns">
+          <button class="vbtn vbtn-v ${done?"active":""}" onclick="validated[${iv.id}]=!validated[${iv.id}];if(validated[${iv.id}]){failed[${iv.id}]=false;updIvStatus(${iv.id},'completed');autoNextMaintenance(${iv.id});pushToKizeo(${iv.id},'completed');pushStatusToNotion(${iv.id},'completed');toast('✅ Validé — sync Kizeo + Notion','#2E7D32')}else{updIvStatus(${iv.id},'pending');pushStatusToNotion(${iv.id},'pending')};saveVF();renderPlanning()">
+            ${done?"✅ Validé":"✓ Valider"}
+          </button>
+          <button class="vbtn vbtn-f ${fail?"active":""}" onclick="failed[${iv.id}]=!failed[${iv.id}];if(failed[${iv.id}]){validated[${iv.id}]=false;updIvStatus(${iv.id},'not_responded');pushToKizeo(${iv.id},'not_responded');pushStatusToNotion(${iv.id},'not_responded');toast('Échec — sync Kizeo + Notion','#C62828')}else{updIvStatus(${iv.id},'pending');pushStatusToNotion(${iv.id},'pending')};saveVF();renderPlanning()">
+            ${fail?"❌ Échec":"✕ Échec"}
+          </button>
+        </div>
+      </div>`
+    }).join("")
+}
+
+// ════════════════════════════════════════════
+// MATÉRIEL
+// ════════════════════════════════════════════
+function renderMateriel(){
+  const date=depDate()
+  const dayIvs=myIvs(date)
+  document.getElementById("mat-title").textContent=`Matériel — ${fdl(date)}`
+  const padpaks=dayIvs.filter(i=>i.padPak)
+  const installs=dayIvs.filter(i=>i.type==="installation")
+  const bats=dayIvs.filter(i=>i.padPak||i.type==="installation")
+  const al=document.getElementById("mat-alert")
+  if(padpaks.length){
+    al.style.display="block"
+    al.innerHTML=`⚡ ${padpaks.length} Pad Pak à changer :<br>${padpaks.map(i=>"• "+i.client+(i.padPakDate?" (périmé "+fd(i.padPakDate)+")":"")).join("<br>")}`
+  } else al.style.display="none"
+  const rows=[
+    padpaks.length?{i:"⚡",n:padpaks.length,l:"Pad Pak",s:"Électrodes à remplacer",c:"var(--orange)"}:null,
+    bats.length?{i:"🔋",n:bats.length,l:"Batteries",s:"Piles de rechange",c:"var(--blue)"}:null,
+    installs.length?{i:"🏥",n:installs.length,l:"DEA complets",s:"Nouvelles installations",c:"var(--green)"}:null,
+    dayIvs.length?{i:"📋",n:dayIvs.length,l:"Fiches Kizeo",s:"À remplir après intervention",c:"var(--purple)"}:null,
+  ].filter(Boolean)
+  document.getElementById("mat-totaux").innerHTML=!rows.length
+    ?`<div style="padding:24px;text-align:center;color:var(--gray)">Aucun matériel spécifique</div>`
+    :rows.map(r=>`<div class="mat-row">
+      <div class="mat-ico">${r.i}</div>
+      <div><div class="mat-n" style="color:${r.c}">${r.n}</div><div style="font-size:14px;font-weight:700">${r.l}</div><div style="font-size:12px;color:var(--gray)">${r.s}</div></div>
+    </div>`).join("")
+  document.getElementById("mat-detail").innerHTML=dayIvs.map(iv=>`
+    <div class="dc" style="margin:5px 12px;border-radius:10px">
+      <div class="dc-top">
+        <div style="font-size:18px">${iv.type==="installation"?"🏥":iv.padPak?"⚡":"🔧"}</div>
+        <div class="dc-info">
+          <div class="dc-client">${iv.client}</div>
+          <div class="dc-addr" style="font-size:11px">${TYPES[iv.type].label} · ${fmin(dur(iv.type,iv.form))}</div>
+        </div>
+      </div>
+      <div class="dc-tags" style="padding-bottom:8px">
+        ${iv.padPak?`<span class="tag tag-warn">⚡ Pad Pak${iv.padPakDate?" exp. "+fd(iv.padPakDate):""}</span>`:""}
+        ${iv.type==="installation"?`<span class="tag tag-ok">DEA neuf + batterie</span>`:`<span class="tag tag-info">DEA en place</span>`}
+        ${iv.contact?`<span class="tag" style="background:var(--bg);color:var(--gray)">👤 ${iv.contact}</span>`:""}
+      </div>
+    </div>`).join("")
+}
+
+// ════════════════════════════════════════════
+// PROFIL
+// ════════════════════════════════════════════
+function renderProfil(){
+  const tc=TB(curTech)
+  const today=TODAY(),mois=today.substring(0,7)
+  const weekDates=getWeek(today)
+  document.getElementById("prof-av").textContent=tc.init
+  document.getElementById("prof-name").textContent=tc.name
+  document.getElementById("prof-veh").textContent=tc.vehicle+" · "+tc.conso+"L/100km"
+  const mAll=ivs.filter(i=>i.techId===curTech&&i.date.startsWith(mois))
+  const mDone=mAll.filter(i=>i.status==="completed")
+  document.getElementById("prof-mois").textContent=mDone.length
+  document.getElementById("prof-sem").textContent=ivs.filter(i=>i.techId===curTech&&weekDates.includes(i.date)).length
+  document.getElementById("prof-rend").textContent=mAll.length?Math.round(mDone.length/mAll.length*100)+"%":"—"
+  const isDemo=location.protocol==="file:"||(!techCfg.token&&!techCfg.formId)
+  document.getElementById("prof-sync-status").innerHTML=isDemo
+    ?`<span class="sync-tag sync-demo">🔬 Mode démo</span>`
+    :`<span class="sync-tag sync-ok">🔗 Kizeo configuré</span>`
+  document.getElementById("cfg-token").value=techCfg.token||""
+  document.getElementById("cfg-form").value=techCfg.formId||""
+  document.getElementById("cfg-uid").value=techCfg.userId||""
+}
+function getWeek(ref){
+  const d=new Date(ref+"T12:00:00"),wd=d.getDay()
+  const mon=new Date(d);mon.setDate(d.getDate()-(wd===0?6:wd-1))
+  return Array.from({length:7},(_,i)=>{const x=new Date(mon);x.setDate(mon.getDate()+i);return x.toISOString().split("T")[0]})
+}
+
+// ════════════════════════════════════════════
+// SYNC KIZEO (pull depuis tablette)
+// ════════════════════════════════════════════
+async function syncKizeo(){
+  const btn=document.querySelector("#v-profil .btn-blue")
+  const res=document.getElementById("sync-result")
+  if(btn){btn.disabled=true;btn.textContent="⏳ Connexion..."}
+  try{
+    const isLocal=location.protocol==="file:"||!techCfg.token
+    if(isLocal){
+      await new Promise(r=>setTimeout(r,1200))
+      res.innerHTML=`<span style="color:var(--green)">✅ Mode démo — 3 fiches simulées récupérées</span>`
+      toast("✅ Sync OK (démo)","#2E7D32")
+    }else{
+      const resp=await fetch("/api/kizeo",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({action:"pull_unread",token:techCfg.token,formId:techCfg.formId})})
+      const data=await resp.json()
+      const count=data.data?.length||0
+      // Traiter les fiches reçues
+      let updated=0
+      ;(data.data||[]).forEach(rec=>{
+        const f=rec.fields||{}
+        const client=f.societe?.value||f.client?.value||""
+        const addr=f.adresse_site?.value||f.adresse?.value||""
+        const match=ivs.find(iv=>iv.techId===curTech&&iv.client.toLowerCase().includes(client.toLowerCase().substring(0,8)))
+        if(match){
+          if(f.date_peremption_pad?.value) ivs=ivs.map(i=>i.id===match.id?{...i,padPakDate:f.date_peremption_pad.value}:i)
+          if(f.pad_pak_change?.value==="Oui") ivs=ivs.map(i=>i.id===match.id?{...i,padPak:true}:i)
+          updated++
+        }
+      })
+      if(updated) saveIvs()
+      res.innerHTML=`<span style="color:var(--green)">✅ ${count} fiche${count>1?"s":""} récupérée${count>1?"s":""}, ${updated} mise${updated>1?"s":""} à jour</span>`
+      toast(`✅ ${count} fiche${count>1?"s":""} Kizeo synchronisée${count>1?"s":""}`, "#2E7D32")
+    }
+    try{localStorage.setItem("kizeo_last_sync_tech",new Date().toLocaleString("fr-FR"))}catch(e){}
+  }catch(e){
+    res.innerHTML=`<span style="color:var(--red)">❌ ${e.message}</span>`
+    toast("Erreur sync: "+e.message,"#C62828")
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent="🔄 Synchroniser les fiches"}
+  }
+}
+
+// ════════════════════════════════════════════
+// EXPORT JOURNÉE
+// ════════════════════════════════════════════
+function exportJournee(){
+  const date=depDate()
+  const dayIvs=myIvs(date)
+  if(!dayIvs.length){toast("Aucune intervention ce jour");return}
+  const tc=TB(curTech)
+  const lines=[
+    "═══════════════════════════════════",
+    "TOURNÉE DEFILIGNE — "+fdl(date).toUpperCase(),
+    "Technicien : "+tc.name+" ("+tc.vehicle+")",
+    "═══════════════════════════════════",""
+  ]
+  dayIvs.forEach((iv,i)=>{
+    const s=validated[iv.id]?"✅ VALIDÉ":failed[iv.id]?"❌ ÉCHEC":"⏳ En attente"
+    lines.push(`${i+1}. ${iv.client}`)
+    lines.push(`   📍 ${iv.addr}`)
+    lines.push(`   ⏱  ${fmin(dur(iv.type,iv.form))} — ${TYPES[iv.type].label}`)
+    if(iv.padPak)lines.push("   ⚡ PAD PAK À CHANGER"+(iv.padPakDate?" (exp. "+fd(iv.padPakDate)+")":""))
+    if(iv.notes)lines.push("   📝 "+iv.notes)
+    if(iv.contact)lines.push("   👤 "+iv.contact+(iv.cphone?" — "+iv.cphone:""))
+    lines.push("   Statut : "+s)
+    lines.push("")
+  })
+  const blob=new Blob([lines.join("\n")],{type:"text/plain;charset=utf-8"})
+  const a=document.createElement("a")
+  a.href=URL.createObjectURL(blob)
+  a.download=`tournee_${date}_${tc.name}.txt`
+  a.click()
+  toast("📤 Tournée exportée","#2E7D32")
+}
+
+// ════════════════════════════════════════════
+// PLANNING — NAVIGATION SEMAINE
+// ════════════════════════════════════════════
+function shiftPlanWeek(n){
+  const d=new Date(planSel+"T12:00:00")
+  d.setDate(d.getDate()+n)
+  planSel=d.toISOString().split("T")[0]
+  renderPlanning()
+}
+
+// ════════════════════════════════════════════
+// NOTION — Pull & Push
+// ════════════════════════════════════════════
+const NOTION_ENDPOINT='/api/notion'
+const isDeployedApp=location.protocol!=='file:'
+
+function nProp(props,...keys){
+  for(const k of keys){
+    const v=props[k];if(!v)continue
+    if(v.type==='title')        return v.title?.map(t=>t.plain_text).join('')||''
+    if(v.type==='rich_text')    return v.rich_text?.map(t=>t.plain_text).join('')||''
+    if(v.type==='date')         return v.date?.start||''
+    if(v.type==='select')       return v.select?.name||''
+    if(v.type==='multi_select') return v.multi_select?.map(s=>s.name).join(', ')||''
+    if(v.type==='checkbox')     return !!v.checkbox
+    if(v.type==='email')        return v.email||''
+    if(v.type==='phone_number') return v.phone_number||''
+    if(v.type==='number')       return v.number??0
+    if(v.type==='people')       return v.people?.map(p=>p.name).join(', ')||''
+    if(v.type==='status')       return v.status?.name||''
+    if(v.type==='files')        return v.files?.length>0
+  }
+  return ''
+}
+
+function getTechIdFromName(name){
+  const n=(name||'').toLowerCase()
+  if(n.includes('cindy')||n.includes('herbet'))       return 1
+  if(n.includes('priscill')||n.includes('beuzelin'))  return 2
+  if(n.includes('yaniss')||n.includes('bouvet'))      return 3
+  if(n.includes('nathan')||n.includes('salah'))       return 4
+  if(n.includes('johann')||n.includes('monlouis'))    return 5
+  return 0
+}
+
+function getTypeFromStr(s){
+  const v=(s||'').toLowerCase()
+  if(v.includes('install')||v.includes('livraison')||v.includes('500p')||
+     v.includes('360p')||v.includes('350p')||v.includes('cr2')||
+     v.includes('rotaid')||v.includes('pédiatrique')||v.includes('formation')) return 'installation'
+  if(v.includes('pad pak')||v.includes('remplac')||v.includes('armoir')||
+     v.includes('électrode')) return 'maintenance_complex'
+  return 'maintenance_simple'
+}
+
+function notionPageToIvTech(page){
+  const p=page.properties||{}
+  const client   = nProp(p,'Société')
+  const addrSite = nProp(p,'Adresse Site')
+  const addrSiege= nProp(p,'Adresse Siéges')
+  const addr     = addrSite||addrSiege||''
+  const dateStr  = nProp(p,'Date intervention')
+  if(!client||!dateStr) return null
+  const techId   = getTechIdFromName(nProp(p,'Commercial '))
+  const terminer = nProp(p,'Terminer')
+  const echec    = nProp(p,'Echec')
+  let status='pending'
+  if(terminer===true) status='completed'
+  else if(echec===true) status='not_responded'
+  const notionId=page.id
+  const existing=ivs.find(i=>i.notionId===notionId)
+  const ivId=existing?existing.id:Math.max(0,...ivs.map(i=>i.id))+1
+  return {
+    id:ivId, client:client.trim(), addr:addr.trim(), siege:(addrSiege||'').trim(),
+    date:dateStr.substring(0,10), type:getTypeFromStr(nProp(p,'INTERVENTION')),
+    status, techId, form:nProp(p,'Fichier')===true,
+    arm:0, dea:0, bat:0, padPak:false, padPakDate:'',
+    notes:nProp(p,'INFO '), contact:nProp(p,'Contact site'),
+    cphone:nProp(p,'Téléphone'), cemail:nProp(p,'E-mail'),
+    notionId
+  }
+}
+
+async function notionCall(action,extra={}){
+  const r=await fetch(NOTION_ENDPOINT,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action,...extra})
+  })
+  if(!r.ok) throw new Error(`Notion ${r.status}`)
+  return r.json()
+}
+
+async function pullFromNotion(dateFrom, dateTo){
+  const statusEl=document.getElementById('notion-status-tech')
+  const profilEl=document.getElementById('notion-profil-status')
+  const setStatus=(html)=>{if(statusEl)statusEl.innerHTML=html;if(profilEl)profilEl.innerHTML=html}
+  if(!isDeployedApp){
+    setStatus('⚠️ Notion disponible uniquement sur Netlify déployé')
+    return
+  }
+  setStatus('⏳ Connexion à Notion...')
+  try{
+    const data=await notionCall('query_range',{dateFrom,dateTo})
+    const pages=data.results||[]
+    setStatus(`✅ ${pages.length} page${pages.length>1?'s':''} trouvée${pages.length>1?'s':''}...`)
+    let added=0,updated=0
+    pages.forEach(page=>{
+      const iv=notionPageToIvTech(page)
+      if(!iv) return
+      const existIdx=ivs.findIndex(i=>i.notionId===page.id)
+      if(existIdx>=0){ivs[existIdx]={...ivs[existIdx],...iv,id:ivs[existIdx].id};updated++}
+      else{ivs.push(iv);added++}
+    })
+    syncVFFromIvs()
+    saveIvs()
+    const msg=`✅ Notion : +${added} ajouts, ${updated} mises à jour`
+    setStatus(msg)
+    toast(msg,'#2E7D32')
+    renderDepart();renderPlanning();updateBadges()
+  }catch(e){
+    const msg='❌ Notion : '+e.message
+    setStatus(msg)
+    toast(msg,'#C62828')
+  }
+}
+
+async function pullNotionTomorrow(){
+  const today=new Date().toISOString().split('T')[0]
+  const d=new Date();d.setDate(d.getDate()+1)
+  return pullFromNotion(today, d.toISOString().split('T')[0])
+}
+
+async function pullNotionWeek(){
+  const d=new Date()
+  const from=d.toISOString().split('T')[0]
+  const to=new Date(d.setDate(d.getDate()+7)).toISOString().split('T')[0]
+  return pullFromNotion(from,to)
+}
+
+async function pullNotionFullYear(){
+  const now=new Date()
+  const from=new Date(now.getFullYear()-1,0,1).toISOString().split('T')[0]  // 1 jan année passée
+  const to=new Date(now.getFullYear(),11,31).toISOString().split('T')[0]    // 31 déc année en cours
+  return pullFromNotion(from, to)
+}
+
+async function pullNotionLastMonth(){
+  const now=new Date()
+  const first=new Date(now.getFullYear(),now.getMonth()-1,1)
+  const last=new Date(now.getFullYear(),now.getMonth(),0)
+  return pullFromNotion(first.toISOString().split('T')[0],last.toISOString().split('T')[0])
+}
+
+function showNotionPanelTech(){
+  const today=new Date().toISOString().split('T')[0]
+  const d=new Date();d.setDate(d.getDate()+1)
+  const tomorrow=d.toISOString().split('T')[0]
+  const f=document.getElementById('notion-date-from-tech')
+  const t=document.getElementById('notion-date-to-tech')
+  if(f)f.value=today
+  if(t)t.value=tomorrow
+  const modal=document.getElementById('notion-modal-tech')
+  if(modal) modal.style.display='flex'
+}
+
+async function pushStatusToNotion(ivId,newStatus){
+  if(!isDeployedApp) return
+  const iv=ivs.find(i=>i.id===ivId)
+  if(!iv||!iv.notionId) return
+  try{
+    await notionCall('update_page',{
+      pageId:iv.notionId,
+      properties:{
+        'Terminer':{checkbox:newStatus==='completed'},
+        'Echec':{checkbox:newStatus==='not_responded'}
+      }
+    })
+  }catch(e){console.warn('Notion push:',e.message)}
+}
+
+// ── Polling automatique Notion ────────────────────────────────────────────────
+let _pollTimer=null
+let _lastPollTs=0   // timestamp ms de la dernière sync réussie
+
+async function silentPollNotion(){
+  if(!isDeployedApp) return
+  const now=Date.now()
+  if(now-_lastPollTs<55000) return  // anti-double si visibilitychange + timer coincident
+  _lastPollTs=now
+
+  const today=new Date().toISOString().split('T')[0]
+  const d2=new Date(); d2.setDate(d2.getDate()+30)
+  const to=d2.toISOString().split('T')[0]
+
+  try{
+    const data=await notionCall('query_range',{dateFrom:today,dateTo:to})
+    const pages=data.results||[]
+    let changed=0
+
+    pages.forEach(page=>{
+      const fresh=notionPageToIvTech(page)
+      if(!fresh) return
+      const idx=ivs.findIndex(i=>i.notionId===page.id)
+      if(idx>=0){
+        const old=ivs[idx]
+        // Détecter un vrai changement (statut, notes, technicien...)
+        if(old.status!==fresh.status||old.notes!==fresh.notes||old.techId!==fresh.techId) changed++
+        ivs[idx]={...ivs[idx],...fresh,id:ivs[idx].id}
+      } else {
+        ivs.push(fresh)
+        changed++
+      }
+    })
+
+    if(changed>0){
+      syncVFFromIvs()
+      saveIvs()
+      renderDepart();renderPlanning();updateBadges()
+      toast(`🔄 ${changed} mise${changed>1?'s':''} à jour depuis Notion`,'#1565C0',3500)
+    }
+
+    // Mettre à jour le bouton Notion avec l'heure de la dernière sync
+    const hm=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})
+    const btn=document.getElementById('btn-notion-pull')
+    if(btn) btn.textContent=`🔄 ${hm}`
+    const profilEl=document.getElementById('notion-profil-status')
+    if(profilEl) profilEl.innerHTML=`✅ Sync auto : ${hm}${changed>0?` · <strong style="color:#1565C0">${changed} modif.</strong>`:''}`
+
+  }catch(e){
+    console.warn('Notion poll silencieux:',e.message)
+  }
+}
+
+function startNotionPolling(){
+  if(_pollTimer) return
+  _pollTimer=setInterval(()=>{ if(!document.hidden) silentPollNotion() }, 60000)
+  // Sync immédiate si on revient sur l'onglet après > 60s d'absence
+  document.addEventListener('visibilitychange',()=>{
+    if(!document.hidden && Date.now()-_lastPollTs>60000) silentPollNotion()
+  })
+}
+
+// ════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════
+try{const s=localStorage.getItem("tech_id");if(s)curTech=parseInt(s)}catch(e){}
+document.getElementById("dep-date").value=TODAY()
+if(techCfg.startTime){const te=document.getElementById("dep-time");if(te)te.value=techCfg.startTime}
+updateTopbar()
+renderDepart()
+updateBadges()
+
+// ── Auto-chargement Notion au démarrage (année passée + en cours) ─────────────
+;(async function autoLoadNotionTech(){
+  console.log('[OPTIQ] isDeployedApp='+isDeployedApp+' protocol='+location.protocol+' host='+location.hostname)
+  if(!isDeployedApp) return
+  const profilEl=document.getElementById('notion-profil-status')
+  if(profilEl) profilEl.innerHTML='⏳ Chargement en cours...'
+  setTopbarSync('⏳ Chargement Notion...')
+  const todayD=new Date()
+  const today=todayD.toISOString().split('T')[0]
+  // Chargement large : 1 an en arrière + 90 jours en avance
+  const fromD=new Date(); fromD.setFullYear(fromD.getFullYear()-1)
+  const from=fromD.toISOString().split('T')[0]
+  const toD=new Date(); toD.setDate(toD.getDate()+90)
+  const to=toD.toISOString().split('T')[0]
+  console.log('[OPTIQ] Chargement Notion de '+from+' à '+to)
+  try{
+    await pullFromNotion(from, to)
+    console.log('[OPTIQ] Pull réussi — ivs.length='+ivs.length+' curTech='+curTech)
+    console.log('[OPTIQ] techIds dans ivs:', [...new Set(ivs.map(i=>i.techId))])
+    renderDepart()
+    updateBadges()
+    const n=ivs.filter(i=>i.techId===curTech).length
+    const nAujourdhui=ivs.filter(i=>i.date===today&&i.techId===curTech).length
+    const hm=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})
+    const msg=`✅ ${n} intervention${n>1?'s':''} · ${nAujourdhui} aujourd'hui · ${hm}`
+    if(profilEl) profilEl.innerHTML=msg
+    setTopbarSync(null)  // revenir à l'affichage normal
+    toast(`✅ ${n} intervention${n>1?'s':''} chargée${n>1?'s':''} (${nAujourdhui} aujourd'hui)`,'#2E7D32',4000)
+    _lastPollTs=Date.now()
+    const btn=document.getElementById('btn-notion-pull')
+    if(btn) btn.textContent=`🔄 ${hm}`
+    startNotionPolling()  // démarrer le polling auto après le premier chargement réussi
+  }catch(e){
+    console.error('[OPTIQ] Erreur autoLoad:', e.message)
+    if(profilEl) profilEl.innerHTML='⚠️ Notion indisponible — nouvelle tentative dans 8s...'
+    setTopbarSync('⚠️ Notion — nouvelle tentative...')
+    // Retry automatique après 8s (Netlify Functions cold start)
+    setTimeout(async()=>{
+      try{
+        if(profilEl) profilEl.innerHTML='⏳ Nouvelle tentative...'
+        await pullFromNotion(from, to)
+        renderDepart();renderPlanning();updateBadges()
+        const n=ivs.filter(i=>i.techId===curTech).length
+        const nAujourdhui=ivs.filter(i=>i.date===today&&i.techId===curTech).length
+        const hm=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})
+        const msg=`✅ ${n} intervention${n>1?'s':''} · ${nAujourdhui} aujourd'hui · ${hm}`
+        if(profilEl) profilEl.innerHTML=msg
+        setTopbarSync(null)
+        toast(`✅ ${n} intervention${n>1?'s':''} chargée${n>1?'s':''}`,'#2E7D32',4000)
+        _lastPollTs=Date.now()
+        const btn=document.getElementById('btn-notion-pull')
+        if(btn) btn.textContent=`🔄 ${hm}`
+      }catch(e2){
+        if(profilEl) profilEl.innerHTML='❌ Notion indisponible — cliquer sur 🔄 Notion pour réessayer'
+        setTopbarSync('❌ Notion — appuyer sur 🔄')
+        toast('❌ Notion inaccessible','#C62828',5000)
+      }
+    }, 8000)
+    startNotionPolling()  // essayer quand même en arrière-plan
+  }
+})()
+
+// pullNotionTech garde la compatibilité avec les anciens appels
+function pullNotionTech(){showNotionPanelTech()}
+
+// Sync temps réel quand l'admin modifie les données dans un autre onglet
+window.addEventListener('storage',e=>{
+  if(e.key==='optiq_ivs_data'&&e.newValue){
+    try{
+      const p=JSON.parse(e.newValue)
+      if(Array.isArray(p)){ivs=p;syncVFFromIvs();updateBadges();goTab(curTab)}
+    }catch{}
+  }
+  if(e.key==='tech_depots'&&e.newValue){
+    try{
+      const saved=JSON.parse(e.newValue)
+      if(Array.isArray(saved)&&saved.length){
+        TECHS=saved.map(d=>{const def=TECHS_DEFAULT.find(t=>t.id===d.id)||{};return{...def,...d,avail:d.avail!==undefined?d.avail:true}})
+        updateTopbar();goTab(curTab)
+      }
+    }catch{}
+  }
+  if(e.key==='optiq_route_order'&&e.newValue){
+    try{
+      const stored=JSON.parse(e.newValue)
+      const date=depDate()
+      const ids=stored[`${curTech}_${date}`]
+      if(ids?.length){techRouteOrder[date]=ids;renderDepart()}
+    }catch{}
+  }
+})
+</script>
+
+<!-- ══ MODAL NOTION SYNC ══ -->
+<div id="notion-modal-tech" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:900;align-items:center;justify-content:center;padding:16px" onclick="if(event.target===this)this.style.display='none'">
+  <div style="background:#fff;border-radius:16px;padding:24px;width:460px;max-width:100%;box-shadow:0 20px 60px rgba(0,0,0,.2)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <svg width="20" height="20" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="14" height="14" rx="2" fill="#fff" stroke="#000" stroke-width="1.5"/><path d="M3 4.5C3 4.22 3.22 4 3.5 4h4.25l4.25 5.5V11.5c0 .28-.22.5-.5.5H3.5A.5.5 0 0 1 3 11.5v-7z" fill="#000"/></svg>
+        <span style="font-size:16px;font-weight:700">Synchronisation Notion</span>
+      </div>
+      <button onclick="document.getElementById('notion-modal-tech').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;color:#757575">✕</button>
+    </div>
+    <div id="notion-status-tech" style="padding:8px 12px;background:#F5F5F5;border-radius:8px;font-size:13px;margin-bottom:16px;color:#616161">Prêt à synchroniser</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+      <button onclick="pullNotionTomorrow()" style="border:none;cursor:pointer;border-radius:10px;padding:12px 8px;background:#1565C0;color:#fff;display:flex;flex-direction:column;align-items:center;gap:4px;font-family:inherit">
+        <span style="font-size:22px">📅</span>
+        <span style="font-size:13px;font-weight:600">Aujourd'hui + demain</span>
+        <span style="font-size:10px;opacity:.8">Planning immédiat</span>
+      </button>
+      <button onclick="pullNotionWeek()" style="border:none;cursor:pointer;border-radius:10px;padding:12px 8px;background:#1B5E20;color:#fff;display:flex;flex-direction:column;align-items:center;gap:4px;font-family:inherit">
+        <span style="font-size:22px">🗓️</span>
+        <span style="font-size:13px;font-weight:600">7 prochains jours</span>
+        <span style="font-size:10px;opacity:.8">Planning de la semaine</span>
+      </button>
+      <button onclick="pullNotionLastMonth()" style="border:none;cursor:pointer;border-radius:10px;padding:12px 8px;background:#4A148C;color:#fff;display:flex;flex-direction:column;align-items:center;gap:4px;font-family:inherit">
+        <span style="font-size:22px">📆</span>
+        <span style="font-size:13px;font-weight:600">Mois dernier</span>
+        <span style="font-size:10px;opacity:.8">Historique récent</span>
+      </button>
+      <button onclick="pullNotionFullYear()" style="border:none;cursor:pointer;border-radius:10px;padding:12px 8px;background:#B71C1C;color:#fff;display:flex;flex-direction:column;align-items:center;gap:4px;font-family:inherit">
+        <span style="font-size:22px">📂</span>
+        <span style="font-size:13px;font-weight:600">Toute l'année</span>
+        <span style="font-size:10px;opacity:.8">Année passée + en cours</span>
+      </button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:14px;align-items:center">
+      <label style="font-size:13px;white-space:nowrap;font-weight:500">Date précise :</label>
+      <input type="date" id="notion-date-from-tech" style="flex:1;padding:7px 10px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:inherit"/>
+      <span style="font-size:12px;color:#757575">→</span>
+      <input type="date" id="notion-date-to-tech" style="flex:1;padding:7px 10px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:inherit"/>
+      <button onclick="(()=>{const f=document.getElementById('notion-date-from-tech').value,t=document.getElementById('notion-date-to-tech').value||f;if(f)pullFromNotion(f,t)})()" style="border:none;cursor:pointer;background:#1565C0;color:#fff;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;font-family:inherit;white-space:nowrap">↓ Pull</button>
+    </div>
+    <div style="border-top:1px solid #F0F0F0;padding-top:12px;font-size:12px;color:#757575">
+      ⚡ Les statuts validés/échec sont <strong>automatiquement mis à jour dans Notion</strong> lors de chaque changement.
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

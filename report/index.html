@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>OptiQ — Rapport Planning</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --blue:#1565C0;--blueDark:#0D47A1;--blueLight:#E3F2FD;
+  --green:#1B5E20;--greenLight:#E8F5E9;
+  --orange:#E65100;--red:#C62828;--purple:#6A1B9A;
+  --gray:#757575;--border:#E0E0E0;--bg:#F5F5F5;--white:#fff;--dark:#1A1A1A;
+  --indigo:#283593;--indigoBg:#E8EAF6
+}
+body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--dark);font-size:14px;min-height:100vh}
+
+/* ── TOP BAR ── */
+#topbar{background:var(--blueDark);color:#fff;padding:0 24px;height:54px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+#topbar .brand{display:flex;align-items:center;gap:12px}
+#topbar .brand h1{font-size:17px;font-weight:800;letter-spacing:-.3px}
+#topbar .brand p{font-size:11px;color:rgba(255,255,255,.55);letter-spacing:.4px;text-transform:uppercase}
+#topbar .right{display:flex;align-items:center;gap:14px}
+#refresh-dot{width:8px;height:8px;border-radius:50%;background:#4CAF50;flex-shrink:0;transition:background .3s}
+#refresh-dot.loading{background:#FFC107;animation:pulse .7s infinite alternate}
+#refresh-dot.error{background:var(--red)}
+#last-update{font-size:11px;color:rgba(255,255,255,.65);white-space:nowrap}
+#solver-pill{font-size:10px;font-weight:700;padding:3px 9px;border-radius:100px;letter-spacing:.4px;text-transform:uppercase;background:rgba(255,255,255,.15);color:#fff;display:none}
+#solver-pill.vroom{background:#fff;color:var(--indigo)}
+#solver-pill.nn{background:rgba(255,255,255,.25);color:#fff}
+#btn-back{padding:6px 14px;border-radius:7px;border:1px solid rgba(255,255,255,.3);background:transparent;color:#fff;font-size:12px;cursor:pointer;font-family:inherit;transition:background .12s}
+#btn-back:hover{background:rgba(255,255,255,.12)}
+#btn-run{padding:6px 16px;border-radius:7px;border:none;background:#fff;color:var(--blueDark);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px}
+#btn-run:hover{background:#E3F2FD}
+
+/* ── CONTENT ── */
+#content{padding:20px 24px;max-width:1400px;margin:0 auto}
+.section-hd{display:flex;align-items:center;gap:10px;margin-top:24px;margin-bottom:10px}
+.section-title{font-size:12px;font-weight:600;color:var(--gray);text-transform:uppercase;letter-spacing:.6px}
+
+/* ── KPI GRID ── */
+.kpig{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.kpig2{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:10px}
+@media(max-width:900px){.kpig,.kpig2{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:500px){.kpig,.kpig2{grid-template-columns:1fr}}
+.kpi{background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px 16px;border-left:3px solid #ccc}
+.kpi .label{font-size:11px;color:var(--gray);margin-bottom:6px}
+.kpi .val{font-size:28px;font-weight:700;line-height:1}
+.kpi .sub{font-size:11px;color:var(--gray);margin-top:4px}
+.kpi-blue{border-left-color:var(--blue)} .kpi-blue .val{color:var(--blue)}
+.kpi-green{border-left-color:var(--green)} .kpi-green .val{color:var(--green)}
+.kpi-orange{border-left-color:var(--orange)} .kpi-orange .val{color:var(--orange)}
+.kpi-red{border-left-color:var(--red)} .kpi-red .val{color:var(--red)}
+.kpi-purple{border-left-color:var(--purple)} .kpi-purple .val{color:var(--purple)}
+.kpi-indigo{border-left-color:var(--indigo)} .kpi-indigo .val{color:var(--indigo)}
+
+/* ── AGENTS GRID ── */
+.agents-g{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media(max-width:900px){.agents-g{grid-template-columns:repeat(2,1fr)}}
+.agent-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+.agent-card .name{font-weight:600;font-size:13px;margin-bottom:4px;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.agent-card .meta{font-size:11px;color:var(--gray);margin-top:8px;line-height:1.8}
+.agent-card .meta b{color:var(--dark)}
+.status-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;display:inline-block}
+.st-ok{background:#4CAF50} .st-idle{background:#9E9E9E} .st-error{background:var(--red)}
+
+/* ── BADGES ── */
+.bdg{display:inline-block;font-size:11px;font-weight:500;padding:2px 9px;border-radius:100px;white-space:nowrap}
+.bdg-err{background:#FFEBEE;color:var(--red)}
+.bdg-warn{background:#FFF3E0;color:var(--orange)}
+.bdg-ok{background:var(--greenLight);color:var(--green)}
+.bdg-vroom{background:var(--indigoBg);color:var(--indigo);font-weight:700;font-size:10px;letter-spacing:.3px;text-transform:uppercase}
+.bdg-nn{background:#F3E5F5;color:var(--purple);font-size:10px;letter-spacing:.3px}
+.bdg-ov{background:#EDE7F6;color:var(--purple)}
+
+/* ── ANOMALIES ── */
+.ano{background:#fff;border:1px solid var(--border);border-radius:10px;padding:13px 15px;margin-bottom:8px;border-left:4px solid}
+.ano-error{border-left-color:var(--red)}
+.ano-warn{border-left-color:var(--orange)}
+.ano .ah{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;flex-wrap:wrap}
+.ano .at{font-weight:600;font-size:13px}
+.ano .am{font-size:12px;color:var(--gray);margin-bottom:4px}
+.ano .as{font-size:12px;color:var(--green);background:var(--greenLight);padding:4px 9px;border-radius:5px;display:inline-block}
+
+/* ── NON ASSIGNABLES ── */
+.nacard{background:#fff;border:1px solid var(--border);border-radius:10px;padding:13px 15px;margin-bottom:8px;border-left:4px solid var(--red)}
+.nacard .nat{font-weight:600;font-size:13px;margin-bottom:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.nacard .nam{font-size:12px;color:var(--gray);margin-bottom:4px}
+.nacard .nas{font-size:12px;color:var(--blue);background:var(--blueLight);padding:4px 9px;border-radius:5px;display:inline-block;margin-top:2px}
+
+/* ── DÉCOUCHERS ── */
+.ovcard{background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:8px;border-left:4px solid var(--purple)}
+.ovcard .ovh{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px}
+.ovcard .ovt{font-weight:600;font-size:13px}
+.ov-split{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
+@media(max-width:600px){.ov-split{grid-template-columns:1fr}}
+.ov-day{background:var(--bg);border-radius:7px;padding:9px 11px}
+.ov-day .odl{font-size:10px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px}
+.ov-day .odi{font-size:12px;color:var(--dark);line-height:1.7}
+.hotel-hint{font-size:11px;color:var(--purple);background:#EDE7F6;padding:4px 9px;border-radius:5px;display:inline-flex;align-items:center;gap:5px;margin-top:6px}
+
+/* ── PLANNING DAYS ── */
+.pday{background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px 15px;margin-bottom:8px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.pday-left{flex:1;min-width:200px}
+.pday-left .tech{font-weight:600;font-size:13px}
+.pday-left .date{font-size:11px;color:var(--gray);margin-top:1px}
+.pday-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pday-km{font-size:16px;font-weight:700;color:var(--blue)}
+.prog-t{height:5px;background:var(--bg);border-radius:3px;overflow:hidden;margin-top:5px}
+.prog-f{height:100%;border-radius:3px}
+
+/* ── LOG ── */
+#log-list{background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;max-height:320px;overflow-y:auto}
+.log-entry{padding:8px 14px;font-size:12px;border-bottom:1px solid var(--bg);display:flex;gap:10px;align-items:flex-start}
+.log-entry:last-child{border-bottom:none}
+.log-ts{color:var(--gray);white-space:nowrap;flex-shrink:0}
+.log-info .log-msg{color:var(--dark)}
+.log-warn .log-msg{color:var(--orange)}
+.log-error .log-msg{color:var(--red);font-weight:500}
+
+/* ── MODAL ── */
+.mo{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:600;align-items:center;justify-content:center;padding:20px}
+.mo.open{display:flex}
+.md{background:#fff;border-radius:12px;padding:24px;width:100%;max-width:480px}
+.md h2{font-size:15px;font-weight:700;margin-bottom:16px}
+.lbl{font-size:12px;color:var(--gray);font-weight:500;display:block;margin-bottom:3px}
+input,select{font-family:inherit;border:1px solid var(--border);border-radius:7px;padding:8px 11px;font-size:14px;color:var(--dark);background:#fff;width:100%}
+input:focus,select:focus{outline:2px solid var(--blue);border-color:var(--blue);outline-offset:0}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.bb{display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border-radius:8px;border:none;background:var(--blue);color:#fff;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;transition:background .12s}
+.bb:hover{background:#1976D2}
+.bg{display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border-radius:8px;border:1px solid var(--border);background:#fff;color:var(--dark);font-size:14px;cursor:pointer;font-family:inherit}
+
+/* ── MISC ── */
+.empty{text-align:center;padding:36px 20px;color:var(--gray);font-size:13px}
+.empty .ico{font-size:36px;display:block;margin-bottom:10px}
+@keyframes pulse{from{opacity:1}to{opacity:.4}}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <div class="brand">
+    <svg width="32" height="32" viewBox="0 0 36 36" fill="none" style="flex-shrink:0">
+      <circle cx="15.5" cy="15.5" r="10.5" stroke="rgba(255,255,255,.9)" stroke-width="3.2" fill="none"/>
+      <line x1="22" y1="22" x2="33" y2="33" stroke="rgba(255,255,255,.9)" stroke-width="3.2" stroke-linecap="round"/>
+      <circle cx="15.5" cy="15.5" r="3" fill="rgba(255,255,255,.4)"/>
+      <line x1="15.5" y1="9" x2="15.5" y2="11" stroke="rgba(255,255,255,.9)" stroke-width="2" stroke-linecap="round"/>
+      <line x1="15.5" y1="20" x2="15.5" y2="22" stroke="rgba(255,255,255,.9)" stroke-width="2" stroke-linecap="round"/>
+      <line x1="9" y1="15.5" x2="11" y2="15.5" stroke="rgba(255,255,255,.9)" stroke-width="2" stroke-linecap="round"/>
+      <line x1="20" y1="15.5" x2="22" y2="15.5" stroke="rgba(255,255,255,.9)" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+    <div>
+      <h1>OptiQ — Rapport Planning</h1>
+      <p>Vroom VRP · Multi-agents · PlanningOS v3</p>
+    </div>
+  </div>
+  <div class="right">
+    <div id="refresh-dot" title="Auto-refresh 15 s"></div>
+    <span id="solver-pill">VROOM</span>
+    <span id="last-update">—</span>
+    <button id="btn-run" onclick="openRunModal()">▶ Lancer analyse</button>
+    <button id="btn-back" onclick="history.back()">← OptiQ</button>
+  </div>
+</div>
+
+<!-- CONTENT -->
+<div id="content">
+
+  <!-- KPIs ROW 1 -->
+  <div class="section-hd" style="margin-top:0"><div class="section-title">Indicateurs clés</div><span id="k-range" style="font-size:11px;color:var(--gray)"></span></div>
+  <div class="kpig">
+    <div class="kpi kpi-blue">
+      <div class="label">Interventions totales</div>
+      <div class="val" id="k-total">—</div>
+      <div class="sub" id="k-tech">— techniciens</div>
+    </div>
+    <div class="kpi kpi-green">
+      <div class="label">Faisabilité</div>
+      <div class="val" id="k-feas">—</div>
+      <div class="sub" id="k-valid">— validées</div>
+    </div>
+    <div class="kpi kpi-red">
+      <div class="label">Non assignables</div>
+      <div class="val" id="k-na">—</div>
+      <div class="sub" id="k-crit">— anomalie(s) critique(s)</div>
+    </div>
+    <div class="kpi kpi-purple">
+      <div class="label">Km économisés</div>
+      <div class="val" id="k-saved">—</div>
+      <div class="sub" id="k-gain">Gain vs ordre Notion : — %</div>
+    </div>
+  </div>
+  <!-- KPIs ROW 2 -->
+  <div class="kpig2">
+    <div class="kpi kpi-indigo">
+      <div class="label">Solveur</div>
+      <div class="val" style="font-size:18px;font-weight:800" id="k-solver">—</div>
+      <div class="sub" id="k-solver-sub">—</div>
+    </div>
+    <div class="kpi kpi-orange">
+      <div class="label">Découchers requis</div>
+      <div class="val" id="k-ov">—</div>
+      <div class="sub">Planning J1/J2 auto-généré</div>
+    </div>
+    <div class="kpi" style="border-left-color:var(--orange)">
+      <div class="label">Avertissements</div>
+      <div class="val" style="color:var(--orange)" id="k-warn">—</div>
+      <div class="sub">KM_EXCESSIF · découcher probable</div>
+    </div>
+    <div class="kpi kpi-blue">
+      <div class="label">Km total planifié</div>
+      <div class="val" id="k-km">—</div>
+      <div class="sub" id="k-kmperiod">— km sur la période</div>
+    </div>
+  </div>
+
+  <!-- AGENTS -->
+  <div class="section-hd"><div class="section-title">Agents</div></div>
+  <div class="agents-g">
+    <div class="agent-card">
+      <div class="name"><span class="status-dot st-idle" id="dot-validateur"></span>Validateur</div>
+      <div class="meta" id="meta-validateur">email · téléphone · code postal</div>
+    </div>
+    <div class="agent-card">
+      <div class="name"><span class="status-dot st-idle" id="dot-logistique"></span>Logistique</div>
+      <div class="meta" id="meta-logistique">haversine · TRAJET_IMPOSSIBLE · KM_EXCESSIF</div>
+    </div>
+    <div class="agent-card">
+      <div class="name"><span class="status-dot st-idle" id="dot-optimiseur"></span>Optimiseur <span id="solver-badge" style="display:none" class="bdg bdg-vroom">VROOM</span></div>
+      <div class="meta" id="meta-optimiseur">Vroom VRP · nearest-neighbour fallback</div>
+    </div>
+    <div class="agent-card">
+      <div class="name"><span class="status-dot st-idle" id="dot-orchestrateur"></span>Orchestrateur</div>
+      <div class="meta" id="meta-orchestrateur">Notion · Groq · pipeline complet</div>
+    </div>
+  </div>
+
+  <!-- ANOMALIES -->
+  <div class="section-hd">
+    <div class="section-title">Anomalies logistiques</div>
+    <select id="filter-severity" onchange="renderReport(lastReport)" style="width:auto;font-size:12px;padding:4px 8px;border-radius:6px">
+      <option value="">Toutes</option>
+      <option value="error">Critiques</option>
+      <option value="warn">Avertissements</option>
+    </select>
+  </div>
+  <div id="anomalies-list"></div>
+
+  <!-- NON ASSIGNABLES -->
+  <div id="unassigned-section" style="display:none">
+    <div class="section-hd">
+      <div class="section-title" style="color:var(--red)">Interventions non assignables</div>
+      <span id="na-badge" class="bdg bdg-err"></span>
+    </div>
+    <div id="unassigned-list"></div>
+  </div>
+
+  <!-- DÉCOUCHERS -->
+  <div id="overnight-section" style="display:none">
+    <div class="section-hd">
+      <div class="section-title" style="color:var(--purple)">Découchers requis — Vroom + Groq J1/J2</div>
+      <span id="ov-badge" class="bdg bdg-ov"></span>
+    </div>
+    <div id="overnight-list"></div>
+  </div>
+
+  <!-- PLANNING PAR JOURNÉE -->
+  <div class="section-hd"><div class="section-title">Journées planifiées</div></div>
+  <div id="planning-list"></div>
+
+  <!-- LOG -->
+  <div class="section-hd"><div class="section-title">Journal d'activité</div></div>
+  <div id="log-list"></div>
+
+</div>
+
+<!-- MODAL LANCER ANALYSE -->
+<div class="mo" id="mo-run">
+  <div class="md">
+    <h2>▶ Lancer une analyse Vroom</h2>
+    <div class="g2" style="margin-bottom:12px">
+      <div><label class="lbl">Date début</label><input type="date" id="run-from"/></div>
+      <div><label class="lbl">Date fin</label><input type="date" id="run-to"/></div>
+    </div>
+    <div style="margin-bottom:12px">
+      <label class="lbl">Technicien (optionnel — vide = tous)</label>
+      <input type="text" id="run-tech" placeholder="Ex : Jean Dupont"/>
+    </div>
+    <div style="margin-bottom:18px;display:flex;align-items:center;gap:8px">
+      <input type="checkbox" id="run-update-notion" style="width:auto"/>
+      <label for="run-update-notion" style="font-size:13px;cursor:pointer">Mettre à jour les statuts Notion après traitement</label>
+    </div>
+    <div id="run-error" style="display:none;color:var(--red);font-size:12px;margin-bottom:10px;padding:8px 10px;background:#FFEBEE;border-radius:6px"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="bg" onclick="closeRunModal()">Annuler</button>
+      <button class="bb" id="btn-run-confirm" onclick="runAnalysis()">▶ Analyser</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API_RAPPORT   = '/api/rapport-planning'
+const API_TRAITER   = '/api/traiter-planning'
+const POLL_INTERVAL = 15000
+
+let lastReport = null
+
+document.addEventListener('DOMContentLoaded', () => {
+  const today  = new Date()
+  const monday = new Date(today)
+  monday.setDate(today.getDate() - today.getDay() + 1)
+  const friday = new Date(monday)
+  friday.setDate(monday.getDate() + 4)
+  document.getElementById('run-from').value = fmtDate(monday)
+  document.getElementById('run-to').value   = fmtDate(friday)
+  fetchReport()
+  setInterval(fetchReport, POLL_INTERVAL)
+})
+
+// ── Fetch ──────────────────────────────────────────────────
+
+async function fetchReport() {
+  const dot = document.getElementById('refresh-dot')
+  dot.className = 'loading'
+  try {
+    const r   = await fetch(API_RAPPORT, { cache: 'no-store' })
+    if (!r.ok) throw new Error(r.status)
+    lastReport = await r.json()
+    dot.className = ''
+    document.getElementById('last-update').textContent = 'Actualisé ' + hhmm(new Date())
+    renderReport(lastReport)
+  } catch {
+    dot.className = 'error'
+    document.getElementById('last-update').textContent = 'Erreur réseau'
+  }
+}
+
+function renderReport(data) {
+  if (!data) return
+  renderKPIs(data)
+  renderAgents(data.agents, data.kpis)
+  renderAnomalies(data.anomalies)
+  renderUnassigned(data.unassigned)
+  renderOvernight(data.overnight)
+  renderPlanning(data.planning)
+  renderLog(data.log)
+}
+
+// ── KPIs ───────────────────────────────────────────────────
+
+function renderKPIs(d) {
+  const k  = d.kpis || {}
+  const dr = d.dateRange || {}
+
+  setText('k-total',  k.totalInterventions ?? '—')
+  setText('k-tech',   (k.techCount ?? '—') + ' technicien' + (k.techCount !== 1 ? 's' : ''))
+  setText('k-feas',   k.tauxFaisabilite != null ? Math.round(k.tauxFaisabilite * 100) + ' %' : '—')
+  setText('k-valid',  (k.interventionsValidees ?? '—') + ' données valides')
+  setText('k-na',     k.nonAssignables ?? '—')
+  setText('k-crit',   (k.anomaliesCritiques ?? '—') + ' anomalie(s) critique(s)')
+  setText('k-saved',  k.kmEconomies != null ? k.kmEconomies + ' km' : '—')
+  setText('k-gain',   'Gain vs ordre Notion : ' + (k.gainPct ?? '—') + ' %')
+  setText('k-ov',     k.decourchersRequis ?? '—')
+  setText('k-warn',   k.anomaliesWarnings ?? '—')
+  setText('k-km',     k.kmTotal ?? '—')
+  setText('k-kmperiod', k.kmTotal != null ? k.kmTotal + ' km sur la période' : '—')
+
+  // Solveur
+  const solver = k.solver || ''
+  const isVroom = solver.toLowerCase().includes('vroom')
+  setText('k-solver',     isVroom ? 'VROOM' : 'NN')
+  setText('k-solver-sub', isVroom ? 'Solveur VRP open-source' : 'Nearest-neighbour (fallback)')
+
+  const pill = document.getElementById('solver-pill')
+  pill.style.display = 'block'
+  pill.className = isVroom ? 'vroom' : 'nn'
+  pill.textContent = isVroom ? '⚡ VROOM VRP' : '🔁 NN fallback'
+
+  if (dr.from && dr.to)
+    setText('k-range', fmt(dr.from) + ' → ' + fmt(dr.to))
+
+  // Colore le KPI non-assignables
+  const naKpi = document.querySelector('#k-na')?.closest('.kpi')
+  if (naKpi) naKpi.style.borderLeftColor = (k.nonAssignables > 0) ? 'var(--red)' : 'var(--green)'
+}
+
+// ── Agents ────────────────────────────────────────────────
+
+function renderAgents(agents, kpis) {
+  if (!agents) return
+  const defs = {
+    validateur:    '✅',
+    logistique:    '🗺️',
+    optimiseur:    '⚡',
+    orchestrateur: '🤖'
+  }
+  for (const [key, icon] of Object.entries(defs)) {
+    const ag   = agents[key] || {}
+    const dot  = document.getElementById('dot-' + key)
+    const meta = document.getElementById('meta-' + key)
+    if (!dot || !meta) continue
+
+    dot.className = 'status-dot st-' + (ag.status || 'idle')
+
+    const lines = []
+    if (ag.processed   != null) lines.push(`<b>${ag.processed}</b> traitées`)
+    if (ag.errors      != null) lines.push(`<b>${ag.errors}</b> erreur(s)`)
+    if (ag.kmSaved     != null) lines.push(`<b>${ag.kmSaved} km</b> économisés`)
+    if (ag.gainPct     != null) lines.push(`gain <b>${ag.gainPct} %</b>`)
+    if (ag.unassigned  != null) lines.push(`<b style="color:var(--red)">${ag.unassigned}</b> non assignable(s)`)
+    if (ag.overnight   != null && ag.overnight > 0) lines.push(`<b>${ag.overnight}</b> découcher(s)`)
+    if (ag.anomalies   != null) lines.push(`<b>${ag.anomalies}</b> anomalie(s)`)
+    if (ag.feasible    != null) lines.push(`<b>${ag.feasible}</b> jour(s) faisable(s)`)
+    if (ag.durationMs  != null) lines.push(`${ag.durationMs} ms`)
+    if (!lines.length) lines.push(icon + ' En attente')
+    meta.innerHTML = lines.join(' · ')
+  }
+
+  // Badge solveur dans la carte optimiseur
+  const badge = document.getElementById('solver-badge')
+  if (badge && agents.optimiseur?.solver) {
+    const isVroom = agents.optimiseur.solver.toLowerCase().includes('vroom')
+    badge.style.display = 'inline-block'
+    badge.className     = 'bdg ' + (isVroom ? 'bdg-vroom' : 'bdg-nn')
+    badge.textContent   = isVroom ? 'VROOM' : 'NN'
+  }
+}
+
+// ── Anomalies ─────────────────────────────────────────────
+
+function renderAnomalies(anomalies) {
+  const el  = document.getElementById('anomalies-list')
+  const sev = document.getElementById('filter-severity').value
+  // Exclure NON_ASSIGNABLE (rendu dans sa propre section)
+  const list = (anomalies || []).filter(a => a.type !== 'NON_ASSIGNABLE' && (!sev || a.severity === sev))
+
+  if (!list.length) {
+    el.innerHTML = '<div class="empty"><span class="ico">✅</span>Aucune anomalie logistique' + (sev ? ' pour ce filtre' : '') + '</div>'
+    return
+  }
+
+  el.innerHTML = list.map(a => `
+    <div class="ano ano-${a.severity}">
+      <div class="ah">
+        <div class="at">${typeLabel(a.type)}</div>
+        <span class="bdg bdg-${a.severity === 'error' ? 'err' : 'warn'}">${a.severity === 'error' ? 'Critique' : 'Attention'}</span>
+      </div>
+      <div class="am">${esc(a.message || '')}</div>
+      ${a.tech ? `<div style="font-size:11px;color:var(--gray);margin-bottom:4px">👷 ${esc(a.tech)}${a.date ? ' · ' + fmt(a.date) : ''}</div>` : ''}
+      ${a.suggestion ? `<div class="as">💡 ${esc(a.suggestion)}</div>` : ''}
+    </div>`).join('')
+}
+
+// ── Non assignables ────────────────────────────────────────
+
+function renderUnassigned(unassigned) {
+  const section = document.getElementById('unassigned-section')
+  const list    = document.getElementById('unassigned-list')
+  const badge   = document.getElementById('na-badge')
+  const items   = unassigned || []
+
+  if (!items.length) { section.style.display = 'none'; return }
+
+  section.style.display = 'block'
+  badge.textContent = items.length + ' intervention' + (items.length > 1 ? 's' : '')
+
+  list.innerHTML = items.map(iv => `
+    <div class="nacard">
+      <div class="nat">
+        <span class="bdg bdg-err">NON ASSIGNABLE</span>
+        ${esc(iv.client || iv.addr || iv.id || '—')}
+      </div>
+      <div class="nam">
+        ${iv.addr ? '📍 ' + esc(iv.addr) + '<br>' : ''}
+        ${iv.tech ? '👷 Initialement : ' + esc(iv.tech) : ''}
+        ${iv.date ? ' · ' + fmt(iv.date) : ''}
+      </div>
+      <div class="nas">💡 Réaffecter à un autre technicien ou décaler à une date différente</div>
+    </div>`).join('')
+}
+
+// ── Découchers J1/J2 ──────────────────────────────────────
+
+function renderOvernight(overnight) {
+  const section = document.getElementById('overnight-section')
+  const list    = document.getElementById('overnight-list')
+  const badge   = document.getElementById('ov-badge')
+  const items   = overnight || []
+
+  if (!items.length) { section.style.display = 'none'; return }
+
+  section.style.display = 'block'
+  badge.textContent = items.length + ' découcher' + (items.length > 1 ? 's' : '')
+
+  list.innerHTML = items.map(ov => {
+    const j1Ids = (ov.planningJ1 || [])
+    const j2Ids = (ov.planningJ2 || [])
+    return `
+    <div class="ovcard">
+      <div class="ovh">
+        <div class="ovt">🏨 ${esc(ov.tech || '—')} — découcher requis</div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <span class="bdg bdg-ov">${ov.durationH ? ov.durationH + ' h tournée' : ''}</span>
+          ${ov.kmJ1 ? `<span class="bdg" style="background:var(--blueLight);color:var(--blue)">J1 : ${ov.kmJ1} km</span>` : ''}
+          ${ov.kmJ2 ? `<span class="bdg" style="background:var(--blueLight);color:var(--blue)">J2 : ${ov.kmJ2} km</span>` : ''}
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--gray);margin-bottom:8px">
+        ${ov.cutReason ? '✂️ ' + esc(ov.cutReason) : ''}
+      </div>
+      <div class="ov-split">
+        <div class="ov-day">
+          <div class="odl">J1 — ${fmt(ov.date)}</div>
+          <div class="odi">${j1Ids.length} intervention${j1Ids.length !== 1 ? 's' : ''}</div>
+        </div>
+        <div class="ov-day">
+          <div class="odl">J2 — ${fmt(ov.dateJ2 || '')}</div>
+          <div class="odi">${j2Ids.length} intervention${j2Ids.length !== 1 ? 's' : ''}</div>
+        </div>
+      </div>
+      ${ov.hotelApprox ? `<div class="hotel-hint">🏨 Hôtel estimé : ${esc(ov.hotelApprox)}</div>` : ''}
+    </div>`
+  }).join('')
+}
+
+// ── Planning journées ──────────────────────────────────────
+
+function renderPlanning(planning) {
+  const el   = document.getElementById('planning-list')
+  const days = planning?.days || []
+
+  if (!days.length) {
+    el.innerHTML = '<div class="empty"><span class="ico">📅</span>Aucun planning disponible</div>'
+    return
+  }
+
+  el.innerHTML = days.map(d => {
+    const pct  = Math.min(100, Math.round((d.kmTotal || 0) / 600 * 100))
+    const col  = pct > 90 ? 'var(--red)' : pct > 75 ? 'var(--orange)' : 'var(--blue)'
+    const bCol = d.feasible ? 'var(--green)' : 'var(--red)'
+    const isVroom = d.solver === 'vroom'
+    return `
+    <div class="pday">
+      <div class="pday-left">
+        <div class="tech">👷 ${esc(d.tech || '—')}</div>
+        <div class="date">${fmt(d.date)} · ${d.count || 0} intervention${d.count !== 1 ? 's' : ''}</div>
+        <div class="prog-t" style="width:200px;max-width:100%;margin-top:6px">
+          <div class="prog-f" style="width:${pct}%;background:${col}"></div>
+        </div>
+      </div>
+      <div class="pday-right">
+        <div>
+          <div class="pday-km">${d.kmTotal || 0} km</div>
+          <div style="font-size:10px;color:var(--gray);text-align:right">${pct}% limite · ${d.kmEconomies || 0} km économisés</div>
+        </div>
+        <span class="bdg" style="background:${bCol}22;color:${bCol}">${d.feasible ? '✓ OK' : '✗ KO'}</span>
+        <span class="bdg ${isVroom ? 'bdg-vroom' : 'bdg-nn'}">${isVroom ? 'VROOM' : 'NN'}</span>
+        ${d.needsOvernight ? `<span class="bdg bdg-ov">🏨 Découcher</span>` : ''}
+        ${d.anomaliesCount > 0 ? `<span class="bdg bdg-warn">${d.anomaliesCount} ⚠</span>` : ''}
+      </div>
+    </div>`
+  }).join('')
+}
+
+// ── Log ───────────────────────────────────────────────────
+
+function renderLog(log) {
+  const el = document.getElementById('log-list')
+  if (!log?.length) { el.innerHTML = '<div class="empty" style="padding:20px">Journal vide</div>'; return }
+  el.innerHTML = [...log].reverse().map(e => `
+    <div class="log-entry log-${e.level}">
+      <span class="log-ts">${hhmm(new Date(e.ts))}</span>
+      <span class="log-msg">${esc(e.msg)}</span>
+    </div>`).join('')
+}
+
+// ── typeLabel ─────────────────────────────────────────────
+
+function typeLabel(t) {
+  return {
+    TRAJET_IMPOSSIBLE: '🚫 Trajet impossible',
+    KM_EXCESSIF:       '⚠️ Kilométrage excessif',
+    DECOUCH_PROBABLE:  '🏨 Découcher probable',
+    COORDS_MANQUANTES: '📍 Coordonnées manquantes',
+    NON_ASSIGNABLE:    '🚷 Non assignable (Vroom)'
+  }[t] || t
+}
+
+// ── Modal ─────────────────────────────────────────────────
+
+function openRunModal() {
+  document.getElementById('mo-run').classList.add('open')
+  document.getElementById('run-error').style.display = 'none'
+}
+function closeRunModal() {
+  document.getElementById('mo-run').classList.remove('open')
+}
+document.getElementById('mo-run').addEventListener('click', e => {
+  if (e.target === document.getElementById('mo-run')) closeRunModal()
+})
+
+async function runAnalysis() {
+  const from  = document.getElementById('run-from').value
+  const to    = document.getElementById('run-to').value
+  const tech  = document.getElementById('run-tech').value.trim()
+  const upd   = document.getElementById('run-update-notion').checked
+  const errEl = document.getElementById('run-error')
+  const btn   = document.getElementById('btn-run-confirm')
+
+  if (!from || !to) { showErr('Veuillez sélectionner les deux dates.'); return }
+
+  btn.textContent = '⏳ Vroom en cours...'
+  btn.disabled    = true
+  errEl.style.display = 'none'
+
+  try {
+    const r = await fetch(API_TRAITER, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dateFrom: from, dateTo: to, tech: tech || undefined, updateNotion: upd })
+    })
+    const d = await r.json()
+    if (!r.ok) { showErr(d.error || `Erreur ${r.status}`); return }
+    closeRunModal()
+    await fetchReport()
+  } catch (e) {
+    showErr('Erreur réseau : ' + e.message)
+  } finally {
+    btn.textContent = '▶ Analyser'
+    btn.disabled    = false
+  }
+
+  function showErr(msg) { errEl.textContent = msg; errEl.style.display = 'block' }
+}
+
+// ── Utilitaires ───────────────────────────────────────────
+
+function setText(id, val) { const el = document.getElementById(id); if (el) el.textContent = val }
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
+function fmt(iso) {
+  if (!iso) return '—'
+  const d = new Date(iso); if (isNaN(d)) return iso
+  return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+function fmtDate(d) { return d.toISOString().slice(0, 10) }
+function hhmm(d) {
+  if (!(d instanceof Date) || isNaN(d)) return '—'
+  return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+}
+</script>
+</body>
+</html>
