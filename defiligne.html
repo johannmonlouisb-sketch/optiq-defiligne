@@ -2703,6 +2703,65 @@ function updMat(id,field,val){
 let prevFilter = "all"  // all | overdue | urgent | soon | ok
 let prevSearch = ""
 let prevTech   = 0
+// Filtres de période (par défaut : 3 prochains mois)
+let prevDateFrom = ""
+let prevDateTo   = ""
+let prevYear     = 0
+let prevMonth    = 0
+;(()=>{
+  try{
+    const s=localStorage.getItem("optiq_prev_period")
+    if(s){const p=JSON.parse(s);prevDateFrom=p.from||"";prevDateTo=p.to||"";prevYear=p.year||0;prevMonth=p.month||0}
+  }catch(e){}
+  // Défaut : 3 prochains mois si aucun filtre sauvegardé
+  if(!prevDateFrom&&!prevDateTo&&!prevYear&&!prevMonth){
+    const today=new Date()
+    prevDateFrom=today.toISOString().split("T")[0]
+    const end=new Date(today);end.setMonth(end.getMonth()+3)
+    prevDateTo=end.toISOString().split("T")[0]
+  }
+})()
+
+function savePrevPeriod(){
+  try{localStorage.setItem("optiq_prev_period",JSON.stringify({from:prevDateFrom,to:prevDateTo,year:prevYear,month:prevMonth}))}catch(e){}
+}
+
+function setPrevPeriod(preset){
+  const today=new Date()
+  const iso=d=>d.toISOString().split("T")[0]
+  prevYear=0;prevMonth=0
+  if(preset==="week"){
+    const mon=new Date(today);mon.setDate(today.getDate()-today.getDay()+1)
+    const sun=new Date(mon);sun.setDate(mon.getDate()+6)
+    prevDateFrom=iso(mon);prevDateTo=iso(sun)
+  } else if(preset==="month"){
+    prevDateFrom=iso(new Date(today.getFullYear(),today.getMonth(),1))
+    prevDateTo=iso(new Date(today.getFullYear(),today.getMonth()+1,0))
+  } else if(preset==="3months"){
+    prevDateFrom=iso(today)
+    const end=new Date(today);end.setMonth(end.getMonth()+3)
+    prevDateTo=iso(end)
+  } else if(preset==="year"){
+    prevDateFrom=iso(new Date(today.getFullYear(),0,1))
+    prevDateTo=iso(new Date(today.getFullYear(),11,31))
+  }
+  savePrevPeriod();rPrev()
+}
+
+function applyPrevCustom(){
+  const f=document.getElementById("prev-df")?.value
+  const t=document.getElementById("prev-dt")?.value
+  if(f)prevDateFrom=f;if(t)prevDateTo=t
+  prevYear=0;prevMonth=0
+  savePrevPeriod();rPrev()
+}
+
+function applyPrevYearMonth(){
+  const y=parseInt(document.getElementById("prev-year")?.value||0)
+  const m=parseInt(document.getElementById("prev-month")?.value||0)
+  prevYear=y;prevMonth=m;prevDateFrom="";prevDateTo=""
+  savePrevPeriod();rPrev()
+}
 
 function rPrev(){
   // Dernière maintenance connue par client+addr
@@ -2711,7 +2770,6 @@ function rPrev(){
     const key=i.client+"||"+i.addr
     if(!lastMaint[key]||i.date>lastMaint[key].date) lastMaint[key]={...i}
   })
-  // Installations terminées = prochaine maintenance dans 1 an
   ivs.filter(i=>i.type==="installation"&&i.status==="completed").forEach(i=>{
     const key=i.client+"||"+i.addr
     if(!lastMaint[key]) lastMaint[key]={...i}
@@ -2727,25 +2785,110 @@ function rPrev(){
     return{...iv,nextDate,days,urgency}
   }).sort((a,b)=>a.days-b.days)
 
-  const overdue=all.filter(f=>f.urgency==="overdue")
-  const urgent= all.filter(f=>f.urgency==="urgent")
-  const soon=   all.filter(f=>f.urgency==="soon")
-  const ok=     all.filter(f=>f.urgency==="ok")
+  // ── Filtre de période sur nextDate ────────────────────────
+  let periodFiltered=all
+  if(prevYear>0){
+    periodFiltered=all.filter(f=>{
+      const y=parseInt(f.nextDate.substring(0,4))
+      const m=parseInt(f.nextDate.substring(5,7))
+      return y===prevYear && (prevMonth===0||m===prevMonth)
+    })
+  } else if(prevDateFrom||prevDateTo){
+    periodFiltered=all.filter(f=>{
+      if(prevDateFrom&&f.nextDate<prevDateFrom) return false
+      if(prevDateTo&&f.nextDate>prevDateTo) return false
+      return true
+    })
+  }
 
-  // Appliquer filtres
-  let list=all
+  const overdue=periodFiltered.filter(f=>f.urgency==="overdue")
+  const urgent= periodFiltered.filter(f=>f.urgency==="urgent")
+  const soon=   periodFiltered.filter(f=>f.urgency==="soon")
+  const ok=     periodFiltered.filter(f=>f.urgency==="ok")
+
+  // ── Filtres urgence / tech / recherche ────────────────────
+  let list=periodFiltered
   if(prevFilter!=="all") list=list.filter(f=>f.urgency===prevFilter)
   if(prevTech>0) list=list.filter(f=>f.techId===prevTech)
   if(prevSearch) list=list.filter(f=>[f.client,f.addr].some(s=>s.toLowerCase().includes(prevSearch.toLowerCase())))
 
+  // ── Libellé période active ────────────────────────────────
+  let periodLabel=""
+  if(prevYear>0){
+    periodLabel=prevMonth>0
+      ? `${["","Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"][prevMonth]} ${prevYear}`
+      : `Année ${prevYear}`
+  } else if(prevDateFrom||prevDateTo){
+    const fmt=d=>new Date(d+"T12:00:00").toLocaleDateString("fr-FR",{day:"2-digit",month:"2-digit",year:"numeric"})
+    periodLabel=(prevDateFrom&&prevDateTo)
+      ? `du ${fmt(prevDateFrom)} au ${fmt(prevDateTo)}`
+      : prevDateFrom ? `à partir du ${fmt(prevDateFrom)}`
+      : `jusqu'au ${fmt(prevDateTo)}`
+  }
+
+  // ── Années disponibles pour le dropdown ───────────────────
+  const years=[...new Set(all.map(f=>f.nextDate.substring(0,4)))].sort()
+
   const kpiStyle=(active,col)=>`cursor:pointer;border-left:3px solid ${col};padding:10px 16px;transition:all .12s;${active?`box-shadow:0 0 0 2px ${col};background:${col}15;`:""}`
+  const qbStyle=(active)=>`font-size:12px;padding:5px 10px;border-radius:100px;border:1.5px solid var(--border);cursor:pointer;background:${active?"var(--blue)":"#fff"};color:${active?"#fff":"var(--dark)"};font-weight:${active?"700":"400"}`
+
+  const isWeek=()=>{const today=new Date();const mon=new Date(today);mon.setDate(today.getDate()-today.getDay()+1);const sun=new Date(mon);sun.setDate(mon.getDate()+6);return prevDateFrom===mon.toISOString().split("T")[0]&&prevDateTo===sun.toISOString().split("T")[0]}
+  const isMth=()=>{const t=new Date();return prevDateFrom===new Date(t.getFullYear(),t.getMonth(),1).toISOString().split("T")[0]&&prevDateTo===new Date(t.getFullYear(),t.getMonth()+1,0).toISOString().split("T")[0]}
+  const is3m=()=>{const t=new Date();const e=new Date(t);e.setMonth(e.getMonth()+3);return prevDateFrom===t.toISOString().split("T")[0]&&prevDateTo===e.toISOString().split("T")[0]}
+  const isYr=()=>{const t=new Date();return prevDateFrom===new Date(t.getFullYear(),0,1).toISOString().split("T")[0]&&prevDateTo===new Date(t.getFullYear(),11,31).toISOString().split("T")[0]}
 
   document.getElementById("d-prev").innerHTML=`
+  <!-- ── Période active ── -->
+  ${periodLabel?`<div style="background:var(--blueLight);border:1.5px solid #90CAF9;border-radius:10px;padding:10px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px">
+    <span style="font-size:15px">📅</span>
+    <span style="font-size:14px;font-weight:700;color:var(--blue)">Prévisions ${periodLabel}</span>
+    <span style="font-size:12px;color:var(--gray);margin-left:4px">· ${periodFiltered.length} client${periodFiltered.length>1?"s":""}</span>
+  </div>`:""}
+
+  <!-- ── Filtres de période ── -->
+  <div class="ss" style="margin-bottom:14px;padding:14px 16px">
+    <div style="font-size:12px;font-weight:700;color:var(--gray);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">Période</div>
+    <!-- Boutons rapides -->
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+      <button style="${qbStyle(isWeek())}" onclick="setPrevPeriod('week')">Cette semaine</button>
+      <button style="${qbStyle(isMth())}"  onclick="setPrevPeriod('month')">Ce mois</button>
+      <button style="${qbStyle(is3m())}"   onclick="setPrevPeriod('3months')">3 prochains mois</button>
+      <button style="${qbStyle(isYr())}"   onclick="setPrevPeriod('year')">Cette année</button>
+      ${!prevYear&&!prevDateFrom&&!prevDateTo?`<button style="${qbStyle(true)}" onclick="">Tout afficher</button>`:`<button style="${qbStyle(false)}" onclick="prevDateFrom='';prevDateTo='';prevYear=0;prevMonth=0;savePrevPeriod();rPrev()">✕ Toutes dates</button>`}
+    </div>
+    <!-- Sélecteur personnalisé + Année/Mois -->
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <div>
+        <div style="font-size:11px;color:var(--gray);margin-bottom:3px">Du</div>
+        <input type="date" id="prev-df" value="${prevDateFrom}" style="font-size:13px;padding:5px 8px;border:1.5px solid var(--border);border-radius:8px" onchange="prevYear=0;prevMonth=0;prevDateFrom=this.value;savePrevPeriod();rPrev()"/>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--gray);margin-bottom:3px">Au</div>
+        <input type="date" id="prev-dt" value="${prevDateTo}" style="font-size:13px;padding:5px 8px;border:1.5px solid var(--border);border-radius:8px" onchange="prevYear=0;prevMonth=0;prevDateTo=this.value;savePrevPeriod();rPrev()"/>
+      </div>
+      <div style="width:1px;background:var(--border);height:32px;align-self:center"></div>
+      <div>
+        <div style="font-size:11px;color:var(--gray);margin-bottom:3px">Année</div>
+        <select id="prev-year" style="font-size:13px;padding:5px 8px;border:1.5px solid var(--border);border-radius:8px" onchange="applyPrevYearMonth()">
+          <option value="0">Toutes</option>
+          ${years.map(y=>`<option value="${y}" ${prevYear==y?"selected":""}>${y}</option>`).join("")}
+        </select>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--gray);margin-bottom:3px">Mois</div>
+        <select id="prev-month" style="font-size:13px;padding:5px 8px;border:1.5px solid var(--border);border-radius:8px" ${!prevYear?"disabled":""} onchange="applyPrevYearMonth()">
+          <option value="0">Tous</option>
+          ${["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"].map((m,i)=>`<option value="${i+1}" ${prevMonth===i+1?"selected":""}>${m}</option>`).join("")}
+        </select>
+      </div>
+    </div>
+  </div>
+
   <!-- KPI cliquables -->
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center">
     <div class="surf" style="${kpiStyle(prevFilter==="all","#1565C0")}" onclick="prevFilter='all';rPrev()">
       <p style="font-size:11px;color:var(--gray)">Tous</p>
-      <p style="font-size:24px;font-weight:700;color:#1565C0">${all.length}</p>
+      <p style="font-size:24px;font-weight:700;color:#1565C0">${periodFiltered.length}</p>
     </div>
     <div class="surf" style="${kpiStyle(prevFilter==="overdue","#C62828")}" onclick="prevFilter='overdue';rPrev()">
       <p style="font-size:11px;color:var(--gray)">⚠️ En retard</p>
@@ -2765,7 +2908,7 @@ function rPrev(){
     </div>
     <div style="display:flex;gap:8px;margin-left:auto">
       <button class="bb bsm" onclick="openSmartPlan()" style="background:#C62828;border-color:#C62828">🚨 Planifier les retards</button>
-      <button class="bb bsm" onclick="planifAll()">📅 Tout planifier (${all.filter(f=>f.days>=0).length})</button>
+      <button class="bb bsm" onclick="planifAll()">📅 Tout planifier (${periodFiltered.filter(f=>f.days>=0).length})</button>
     </div>
   </div>
 
@@ -2776,12 +2919,12 @@ function rPrev(){
       <option value="0">Tous les techniciens</option>
       ${TECHS.map(t=>`<option value="${t.id}" ${prevTech===t.id?"selected":""}>${t.name}</option>`).join("")}
     </select>
-    <span style="font-size:12px;color:var(--gray)">${list.length} client${list.length>1?"s":""}</span>
-    ${(prevFilter!=="all"||prevTech>0||prevSearch)?`<button class="bg bsm" onclick="prevFilter='all';prevTech=0;prevSearch='';rPrev()">✕ Effacer filtres</button>`:""}
+    <span style="font-size:12px;color:var(--gray)">${list.length} résultat${list.length>1?"s":""}</span>
+    ${(prevFilter!=="all"||prevTech>0||prevSearch)?`<button class="bg bsm" onclick="prevFilter='all';prevTech=0;prevSearch='';rPrev()">✕ Effacer</button>`:""}
   </div>
 
   <!-- Liste -->
-  ${!list.length?`<div class="card" style="text-align:center;color:var(--gray);padding:36px">Aucun client correspond aux filtres</div>`:""}
+  ${!list.length?`<div class="card" style="text-align:center;color:var(--gray);padding:36px">Aucun client dans cette période</div>`:""}
   ${list.map(f=>prevCard(f)).join("")}
   `
 }
