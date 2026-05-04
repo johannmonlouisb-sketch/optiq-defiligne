@@ -216,6 +216,7 @@ function nProp(props, ...keys) {
     if (v.type === 'select')       return v.select?.name || ''
     if (v.type === 'multi_select') return v.multi_select?.map(s => s.name).join(', ') || ''
     if (v.type === 'checkbox')     return !!v.checkbox
+    if (v.type === 'people')       return v.people?.map(p => p.name).join(', ') || ''
   }
   return ''
 }
