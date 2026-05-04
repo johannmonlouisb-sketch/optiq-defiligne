@@ -174,7 +174,8 @@ async function fetchNotionInterventions(cfg, dateFrom, dateTo) {
       addr:     nProp(p, 'Adresse Site'),
       siege:    nProp(p, 'Adresse Siéges'),
       date:     nProp(p, 'Date intervention'),
-      tech:     nProp(p, 'Commercial '),
+      tech:     nProp(p, 'Technicien') || nProp(p, 'Technicien ') || 'Non assigné',
+      commercial: nProp(p, 'Commercial '),
       type:     nProp(p, 'INTERVENTION'),  // multi_select → CSV
       notes:    nProp(p, 'INFO '),
       motif:    nProp(p, 'Motif'),

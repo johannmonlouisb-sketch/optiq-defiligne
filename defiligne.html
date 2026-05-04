@@ -162,6 +162,7 @@ tr:hover td{background:var(--bg)}
   <div class="ni" onclick="SV('depart')" id="n-depart"><span class="ic">🚀</span><span>Départ du jour</span></div>
   <div class="ni" onclick="SV('planning')" id="n-planning"><span class="ic">📅</span><span>Planning</span></div>
   <div class="ni" onclick="SV('carte')" id="n-carte"><span class="ic">🗺️</span><span>Carte & Itinéraire</span></div>
+  <div class="ni" onclick="SV('zones')" id="n-zones"><span class="ic">🗂️</span><span>Zones & Techs</span></div>
   <div class="ni" onclick="SV('interventions')" id="n-interventions"><span class="ic">📋</span><span>Interventions</span></div>
   <div class="ni" onclick="SV('materiel')" id="n-materiel"><span class="ic">📦</span><span>Matériel</span></div>
   <div class="ni" onclick="SV('previsions')" id="n-previsions"><span class="ic">📊</span><span>Prévisions</span></div>
@@ -301,6 +302,9 @@ tr:hover td{background:var(--bg)}
     <div id="map-con" style="border-radius:10px;overflow:hidden;border:1px solid var(--border);flex:1;min-height:360px"><div id="mapid" style="width:100%;height:100%;min-height:360px"></div></div>
     <div id="map-ivl"></div>
   </div>
+
+  <!-- ZONES & TECHS -->
+  <div id="p-zones" class="vp" style="padding:18px;gap:14px"><div id="d-zones"></div></div>
 
   <!-- INTERVENTIONS -->
   <div id="p-interventions" class="vp" style="padding:18px;gap:12px"><div id="d-iv"></div></div>
@@ -1725,7 +1729,7 @@ function clearDepTechs(e){
 // ═══════════════════════════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════════════════════════
-const VT={dashboard:"Tableau de bord",depart:"Départ du jour",planning:"Planning de la semaine",carte:"Carte & Itinéraire",interventions:"Toutes les interventions",materiel:"Matériel du jour",previsions:"Prévisions maintenances",notifications:"Notifications clients",parametres:"Paramètres"}
+const VT={dashboard:"Tableau de bord",depart:"Départ du jour",planning:"Planning de la semaine",carte:"Carte & Itinéraire",zones:"Zones & Techniciens",interventions:"Toutes les interventions",materiel:"Matériel du jour",previsions:"Prévisions maintenances",notifications:"Notifications clients",parametres:"Paramètres"}
 function SV(v){
   curView=v
   document.querySelectorAll(".ni").forEach(e=>e.classList.remove("on"))
@@ -1740,6 +1744,7 @@ function SV(v){
   else if(v==="interventions")rIv()
   else if(v==="materiel"){matFilter.date=selDate;rMat()}
   else if(v==="previsions")rPrev()
+  else if(v==="zones")rZones()
   else if(v==="analyse")rAnalyse()
   else if(v==="notifications")rNotif()
   else if(v==="parametres")rParam()
@@ -4118,6 +4123,238 @@ async function geocodeWithFallback(addr, client='', siege=''){
   return null
 }
 function sp(pct,msg){document.getElementById("pf").style.width=pct+"%";document.getElementById("pm").textContent=msg||"";document.getElementById("pp").textContent=pct+"%"}
+
+// ═══════════════════════════════════════════════════════
+// ZONES & TECHS — clustering géographique + assignation manuelle
+// ═══════════════════════════════════════════════════════
+let zonesMapObj=null, zonesMarkersByCluster=[]
+
+const CLUSTER_COLORS=["#1565C0","#C62828","#2E7D32","#E65100","#6A1B9A","#00838F","#AD1457","#4E342E"]
+
+function kmeansGeo(pts,k,maxIter=25){
+  if(!pts.length||k<1) return pts.map(()=>0)
+  k=Math.min(k,pts.length)
+  // Init : centres répartis sur les latitudes triées
+  const sorted=[...pts].map((p,i)=>({...p,i})).sort((a,b)=>a.lat-b.lat)
+  const step=pts.length/k
+  let centroids=Array.from({length:k},(_,ci)=>{
+    const s=sorted[Math.min(Math.round(ci*step),pts.length-1)]
+    return{lat:s.lat,lng:s.lng}
+  })
+  let assignments=new Array(pts.length).fill(0)
+  for(let iter=0;iter<maxIter;iter++){
+    const next=pts.map(p=>{
+      let best=0,bd=Infinity
+      centroids.forEach((c,ci)=>{
+        const d=(p.lat-c.lat)**2+(p.lng-c.lng)**2
+        if(d<bd){bd=d;best=ci}
+      })
+      return best
+    })
+    if(next.every((v,i)=>v===assignments[i])) break
+    assignments=next
+    centroids=centroids.map((_,ci)=>{
+      const mb=pts.filter((_,i)=>assignments[i]===ci)
+      if(!mb.length) return centroids[ci]
+      return{lat:mb.reduce((s,p)=>s+p.lat,0)/mb.length,lng:mb.reduce((s,p)=>s+p.lng,0)/mb.length}
+    })
+  }
+  return assignments
+}
+
+let zoneAssignments={} // clusterId → techId
+
+function rZones(){
+  const el=document.getElementById("d-zones")
+  if(!el) return
+  const today=new Date().toISOString().split("T")[0]
+  const plus30=new Date();plus30.setDate(plus30.getDate()+30)
+  const end=plus30.toISOString().split("T")[0]
+  el.innerHTML=`
+    <div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:15px;font-weight:700;margin-bottom:4px">🗂️ Regroupement par zone géographique</div>
+        <div style="font-size:12px;color:var(--gray)">L'algorithme regroupe les interventions par proximité. Tu choisis quel technicien fait chaque zone.</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="date" id="z-from" value="${today}" style="font-size:13px;padding:6px 10px;width:auto"/>
+        <input type="date" id="z-to"   value="${end}"   style="font-size:13px;padding:6px 10px;width:auto"/>
+        <div style="display:flex;align-items:center;gap:6px;font-size:13px">
+          <label style="color:var(--gray)">Zones :</label>
+          <input type="number" id="z-k" value="${Math.min(TECHS.length,4)}" min="1" max="${TECHS.length}" style="width:60px;padding:6px 10px;font-size:13px"/>
+        </div>
+        <button class="bb" onclick="analyserZones()">🔍 Analyser</button>
+      </div>
+    </div>
+    <div id="z-progress" style="display:none" class="card">
+      <div style="font-size:13px;color:var(--gray)" id="z-msg">Géocodage en cours...</div>
+      <div class="prog-t" style="margin-top:6px"><div id="z-bar" class="prog-f" style="background:var(--blue);width:0%"></div></div>
+    </div>
+    <div id="z-result"></div>`
+}
+
+async function analyserZones(){
+  const from=document.getElementById("z-from")?.value
+  const to=document.getElementById("z-to")?.value
+  const k=parseInt(document.getElementById("z-k")?.value)||3
+  const prog=document.getElementById("z-progress")
+  const bar=document.getElementById("z-bar")
+  const msg=document.getElementById("z-msg")
+  const res=document.getElementById("z-result")
+  if(!from||!to){alert("Choisissez une plage de dates");return}
+  prog.style.display="block"
+  res.innerHTML=""
+
+  // Filtrer les interventions dans la période
+  const pool=ivs.filter(i=>i.date>=from&&i.date<=to&&i.status!=="completed")
+  if(!pool.length){res.innerHTML=`<div class="card" style="text-align:center;color:var(--gray);padding:36px">Aucune intervention sur cette période.</div>`;prog.style.display="none";return}
+
+  // Géocoder
+  const pts=[]
+  for(let i=0;i<pool.length;i++){
+    msg.textContent=`Géocodage ${i+1}/${pool.length}...`
+    bar.style.width=Math.round(i/pool.length*70)+"%"
+    const iv=pool[i]
+    let c=gcache[iv.addr]||null
+    if(!c) c=await geocodeWithFallback(iv.addr,iv.client,iv.siege||'')
+    if(c) pts.push({iv,lat:c.lat,lng:c.lng})
+  }
+  if(!pts.length){res.innerHTML=`<div class="card" style="text-align:center;color:var(--gray);padding:36px">Impossible de géocoder les adresses.</div>`;prog.style.display="none";return}
+
+  // K-means clustering
+  msg.textContent="Clustering géographique..."
+  bar.style.width="80%"
+  const assignments=kmeansGeo(pts,k)
+
+  // Stocker pour appliquerZones()
+  window._zoneLastPts=pts
+  window._zoneAssignments=assignments
+
+  // Grouper par cluster
+  const clusters=Array.from({length:k},()=>[])
+  pts.forEach((p,i)=>clusters[assignments[i]].push(p))
+
+  bar.style.width="100%"
+  prog.style.display="none"
+
+  // Charger les assignations sauvegardées
+  try{const saved=localStorage.getItem("optiq_zone_assignments");if(saved)zoneAssignments=JSON.parse(saved)}catch(e){}
+
+  // Rendu des clusters + carte
+  renderZoneResult(clusters,pts)
+}
+
+function renderZoneResult(clusters,allPts){
+  const res=document.getElementById("z-result")
+  if(!res) return
+
+  // Calculer centre et rayon de chaque cluster
+  const clusterInfo=clusters.map((pts,ci)=>{
+    if(!pts.length) return{ci,pts,centerLat:0,centerLng:0,radiusKm:0,km:0}
+    const clat=pts.reduce((s,p)=>s+p.lat,0)/pts.length
+    const clng=pts.reduce((s,p)=>s+p.lng,0)/pts.length
+    const depotC={lat:48.965,lng:1.967}
+    let maxD=0
+    pts.forEach(p=>{const d=Math.hypot(p.lat-clat,p.lng-clng)*111;if(d>maxD)maxD=d})
+    const depDist=Math.round(Math.hypot(clat-depotC.lat,clng-depotC.lng)*111*1.4)
+    return{ci,pts,centerLat:clat,centerLng:clng,radiusKm:Math.round(maxD),distDepot:depDist}
+  }).filter(c=>c.pts.length>0)
+
+  // Construire la carte Leaflet
+  const mapDiv=`<div id="z-mapid" style="height:360px;border-radius:10px;border:1px solid var(--border)"></div>`
+
+  // Cartes de clusters
+  const cards=clusterInfo.map(({ci,pts,radiusKm,distDepot})=>{
+    const col=CLUSTER_COLORS[ci%CLUSTER_COLORS.length]
+    const curTech=zoneAssignments[ci]||""
+    const clients=pts.slice(0,4).map(p=>`<div style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dark)">• ${p.iv.client}</div>`).join("")
+    const more=pts.length>4?`<div style="font-size:11px;color:var(--gray)">+ ${pts.length-4} autres</div>`:""
+    return`<div class="card" style="border-left:4px solid ${col};padding:14px 16px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <div style="width:14px;height:14px;border-radius:50%;background:${col};flex-shrink:0"></div>
+        <div style="font-size:15px;font-weight:700;flex:1">Zone ${ci+1} — ${pts.length} intervention${pts.length>1?"s":""}</div>
+        <div style="font-size:11px;color:var(--gray)">${distDepot}km du dépôt</div>
+      </div>
+      <div style="margin-bottom:10px">${clients}${more}</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <label style="font-size:12px;color:var(--gray);font-weight:600;flex-shrink:0">Technicien :</label>
+        <select style="flex:1;font-size:13px;padding:6px 10px" onchange="zoneAssignments[${ci}]=parseInt(this.value);saveZoneAssignments()" data-ci="${ci}">
+          <option value="">— Choisir —</option>
+          ${TECHS.map(t=>`<option value="${t.id}" ${curTech==t.id?"selected":""}>${t.name}</option>`).join("")}
+        </select>
+      </div>
+    </div>`
+  }).join("")
+
+  res.innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 340px;gap:14px;align-items:start">
+      <div>${mapDiv}</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        ${cards}
+        <button class="bb" style="width:100%" onclick="appliquerZones(${JSON.stringify(clusterInfo.map(c=>c.ci))})">✅ Appliquer les attributions</button>
+      </div>
+    </div>`
+
+  // Initialiser la carte Leaflet
+  if(zonesMapObj){zonesMapObj.remove();zonesMapObj=null}
+  setTimeout(()=>{
+    zonesMapObj=L.map("z-mapid",{center:[46.5,2.3],zoom:5})
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OSM",maxZoom:19}).addTo(zonesMapObj)
+    const bounds=[]
+    clusterInfo.forEach(({ci,pts})=>{
+      const col=CLUSTER_COLORS[ci%CLUSTER_COLORS.length]
+      pts.forEach(p=>{
+        const icon=L.divIcon({html:`<div style="width:12px;height:12px;background:${col};border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,className:"",iconSize:[12,12],iconAnchor:[6,6]})
+        L.marker([p.lat,p.lng],{icon}).addTo(zonesMapObj)
+          .bindPopup(`<strong>${p.iv.client}</strong><br><small>${p.iv.addr}</small><br><small style="color:${col}">Zone ${ci+1}</small>`)
+        bounds.push([p.lat,p.lng])
+      })
+    })
+    if(bounds.length) zonesMapObj.fitBounds(L.latLngBounds(bounds),{padding:[30,30]})
+  },100)
+}
+
+function saveZoneAssignments(){
+  try{localStorage.setItem("optiq_zone_assignments",JSON.stringify(zoneAssignments))}catch(e){}
+}
+
+function appliquerZones(ciList){
+  // Récupère les pts actuellement affichés
+  const cards=document.querySelectorAll("[data-ci]")
+  let applied=0
+  cards.forEach(sel=>{
+    const ci=parseInt(sel.dataset.ci)
+    const techId=parseInt(sel.value)
+    if(!techId) return
+    zoneAssignments[ci]=techId
+  })
+  saveZoneAssignments()
+
+  // Met à jour techId dans ivs pour toutes les interventions de chaque cluster
+  // On retrouve les assignations via les marqueurs sur la carte
+  if(zonesMapObj){
+    // Relire les pts depuis le résultat précédent — stockés dans les popups
+    // Alternative : on re-run le clustering avec les mêmes paramètres
+  }
+
+  // Simple : mettre à jour à partir des données en mémoire dans le DOM
+  // Les pts sont stockés dans la fermeture de renderZoneResult → on re-applique via la fenêtre
+  if(window._zoneLastPts&&window._zoneAssignments){
+    window._zoneLastPts.forEach((p,i)=>{
+      const ci=window._zoneAssignments[i]
+      const techId=zoneAssignments[ci]
+      if(techId){
+        ivs=ivs.map(iv=>iv.id===p.iv.id?{...iv,techId}:iv)
+        applied++
+      }
+    })
+    cloudSave()
+    alert(`✅ ${applied} intervention(s) attribuées aux techniciens sélectionnés.`)
+    SV("zones")
+  } else {
+    alert("Cliquez sur Analyser d'abord pour charger les données.")
+  }
+}
 // ═══════════════════════════════════════════════════════
 // HAVERSINE DISTANCE (km entre 2 coords)
 // ═══════════════════════════════════════════════════════

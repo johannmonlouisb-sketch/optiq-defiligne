@@ -244,6 +244,64 @@ async function notionUpdate(token, pageId, properties) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// HISTORIQUE VISITES — score de priorité portatour-style
+// ═══════════════════════════════════════════════════════════════
+
+async function loadLastVisits(token, dbId, push) {
+  push('📊 Historique visites clients...')
+  const twoYearsAgo = new Date()
+  twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2)
+  const dateFrom = twoYearsAgo.toISOString().split('T')[0]
+
+  const pages = await notionQuery(token, dbId, {
+    and: [
+      { property: 'Date intervention', date: { on_or_after: dateFrom } },
+      { property: 'Terminer', checkbox: { equals: true } }
+    ]
+  })
+
+  // Map : "client|adresse" → date la plus récente
+  const lastVisit = {}
+  for (const page of pages) {
+    const p = page.properties || {}
+    const client = nProp(p, 'Société')
+    const addr   = nProp(p, 'Adresse Site') || nProp(p, 'Adresse Siéges') || ''
+    const date   = nProp(p, 'Date intervention')
+    if (!client || !date) continue
+    const key = (client + '|' + addr).toLowerCase().trim()
+    if (!lastVisit[key] || date > lastVisit[key]) lastVisit[key] = date.substring(0, 10)
+  }
+
+  push(`   ✅ ${Object.keys(lastVisit).length} clients avec historique`)
+  return lastVisit
+}
+
+// Score 0-100 inspiré de portatour :
+//   urgent      → 100
+//   installation → 40 (événement ponctuel, priorité moyenne)
+//   maintenance  → 0..80 selon ratio (jours écoulés / 365)
+//     • jamais visité  → 66 (400 j / 365 × 60)
+//     • 365 j écoulés  → 60  (cycle annuel respecté)
+//     • 500 j écoulés  → 80  (retard, haute priorité)
+function enrichPriorityScores(interventions, lastVisit) {
+  const nowMs = Date.now()
+  for (const iv of interventions) {
+    if (iv.urgent) { iv.priorityScore = 100; continue }
+    if (iv.type === 'installation') { iv.priorityScore = 40; continue }
+
+    const key = (iv.client + '|' + iv.addr).toLowerCase().trim()
+    const lastDate = lastVisit[key]
+    const daysSinceLast = lastDate
+      ? Math.round((nowMs - new Date(lastDate + 'T12:00:00').getTime()) / 86400000)
+      : 400  // jamais visité → équivalent à ~13 mois
+
+    iv.priorityScore  = Math.min(80, Math.round(daysSinceLast / 365 * 60))
+    iv.daysSinceLast  = daysSinceLast
+    iv.lastVisitDate  = lastDate || null
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // AGENT 1 — Lecture Notion 14 jours
 // ═══════════════════════════════════════════════════════════════
 
@@ -271,7 +329,8 @@ async function agent1Data(token, dbId, dateFrom, dateTo, push) {
       client:   nProp(p, 'Société'),
       addr:     nProp(p, 'Adresse Site') || nProp(p, 'Adresse Siéges') || '',
       date:     dateStr.substring(0, 10),
-      tech:     nProp(p, 'Commercial '),
+      tech:     nProp(p, 'Technicien') || nProp(p, 'Technicien ') || 'Non assigné',
+      commercial: nProp(p, 'Commercial '),
       type,
       notes:    nProp(p, 'INFO ') || '',
       urgent:   !!(nProp(p, 'Urgent')),
@@ -339,10 +398,12 @@ function handleGeoOverflow(byDateTech, depotLat, depotLng, allTechs, push) {
 
       push(`   ⚠️  ${date}/${tech}: surcharge (${totalKm}km, ${Math.round(totalMin/60*10)/10}h) — réorganisation...`)
 
-      // Trier les interventions : urgentes en premier, puis par distance croissante du dépôt
-      const nonUrgent = ivs.filter(iv => !iv.urgent).sort((a, b) =>
-        distFromDepot(b, depotLat, depotLng) - distFromDepot(a, depotLat, depotLng)
-      )
+      // Bumper : priorité basse ET loin d'abord (score ascendant, distance descendante en égalité)
+      const nonUrgent = ivs.filter(iv => !iv.urgent).sort((a, b) => {
+        const sa = a.priorityScore ?? 30, sb = b.priorityScore ?? 30
+        if (sa !== sb) return sa - sb  // score le plus bas → bumped en premier
+        return distFromDepot(b, depotLat, depotLng) - distFromDepot(a, depotLat, depotLng)
+      })
 
       // Extraire jusqu'à 3 interventions lointaines/non-urgentes
       const toMove = []
@@ -358,33 +419,23 @@ function handleGeoOverflow(byDateTech, depotLat, depotLng, allTechs, push) {
       for (const iv of toMove) {
         ivs.splice(ivs.indexOf(iv), 1)
 
-        // Essayer un autre tech disponible ce jour
-        const altTech = findAvailableTech(date, byDateTech, allTechs)
-        if (altTech) {
-          if (!byDateTech[date][altTech]) byDateTech[date][altTech] = []
-          byDateTech[date][altTech].push(iv)
-          iv.tech = altTech
-          reassignments.push({ notionId: iv.notionId, client: iv.client, from: tech, to: altTech, date })
-          push(`   🔄 "${iv.client}" réaffecté à ${altTech} le ${date}`)
+        // Déplacer au prochain jour disponible pour le MÊME tech (pas de réaffectation inter-techs)
+        const nextDay = findNextFreeDay(date, tech, byDateTech)
+        if (nextDay) {
+          if (!byDateTech[nextDay]) byDateTech[nextDay] = {}
+          if (!byDateTech[nextDay][tech]) byDateTech[nextDay][tech] = []
+          byDateTech[nextDay][tech].push(iv)
+          iv.date = nextDay
+          dateMoves.push({ notionId: iv.notionId, client: iv.client, fromDate: date, toDate: nextDay, tech })
+          push(`   📅 "${iv.client}" déplacé au ${nextDay} (${tech})`)
         } else {
-          // Trouver le prochain jour libre pour ce tech
-          const nextDay = findNextFreeDay(date, tech, byDateTech)
-          if (nextDay) {
-            if (!byDateTech[nextDay]) byDateTech[nextDay] = {}
-            if (!byDateTech[nextDay][tech]) byDateTech[nextDay][tech] = []
-            byDateTech[nextDay][tech].push(iv)
-            iv.date = nextDay
-            dateMoves.push({ notionId: iv.notionId, client: iv.client, fromDate: date, toDate: nextDay, tech })
-            push(`   📅 "${iv.client}" déplacé au ${nextDay}`)
-          } else {
-            push(`   ⚠️  "${iv.client}" non recasable dans les 14 prochains jours`)
-          }
+          push(`   ⚠️  "${iv.client}" non recasable dans les 14 prochains jours`)
         }
       }
     }
   }
 
-  return { dateMoves, reassignments, overnights }
+  return { dateMoves, overnights }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -411,7 +462,7 @@ function rebalanceLoad(byDateTech, depotLat, depotLng, push) {
       if (heavy.min > RULES.warnLoadMin && light.min < 480 && (heavy.min - light.min) > 120) {
         const candidates = heavy.ivs
           .filter(iv => !iv.urgent)
-          .sort((a, b) => (RULES.durations[a.type] || 20) - (RULES.durations[b.type] || 20))
+          .sort((a, b) => (a.priorityScore ?? 30) - (b.priorityScore ?? 30))  // basse priorité déplacée en premier
 
         if (candidates.length) {
           const iv = candidates[0]
@@ -632,6 +683,12 @@ export default async (req) => {
     // ── Géocodage ──────────────────────────────────────────────
     await geocodeAll(interventions, push)
 
+    // ── Scores de priorité (portatour-style) ───────────────────
+    const lastVisit = await loadLastVisits(token, dbId, push)
+    enrichPriorityScores(interventions, lastVisit)
+    const highPrio = interventions.filter(iv => iv.priorityScore >= 60).length
+    if (highPrio) push(`   ⚠️  ${highPrio} intervention(s) priorité haute (cycle annuel dépassé)`)
+
     // ── Regrouper par date/tech ────────────────────────────────
     const byDateTech = {}
     for (const iv of interventions) {
@@ -641,22 +698,12 @@ export default async (req) => {
       byDateTech[iv.date][t].push(iv)
     }
 
-    // ── Rééquilibrage charge ───────────────────────────────────
-    push('\n⚖️  Rééquilibrage charge...')
-    const balReassign = rebalanceLoad(byDateTech, depotLat, depotLng, push)
-    if (!balReassign.length) push('   ✅ Aucun rééquilibrage nécessaire')
-
-    // ── Validation géo + gestion overflow ─────────────────────
+    // ── Validation géo + détection overflow (sans réaffectation inter-techs) ──
     push('\n🌍 Validation géographique...')
-    const { dateMoves, reassignments: geoReassign, overnights } = handleGeoOverflow(byDateTech, depotLat, depotLng, allTechs, push)
-    if (!dateMoves.length && !geoReassign.length && !overnights.length) push('   ✅ Toutes les tournées sont dans les limites')
+    const { dateMoves, overnights } = handleGeoOverflow(byDateTech, depotLat, depotLng, allTechs, push)
+    if (!dateMoves.length && !overnights.length) push('   ✅ Toutes les tournées sont dans les limites')
 
-    // ── Écriture Notion : réaffectations + déplacements dates ──
-    const allReassign = [...balReassign, ...geoReassign]
-    if (allReassign.length) {
-      push(`\n📝 Mise à jour techniciens Notion (${allReassign.length})...`)
-      await writeReassignments(token, allReassign, push)
-    }
+    // ── Déplacements de dates Notion (surcharge journée) ──────
     if (dateMoves.length) {
       push(`\n📅 Déplacement dates Notion (${dateMoves.length})...`)
       await writeDateMoves(token, dateMoves, push)
@@ -706,7 +753,6 @@ export default async (req) => {
       const icon = !r.feasible ? '❌' : r.totalHours > 10 ? '⚠️' : '✅'
       push(`  ${icon} ${r.date}/${r.tech} — ${r.count} arrêts, ${r.km}km, ${r.totalHours}h`)
     })
-    if (allReassign.length) push(`\n🔄 ${allReassign.length} réaffectation(s) Notion`)
     if (dateMoves.length)   push(`📅 ${dateMoves.length} déplacement(s) de date Notion`)
     if (overnights.length)  push(`🌙 ${overnights.length} tournée(s) avec découcher`)
     push(`💾 ${totalWritten} heures planifiées écrites dans Notion`)
@@ -715,7 +761,7 @@ export default async (req) => {
     push(`\n🏁 Terminé — ${new Date().toLocaleString('fr-FR', { timeZone: 'Europe/Paris' })}`)
 
     return new Response(
-      JSON.stringify({ status: 'ok', dayResults, reassignments: allReassign, dateMoves, overnights, planning, log }),
+      JSON.stringify({ status: 'ok', dayResults, dateMoves, overnights, planning, log }),
       { status: 200, headers: { 'Content-Type': 'application/json' } }
     )
 

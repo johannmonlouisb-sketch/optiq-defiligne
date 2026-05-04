@@ -95,7 +95,7 @@ function buildDayPayload(groups, depotLat, depotLng) {
         id:       jid,
         location: [iv.lng, iv.lat],       // Vroom : [lng, lat]
         service:  serviceSeconds(iv.type),
-        priority: iv.urgent ? 100 : 0
+        priority: iv.priorityScore !== undefined ? iv.priorityScore : (iv.urgent ? 100 : 0)
       })
     }
   }
