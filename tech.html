@@ -1726,6 +1726,32 @@ function startNotionPolling(){
 try{const s=localStorage.getItem("tech_id");if(s)curTech=parseInt(s)}catch(e){}
 document.getElementById("dep-date").value=TODAY()
 if(techCfg.startTime){const te=document.getElementById("dep-time");if(te)te.value=techCfg.startTime}
+
+// Charger les paramètres depuis Netlify (noms techs, véhicules, dépôts)
+if(isDeployedApp){
+  fetch('/api/settings').then(r=>r.ok?r.json():null).then(s=>{
+    if(!s?.techs?.length) return
+    s.techs.forEach(d=>{
+      const t=TECHS.find(tc=>tc.id===d.id)
+      if(t){
+        if(d.name)    { t.name=d.name; t.init=d.init||d.name.substring(0,2).toUpperCase() }
+        if(d.vehicle) t.vehicle=d.vehicle
+        if(d.conso)   t.conso=d.conso
+        if(d.color)   t.color=d.color
+        if(d.depotAddr!==undefined) t.depotAddr=d.depotAddr
+        if(d.avail!==undefined)     t.avail=d.avail
+      } else if(d.id && d.name){
+        TECHS.push({id:d.id,name:d.name,init:d.init||d.name.substring(0,2).toUpperCase(),
+          vehicle:d.vehicle||'—',conso:d.conso||7.0,avail:d.avail!==false,
+          color:d.color||'#607D8B',depotAddr:d.depotAddr||''})
+      }
+    })
+    if(s.depot) window._settingsDepot=s.depot
+    updateTopbar()
+    renderDepart()
+  }).catch(()=>{})
+}
+
 updateTopbar()
 renderDepart()
 updateBadges()

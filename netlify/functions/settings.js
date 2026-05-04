@@ -1,7 +1,7 @@
 // netlify/functions/settings.js
-// Persistance des paramètres OptiQ via Netlify Blobs (stockage cloud cross-device)
+// Persistance des paramètres OptiQ via Netlify Blobs (cross-device)
 
-const { getStore } = require('@netlify/blobs')
+import { getStore } from '@netlify/blobs'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -10,32 +10,32 @@ const CORS = {
   'Content-Type': 'application/json'
 }
 
-exports.handler = async (event) => {
-  if (event.httpMethod === 'OPTIONS')
-    return { statusCode: 200, headers: { ...CORS, 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS' }, body: '' }
+export default async (request) => {
+  if (request.method === 'OPTIONS')
+    return new Response('', { status: 200, headers: CORS })
 
   try {
     const store = getStore({ name: 'optiq-config', consistency: 'strong' })
 
-    // GET — charger les paramètres
-    if (event.httpMethod === 'GET') {
+    if (request.method === 'GET') {
       const data = await store.get('settings', { type: 'json' }).catch(() => null)
-      return { statusCode: 200, headers: CORS, body: JSON.stringify(data || {}) }
+      return new Response(JSON.stringify(data || {}), { status: 200, headers: CORS })
     }
 
-    // POST — sauvegarder les paramètres
-    if (event.httpMethod === 'POST') {
+    if (request.method === 'POST') {
       let body
-      try { body = JSON.parse(event.body || '{}') }
-      catch { return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'JSON invalide' }) } }
+      try { body = await request.json() }
+      catch { return new Response(JSON.stringify({ error: 'JSON invalide' }), { status: 400, headers: CORS }) }
 
       await store.set('settings', JSON.stringify({ ...body, _savedAt: new Date().toISOString() }))
-      return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true }) }
+      return new Response(JSON.stringify({ ok: true }), { status: 200, headers: CORS })
     }
 
-    return { statusCode: 405, headers: CORS, body: JSON.stringify({ error: 'Method not allowed' }) }
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: CORS })
   } catch (e) {
     console.error('Settings error:', e.message)
-    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: e.message }) }
+    return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: CORS })
   }
 }
+
+export const config = { path: '/api/settings' }
