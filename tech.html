@@ -632,10 +632,21 @@ function renderDepart(){
   if(!dayIvs.length){if(empty)empty.style.display="block";if(list)list.innerHTML="";return}
   if(empty)empty.style.display="none"
 
+  const tToMin=hhmm=>{if(!hhmm)return null;const[h,m]=hhmm.split(':').map(Number);return h*60+m}
   list.innerHTML=dayIvs.map((iv,idx)=>{
     const done=validated[iv.id], fail=failed[iv.id]
     const col=done?"#2E7D32":fail?"#C62828":TYPES[iv.type].color
     const lbl=done?"✓":fail?"✗":(idx+1)
+    // Temps de trajet = ETA(ce stop) - leave(stop précédent ou départ)
+    let travelMin=null
+    const etaThis=tToMin(techETAs[iv.id]?.eta)
+    if(etaThis!==null){
+      const prevLeave=idx===0
+        ? tToMin(depStartTime())
+        : tToMin(techETAs[dayIvs[idx-1]?.id]?.leave)
+      if(prevLeave!==null) travelMin=etaThis-prevLeave
+    }
+    const workMin=dur(iv.type,iv.form)
     return `<div class="dc ${done?"vdone":fail?"vfail":""}" id="dc-${iv.id}"
       draggable="true"
       ondragstart="_dragId=${iv.id};event.dataTransfer.effectAllowed='move'"
@@ -662,7 +673,8 @@ function renderDepart(){
         </div>
       </div>
       <div class="dc-tags">
-        <span class="tag tag-info">${TYPES[iv.type].label} · ${fmin(dur(iv.type,iv.form))}</span>
+        ${travelMin!==null?`<span class="tag" style="background:#E3F2FD;color:#1565C0;font-weight:600">🚗 ${fmin(travelMin)} de trajet</span>`:""}
+        <span class="tag tag-info">🔧 ${fmin(workMin)} · ${TYPES[iv.type].label}</span>
         ${techETAs[iv.id]?`<span class="tag" style="background:#E8F5E9;color:#2E7D32;font-weight:600">🕐 ${techETAs[iv.id].eta} → ${techETAs[iv.id].leave}</span>`:""}
         ${iv.padPak?`<span class="tag tag-warn">⚡ Pad Pak</span>`:""}
         ${iv.form?`<span class="tag" style="background:#F3E5F5;color:#6A1B9A">+Formation</span>`:""}
