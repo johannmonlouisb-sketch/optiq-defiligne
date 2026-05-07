@@ -111,3 +111,8 @@
   from   = "/api/traiter-planning"
   to     = "/.netlify/functions/traiter-planning"
   status = 200
+
+[[redirects]]
+  from   = "/api/kizeo-import"
+  to     = "/.netlify/functions/kizeo-import"
+  status = 200
