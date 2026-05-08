@@ -13,7 +13,7 @@ export const config = {
 const NOTION_VERSION = '2022-06-28'
 const NOTION_BASE    = 'https://api.notion.com/v1'
 const KIZEO_BASE     = 'https://forms.kizeo.com/rest/v3'
-const CLAUDE_BASE    = 'https://api.anthropic.com/v1'
+const GROQ_BASE      = 'https://api.groq.com/openai/v1'
 const BREVO_BASE     = 'https://api.brevo.com/v3'
 
 // ─────────────────────────────────────────────────────────────
@@ -33,14 +33,14 @@ export default async (req) => {
     kizeoToken:    process.env.OPTIQ_KIZEO_TOKEN,
     kizeoFormId:   process.env.OPTIQ_KIZEO_FORM_ID,
     brevoKey:      process.env.OPTIQ_BREVO_KEY,
-    claudeKey:     process.env.ANTHROPIC_API_KEY,
+    groqKey:       process.env.GROQ_API_KEY || process.env.GROQ,
     depotAddress:  process.env.OPTIQ_DEPOT_ADDRESS || '7 rue des entrepreneurs, 78540 Vernouillet',
     alertEmail:    process.env.OPTIQ_ALERT_EMAIL || '',
   }
 
   // Vérifications
   if (!cfg.notionToken) { push('❌ NOTION_TOKEN manquant'); return new Response('Missing NOTION_TOKEN', {status:500}) }
-  if (!cfg.claudeKey)   { push('❌ ANTHROPIC_API_KEY manquant'); return new Response('Missing CLAUDE key', {status:500}) }
+  if (!cfg.groqKey)     { push('❌ GROQ_API_KEY manquant'); return new Response('Missing GROQ_API_KEY', {status:500}) }
 
   try {
     // ── ÉTAPE 1 : Lire les interventions de demain dans Notion ─────────────
@@ -270,24 +270,25 @@ Réponds UNIQUEMENT en JSON valide, sans markdown :
   "endTime": "17:00"
 }`
 
-  const r = await fetch(`${CLAUDE_BASE}/messages`, {
+  if (!cfg.groqKey) throw new Error('GROQ_API_KEY manquante — configurez-la dans Netlify')
+  const r = await fetch(`${GROQ_BASE}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': cfg.claudeKey,
-      'anthropic-version': '2023-06-01'
+      'Authorization': `Bearer ${cfg.groqKey}`,
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
+      model: 'llama-3.3-70b-versatile',
       max_tokens: 2000,
+      temperature: 0.3,
       messages: [{ role: 'user', content: prompt }]
     })
   })
 
   const data = await r.json()
-  if (!r.ok) throw new Error(`Claude API error: ${JSON.stringify(data)}`)
+  if (!r.ok) throw new Error(`Groq API error: ${JSON.stringify(data)}`)
 
-  const text = data.content?.[0]?.text || '{}'
+  const text = data.choices?.[0]?.message?.content || '{}'
   try {
     return JSON.parse(text.replace(/```json|```/g,'').trim())
   } catch(e) {

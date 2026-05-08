@@ -4,8 +4,7 @@
   "description": "OptiQ — Gestion de tournées techniciens DEA",
   "private": true,
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.39.0",
-    "@netlify/blobs": "^8.2.0",
+"@netlify/blobs": "^8.2.0",
     "@notionhq/client": "^2.3.0",
     "node-fetch": "^3.3.2"
   },
