@@ -170,8 +170,7 @@ async function runAgent(messages) {
       tool_choice: 'auto',
     });
 
-    const data = await res.json();
-    const choice = data.choices?.[0];
+    const choice = res.choices?.[0];
     const msg = choice?.message;
 
     lastText = msg?.content || lastText;
