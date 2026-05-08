@@ -4,7 +4,7 @@ const GROQ_API_KEY     = process.env.GROQ_API_KEY || process.env.GROQ;
 const DB_KIZEO         = '4326bdb2-994b-4250-9759-a897ff7a4a1f';
 const DB_INTERVENTIONS = '3ab30393-8dd2-4f10-98e4-b7f7b1c91f60';
 const GROQ_URL         = 'https://api.groq.com/openai/v1/chat/completions';
-const GROQ_MODEL       = 'llama-3.1-8b-instant'; // 30k TPM vs 12k pour 70b
+const GROQ_MODEL       = 'llama-3.3-70b-versatile'; // 12k TPM (> 6k pour 8b sur ce compte)
 
 const SYSTEM = `Tu es l'agent de planification de Défi Ligne, spécialisée dans la maintenance de défibrillateurs (DAE) et PAD PAK.
 
@@ -51,7 +51,7 @@ const TOOLS = [
             description: 'Filtrer par urgences maintenance annuelle',
           },
           technicien: { type: 'string', description: 'Nom partiel du technicien ex: HERBET' },
-          limit: { type: 'number', description: 'Nombre max de sites (défaut 25, max 40)' },
+          limit: { type: 'number', description: 'Nombre max de sites (défaut 15, max 20)' },
         },
       },
     },
@@ -220,7 +220,7 @@ async function runAgent(messages) {
 }
 
 // ── Outils ────────────────────────────────────────────────────────────────────
-async function toolGetKizeoSites({ urgence_padpak, urgence_annuelle, technicien, limit = 25 }) {
+async function toolGetKizeoSites({ urgence_padpak, urgence_annuelle, technicien, limit = 15 }) {
   const filters = [];
 
   if (urgence_padpak?.length) {
