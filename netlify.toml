@@ -119,3 +119,8 @@
   from   = "/api/kizeo-import"
   to     = "/.netlify/functions/kizeo-import"
   status = 200
+
+[[redirects]]
+  from   = "/api/agent-directif"
+  to     = "/.netlify/functions/agent-directif"
+  status = 200
