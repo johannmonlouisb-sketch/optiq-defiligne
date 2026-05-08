@@ -12,7 +12,7 @@ Tu aides à planifier les tournées de techniciens (HERBET, BEUZELIN, etc.) en t
 - Des urgences PAD PAK : expired (⚠️ expiré), critical (🔴 ≤30j), urgent (🟠 ≤90j), soon (🟡 ≤180j)
 - Des maintenances annuelles : overdue (🔴 en retard), critical, urgent
 - De la proximité géographique (regroupe les sites par département = 2 premiers chiffres du code postal)
-- Des infos Kizeo : modèle DAE, numéro de série, dernier technicien, dernière visite
+- Des infos Kizeo retournées en compact : id, nom, adr (CP ville), tech, pp (PAD PAK urgence), ann (annuelle urgence), exp (expiration)
 
 Règles de planification :
 - Max 10 sites par jour par technicien (~8h de travail)
@@ -36,7 +36,7 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'get_kizeo_sites',
-      description: 'Récupère les sites depuis la base Kizeo Notion. Retourne : nom, adresse, ville, code postal, urgence PAD PAK, urgence annuelle, technicien, modèle DAE, dernière visite.',
+      description: 'Récupère les sites depuis la base Kizeo Notion. Retourne (format compact) : id, nom, adr (CP+ville), tech (technicien), pp (urgence PAD PAK), ann (urgence annuelle), exp (prochaine expiration).',
       parameters: {
         type: 'object',
         properties: {
@@ -51,7 +51,7 @@ const TOOLS = [
             description: 'Filtrer par urgences maintenance annuelle',
           },
           technicien: { type: 'string', description: 'Nom partiel du technicien ex: HERBET' },
-          limit: { type: 'number', description: 'Nombre max de sites (défaut 60)' },
+          limit: { type: 'number', description: 'Nombre max de sites (défaut 25, max 40)' },
         },
       },
     },
@@ -105,7 +105,7 @@ const TOOLS = [
                       urgence_annuelle: { type: 'string' },
                       motif:            { type: 'string' },
                     },
-                    required: ['nom', 'adresse', 'ville', 'motif'],
+                    required: ['nom', 'motif'],
                   },
                 },
               },
@@ -166,7 +166,7 @@ async function runAgent(messages) {
       headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: GROQ_MODEL,
-        max_tokens: 4096,
+        max_tokens: 2048,
         temperature: 0.3,
         messages: groqMsgs,
         tools: TOOLS,
@@ -240,7 +240,7 @@ async function runAgent(messages) {
 }
 
 // ── Outils ────────────────────────────────────────────────────────────────────
-async function toolGetKizeoSites({ urgence_padpak, urgence_annuelle, technicien, limit = 60 }) {
+async function toolGetKizeoSites({ urgence_padpak, urgence_annuelle, technicien, limit = 25 }) {
   const filters = [];
 
   if (urgence_padpak?.length) {
@@ -272,19 +272,15 @@ async function toolGetKizeoSites({ urgence_padpak, urgence_annuelle, technicien,
       if (type === 'date')   return prop.date?.start || null;
       return null;
     };
+    // Champs compacts pour limiter les tokens Groq (plan gratuit 12k TPM)
     return {
-      notion_id:          p.id,
-      nom:                g('Nom Site', 'title'),
-      adresse:            g('Adresse', 'text'),
-      code_postal:        g('Code Postal', 'text'),
-      ville:              g('Ville', 'text'),
-      technicien:         g('Technicien référent', 'text'),
-      dae_modele:         g('Modèle DAE', 'text'),
-      urgence_padpak:     g('Urgence PAD PAK', 'select'),
-      urgence_annuelle:   g('Urgence Annuelle', 'select'),
-      prochaine_exp:      g('Prochaine Expiration', 'date'),
-      derniere_visite:    g('Dernière Intervention Kizeo', 'date'),
-      prochaine_annuelle: g('Prochaine Maintenance Annuelle', 'date'),
+      id:   p.id,
+      nom:  g('Nom Site', 'title'),
+      adr:  [g('Code Postal', 'text'), g('Ville', 'text')].filter(Boolean).join(' '),
+      tech: g('Technicien référent', 'text'),
+      pp:   g('Urgence PAD PAK', 'select'),
+      ann:  g('Urgence Annuelle', 'select'),
+      exp:  g('Prochaine Expiration', 'date'),
     };
   });
 }
