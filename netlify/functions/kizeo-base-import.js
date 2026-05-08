@@ -38,9 +38,10 @@ exports.handler = async (event) => {
 
     const records = parseKizeoBase(csvContent);
     const urgencyBreakdown = getBreakdown(records);
+    const annualBreakdown = getAnnualBreakdown(records);
 
     if (dryRun) {
-      return { statusCode: 200, headers, body: JSON.stringify({ total: records.length, urgencyBreakdown, sample: records.slice(0,3) }) };
+      return { statusCode: 200, headers, body: JSON.stringify({ total: records.length, urgencyBreakdown, annualBreakdown, sample: records.slice(0,3) }) };
     }
 
     let sitesImported = 0, maintenancesCreated = 0, errors = [];
@@ -48,17 +49,26 @@ exports.handler = async (event) => {
       try {
         await createKizeoSite(r);
         sitesImported++;
+
+        // Maintenance PAD PAK si expirations urgentes
         if (!r.isTele && ['expired','critical','urgent','soon'].includes(r.urgency)) {
-          await createMaintenance(r);
+          await createMaintenance(r, 'padpak');
           maintenancesCreated++;
         }
+
+        // Maintenance annuelle si en retard ou urgente
+        if (!r.isTele && ['overdue','critical','urgent'].includes(r.annualUrgency)) {
+          await createMaintenance(r, 'annual');
+          maintenancesCreated++;
+        }
+
         await sleep(300);
       } catch(e) {
         errors.push({ site: r.nomSite, error: e.message });
       }
     }
 
-    return { statusCode: 200, headers, body: JSON.stringify({ success: true, total: records.length, sitesImported, maintenancesCreated, errors, urgencyBreakdown }) };
+    return { statusCode: 200, headers, body: JSON.stringify({ success: true, total: records.length, sitesImported, maintenancesCreated, errors, urgencyBreakdown, annualBreakdown }) };
   } catch(e) {
     return { statusCode: 500, headers, body: JSON.stringify({ error: e.message }) };
   }
@@ -93,13 +103,17 @@ function parseKizeoBase(text) {
     const societe = get('societe');
     const adresse = [get('adresse'), get('codePostal'), get('ville')].filter(Boolean).join(' ');
     if (!adresse && !societe) continue;
+    const dateIntervention = parseDate(get('dateDebut'));
+    const nextAnnual = calcNextAnnualDate(dateIntervention);
     records.push({
       technicien: get('technicien'), societe,
       nomSite: get('nomSite') || societe,
       adresse, codePostal: get('codePostal'), ville: get('ville'),
       daeModele: get('daeModele') || get('daeModele2'),
       daeSerial: get('daeSerial'), typeIntv, isTele,
-      dateIntervention: parseDate(get('dateDebut')),
+      dateIntervention,
+      nextAnnualMaintenance: nextAnnual,
+      annualUrgency: calcAnnualUrgency(dateIntervention),
       expirations, earliestExpiration: earliest,
       urgency: calcUrgency(earliest),
     });
@@ -118,6 +132,7 @@ async function createKizeoSite(r) {
   t('Ville',r.ville); t('Technicien référent',r.technicien);
   t('Modèle DAE',r.daeModele); t('N° Série DAE',r.daeSerial);
   s('Urgence PAD PAK',r.urgency);
+  s('Urgence Annuelle',r.annualUrgency);
   s('Type intervention', r.isTele ? 'TÉLÉ-ASSISTANCE' : 'PASSAGE PHYSIQUE');
   d('Prochaine Expiration',r.earliestExpiration);
   d('Expiration Électrodes',r.expirations?.electrodes);
@@ -125,26 +140,40 @@ async function createKizeoSite(r) {
   d('Expiration PAD PAK Adulte',r.expirations?.padPakAdulte);
   d('Expiration PAD PAK Pédiatrique',r.expirations?.padPakPedia);
   d('Dernière Intervention Kizeo',r.dateIntervention);
+  d('Prochaine Maintenance Annuelle',r.nextAnnualMaintenance);
   props['Maintenance planifiée'] = { checkbox: false };
   await notionReq('POST','/pages',{ parent:{database_id:NOTION_DB_KIZEO}, properties:props });
 }
 
-async function createMaintenance(r) {
-  const expDate = new Date(r.earliestExpiration);
-  const mDate = new Date(expDate);
-  mDate.setDate(mDate.getDate() - 60);
-  if (mDate < new Date()) mDate.setTime(Date.now() + 7*86400000);
-  const dateStr = mDate.toISOString().split('T')[0];
-  const urgLabel = {expired:'⚠️ EXPIRÉ',critical:'🔴 CRITIQUE',urgent:'🟠 URGENT',soon:'🟡 À PLANIFIER'}[r.urgency]||'';
+async function createMaintenance(r, type) {
+  let dateStr, motif, urgLabel;
+
+  if (type === 'padpak') {
+    const expDate = new Date(r.earliestExpiration);
+    const mDate = new Date(expDate);
+    mDate.setDate(mDate.getDate() - 60);
+    if (mDate < new Date()) mDate.setTime(Date.now() + 7*86400000);
+    dateStr = mDate.toISOString().split('T')[0];
+    urgLabel = {expired:'⚠️ EXPIRÉ',critical:'🔴 CRITIQUE',urgent:'🟠 URGENT',soon:'🟡 À PLANIFIER'}[r.urgency]||'';
+    motif = `Maintenance préventive PAD PAK — ${urgLabel} — Expiration: ${r.earliestExpiration}`;
+  } else {
+    // Maintenance annuelle : planifiée à la date prévue, ou dans 7 jours si déjà dépassée
+    const aDate = r.nextAnnualMaintenance ? new Date(r.nextAnnualMaintenance) : new Date();
+    if (aDate < new Date()) aDate.setTime(Date.now() + 7*86400000);
+    dateStr = aDate.toISOString().split('T')[0];
+    const annualLbl = {overdue:'🔴 EN RETARD',critical:'🔴 CRITIQUE',urgent:'🟠 URGENT'}[r.annualUrgency]||'';
+    motif = `Maintenance annuelle obligatoire — ${annualLbl} — Dernière visite: ${r.dateIntervention||'inconnue'}`;
+  }
+
   await notionReq('POST','/pages',{
     parent:{database_id:NOTION_DB_INTERVENTIONS},
     properties:{
       'Société':{title:[{text:{content:(r.nomSite||r.societe||'').substring(0,2000)}}]},
       'Adresse Site':{rich_text:[{text:{content:(r.adresse||'').substring(0,2000)}}]},
       'Date intervention':{date:{start:dateStr}},
-      'INTERVENTION':{multi_select:[{name:'Maintenance PAD PAK'}]},
-      'Motif':{rich_text:[{text:{content:`Maintenance préventive PAD PAK — ${urgLabel} — Expiration: ${r.earliestExpiration}`}}]},
-      'Urgent':{rich_text:[{text:{content:(r.urgency==='expired'||r.urgency==='critical')?'Oui':'Non'}}]},
+      'INTERVENTION':{multi_select:[{name: type === 'padpak' ? 'Maintenance PAD PAK' : 'Maintenance Annuelle'}]},
+      'Motif':{rich_text:[{text:{content:motif}}]},
+      'Urgent':{rich_text:[{text:{content:(r.urgency==='expired'||r.urgency==='critical'||r.annualUrgency==='overdue')?'Oui':'Non'}}]},
       'Terminer':{checkbox:false},'Echec':{checkbox:false},
     }
   });
@@ -172,14 +201,35 @@ function parseDate(raw) {
   if(/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.substring(0,10);
   return null;
 }
+function calcNextAnnualDate(lastIntervention) {
+  if (!lastIntervention) return null;
+  const d = new Date(lastIntervention);
+  d.setFullYear(d.getFullYear() + 1);
+  return d.toISOString().split('T')[0];
+}
 function calcUrgency(d) {
   if(!d) return 'unknown';
   const diff=Math.floor((new Date(d)-new Date())/86400000);
   if(diff<0) return 'expired'; if(diff<=30) return 'critical';
   if(diff<=90) return 'urgent'; if(diff<=180) return 'soon'; return 'ok';
 }
+function calcAnnualUrgency(lastIntervention) {
+  if (!lastIntervention) return 'unknown';
+  const next = new Date(lastIntervention);
+  next.setFullYear(next.getFullYear() + 1);
+  const diff = Math.floor((next - new Date()) / 86400000);
+  if (diff < 0) return 'overdue';
+  if (diff <= 30) return 'critical';
+  if (diff <= 90) return 'urgent';
+  if (diff <= 180) return 'soon';
+  return 'ok';
+}
 function getBreakdown(records) {
   const b={expired:0,critical:0,urgent:0,soon:0,ok:0,unknown:0};
   records.forEach(r=>b[r.urgency]=(b[r.urgency]||0)+1); return b;
+}
+function getAnnualBreakdown(records) {
+  const b={overdue:0,critical:0,urgent:0,soon:0,ok:0,unknown:0};
+  records.forEach(r=>b[r.annualUrgency]=(b[r.annualUrgency]||0)+1); return b;
 }
 const sleep = ms => new Promise(r=>setTimeout(r,ms));

@@ -369,10 +369,12 @@ tr:hover td{background:var(--bg)}
           <table style="width:100%;border-collapse:collapse;font-size:13px">
             <thead>
               <tr style="background:#f5f5f7">
-                <th style="padding:10px 12px;text-align:left;font-size:12px;color:#666">Urgence</th>
+                <th style="padding:10px 12px;text-align:left;font-size:12px;color:#666">PAD PAK</th>
+                <th style="padding:10px 12px;text-align:left;font-size:12px;color:#666">Maint. annuelle</th>
                 <th style="padding:10px 12px;text-align:left;font-size:12px;color:#666">Site</th>
                 <th style="padding:10px 12px;text-align:left;font-size:12px;color:#666">Ville</th>
                 <th style="padding:10px 12px;text-align:left;font-size:12px;color:#666">Prochaine exp.</th>
+                <th style="padding:10px 12px;text-align:left;font-size:12px;color:#666">Prochaine visite</th>
                 <th style="padding:10px 12px;text-align:left;font-size:12px;color:#666">Technicien</th>
               </tr>
             </thead>
@@ -7237,7 +7239,15 @@ function showKizeoResult(data, dryRun) {
       </p>
       <p>📊 Total analysés : <strong>${data.total || 0}</strong></p>
       ${!dryRun ? `<p>📦 Sites importés dans Notion : <strong>${data.sitesImported||0}</strong></p>` : ''}
-      ${!dryRun ? `<p>📅 Maintenances planifiées : <strong>${data.maintenancesCreated||0}</strong></p>` : ''}
+      ${!dryRun ? `<p>📅 Maintenances planifiées (PAD PAK + annuelles) : <strong>${data.maintenancesCreated||0}</strong></p>` : ''}
+      ${data.annualBreakdown ? `<p style="margin-top:8px;font-weight:500;color:#374151">🗓️ Maintenances annuelles :</p>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;margin-bottom:8px">
+        ${data.annualBreakdown.overdue ? `<span style="background:#dc2626;color:white;padding:2px 8px;border-radius:20px;font-size:12px">🔴 En retard: ${data.annualBreakdown.overdue}</span>` : ''}
+        ${data.annualBreakdown.critical ? `<span style="background:#ea580c;color:white;padding:2px 8px;border-radius:20px;font-size:12px">🔴 Critiques: ${data.annualBreakdown.critical}</span>` : ''}
+        ${data.annualBreakdown.urgent ? `<span style="background:#d97706;color:white;padding:2px 8px;border-radius:20px;font-size:12px">🟠 Urgents: ${data.annualBreakdown.urgent}</span>` : ''}
+        ${data.annualBreakdown.soon ? `<span style="background:#2563eb;color:white;padding:2px 8px;border-radius:20px;font-size:12px">🟡 Bientôt: ${data.annualBreakdown.soon}</span>` : ''}
+        ${data.annualBreakdown.ok ? `<span style="background:#16a34a;color:white;padding:2px 8px;border-radius:20px;font-size:12px">✅ OK: ${data.annualBreakdown.ok}</span>` : ''}
+      </div>` : ''}
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
         ${b.expired ? `<span style="background:#dc2626;color:white;padding:3px 10px;border-radius:20px;font-size:12px">⚠️ Expirés: ${b.expired}</span>` : ''}
         ${b.critical ? `<span style="background:#ea580c;color:white;padding:3px 10px;border-radius:20px;font-size:12px">🔴 Critiques: ${b.critical}</span>` : ''}
@@ -7254,12 +7264,16 @@ function showKizeoPreview(data) {
   const body = document.getElementById('kizeo-preview-body');
   const urgColor = {expired:'#dc2626',critical:'#ea580c',urgent:'#d97706',soon:'#2563eb',ok:'#16a34a',unknown:'#9ca3af'};
   const urgLbl = {expired:'⚠️ Expiré',critical:'🔴 Critique',urgent:'🟠 Urgent',soon:'🟡 Bientôt',ok:'✅ OK',unknown:'—'};
+  const annualColor = {overdue:'#dc2626',critical:'#ea580c',urgent:'#d97706',soon:'#2563eb',ok:'#16a34a',unknown:'#9ca3af'};
+  const annualLbl = {overdue:'🔴 En retard',critical:'🔴 Critique',urgent:'🟠 Urgent',soon:'🟡 Bientôt',ok:'✅ OK',unknown:'—'};
   body.innerHTML = data.sample.map(r => `
     <tr style="border-bottom:1px solid #f0f0f0">
       <td style="padding:10px 12px"><span style="color:${urgColor[r.urgency]||'#666'};font-weight:500">${urgLbl[r.urgency]||r.urgency}</span></td>
+      <td style="padding:10px 12px"><span style="color:${annualColor[r.annualUrgency]||'#666'};font-weight:500">${annualLbl[r.annualUrgency]||r.annualUrgency}</span></td>
       <td style="padding:10px 12px">${r.nomSite||'—'}</td>
       <td style="padding:10px 12px">${r.ville||'—'}</td>
       <td style="padding:10px 12px">${r.earliestExpiration||'—'}</td>
+      <td style="padding:10px 12px">${r.nextAnnualMaintenance||'—'}</td>
       <td style="padding:10px 12px">${r.technicien||'—'}</td>
     </tr>`).join('');
 }
