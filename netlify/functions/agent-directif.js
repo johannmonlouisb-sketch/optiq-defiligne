@@ -4,7 +4,7 @@ const GROQ_API_KEY     = process.env.GROQ_API_KEY || process.env.GROQ;
 const DB_KIZEO         = '4326bdb2-994b-4250-9759-a897ff7a4a1f';
 const DB_INTERVENTIONS = '3ab30393-8dd2-4f10-98e4-b7f7b1c91f60';
 const GROQ_URL         = 'https://api.groq.com/openai/v1/chat/completions';
-const GROQ_MODEL       = 'llama-3.3-70b-versatile';
+const GROQ_MODEL       = 'llama-3.1-8b-instant'; // 30k TPM vs 12k pour 70b
 
 const SYSTEM = `Tu es l'agent de planification de Défi Ligne, spécialisée dans la maintenance de défibrillateurs (DAE) et PAD PAK.
 
@@ -161,23 +161,14 @@ async function runAgent(messages) {
   let lastText = '';
 
   for (let turn = 0; turn < 6; turn++) {
-    const res = await fetch(GROQ_URL, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: GROQ_MODEL,
-        max_tokens: 2048,
-        temperature: 0.3,
-        messages: groqMsgs,
-        tools: TOOLS,
-        tool_choice: 'auto',
-      }),
+    const res = await groqCall({
+      model: GROQ_MODEL,
+      max_tokens: 2048,
+      temperature: 0.3,
+      messages: groqMsgs,
+      tools: TOOLS,
+      tool_choice: 'auto',
     });
-
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`Groq error ${res.status}: ${err}`);
-    }
 
     const data = await res.json();
     const choice = data.choices?.[0];
@@ -220,18 +211,8 @@ async function runAgent(messages) {
     // Si plan proposé, on attend la confirmation utilisateur
     if (pendingPlan) {
       // Dernier tour pour récupérer le texte de conclusion
-      const finalRes = await fetch(GROQ_URL, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: GROQ_MODEL, max_tokens: 512, temperature: 0.3,
-          messages: groqMsgs, tools: TOOLS, tool_choice: 'none',
-        }),
-      });
-      if (finalRes.ok) {
-        const fd = await finalRes.json();
-        lastText = fd.choices?.[0]?.message?.content || lastText;
-      }
+      const finalRes = await groqCall({ model: GROQ_MODEL, max_tokens: 512, temperature: 0.3, messages: groqMsgs, tools: TOOLS, tool_choice: 'none' });
+      lastText = finalRes.choices?.[0]?.message?.content || lastText;
       break;
     }
   }
@@ -364,3 +345,22 @@ async function notionReq(method, path, body) {
 }
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// Groq fetch avec retry automatique sur 429 (max 8s d'attente)
+async function groqCall(body, retries = 2) {
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (res.status === 429 && retries > 0) {
+    const err = await res.json().catch(() => ({}));
+    const msg = err?.error?.message || '';
+    const match = msg.match(/try again in ([\d.]+)s/);
+    const wait = match ? Math.min(parseFloat(match[1]) * 1000 + 500, 8000) : 3000;
+    await sleep(wait);
+    return groqCall(body, retries - 1);
+  }
+  if (!res.ok) { const e = await res.text(); throw new Error(`Groq error ${res.status}: ${e}`); }
+  return res.json();
+}
