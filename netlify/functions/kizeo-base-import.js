@@ -139,10 +139,12 @@ async function createMaintenance(r) {
   await notionReq('POST','/pages',{
     parent:{database_id:NOTION_DB_INTERVENTIONS},
     properties:{
-      'Adresse Site':{title:[{text:{content:(r.adresse||r.nomSite||'').substring(0,2000)}}]},
+      'Société':{title:[{text:{content:(r.nomSite||r.societe||'').substring(0,2000)}}]},
+      'Adresse Site':{rich_text:[{text:{content:(r.adresse||'').substring(0,2000)}}]},
       'Date intervention':{date:{start:dateStr}},
-      'INTERVENTION':{rich_text:[{text:{content:`Maintenance préventive PAD PAK — ${urgLabel} — Expiration: ${r.earliestExpiration}`}}]},
-      'Urgent':{checkbox: r.urgency==='expired'||r.urgency==='critical'},
+      'INTERVENTION':{multi_select:[{name:'Maintenance PAD PAK'}]},
+      'Motif':{rich_text:[{text:{content:`Maintenance préventive PAD PAK — ${urgLabel} — Expiration: ${r.earliestExpiration}`}}]},
+      'Urgent':{rich_text:[{text:{content:(r.urgency==='expired'||r.urgency==='critical')?'Oui':'Non'}}]},
       'Terminer':{checkbox:false},'Echec':{checkbox:false},
     }
   });
