@@ -1801,6 +1801,14 @@ function isHoliday(date){
   if(!_hcache[y])_hcache[y]=getFrenchHolidays(y)
   return _hcache[y][date]||null
 }
+function isWeekend(date){
+  if(!date) return null
+  const d=new Date(date+'T12:00:00').getDay()
+  if(d===6) return 'Samedi'
+  if(d===0) return 'Dimanche'
+  return null
+}
+function isOffDay(date){ return isHoliday(date) || isWeekend(date) }
 function refreshTechSels(){
   const s=document.getElementById("m-tech");if(s){const prev=s.value;s.innerHTML=TECHS.map(t=>`<option value="${t.id}">${t.name}</option>`).join("");if(prev)s.value=prev}
 }
@@ -2447,10 +2455,15 @@ function ivCard(iv, idx, showNum){
 function daySection(date){
   const dayIvs=ivs.filter(i=>i.date===date)
   const holy=isHoliday(date)
+  const wknd=!holy&&isWeekend(date)
   const holyBanner=holy?`<div style="background:#FFCDD2;border:2px solid #C62828;border-radius:10px;padding:10px 16px;margin-bottom:12px;display:flex;align-items:center;gap:10px">
     <span style="font-size:22px">🚫</span>
     <div><div style="font-weight:700;color:#B71C1C;font-size:15px">${holy}</div>
-    <div style="font-size:12px;color:#C62828">Jour férié — interventions déconseillées ce jour</div></div></div>`:""
+    <div style="font-size:12px;color:#C62828">Jour férié — interventions déconseillées ce jour</div></div></div>`:
+  wknd?`<div style="background:#F3F4F6;border:1.5px solid #9CA3AF;border-radius:10px;padding:10px 16px;margin-bottom:12px;display:flex;align-items:center;gap:10px">
+    <span style="font-size:22px">🏖️</span>
+    <div><div style="font-weight:700;color:#4B5563;font-size:15px">${wknd}</div>
+    <div style="font-size:12px;color:#6B7280">Week-end — pas d'intervention prévue</div></div></div>`:""
   if(!dayIvs.length) return holyBanner+`<div class="card" style="text-align:center;color:var(--gray);padding:24px">Aucune intervention planifiée</div>`
   const byTech={}
   dayIvs.forEach(iv=>{if(!byTech[iv.techId])byTech[iv.techId]=[];byTech[iv.techId].push(iv)})
@@ -2525,10 +2538,13 @@ function rPlanWeek(el){
       const techCount=new Set(ivs.filter(iv=>iv.date===d).map(iv=>iv.techId)).size
       const isSel=d===selDate,isT=d===TODAY
       const holy=isHoliday(d)
-      return `<div class="db ${isSel?"on":isT?"td":""}" onclick="selDate='${d}';rPlan()" style="${holy&&!isSel?"background:#FFCDD2;border-color:#C62828;border-width:2px":""}">
-        <div class="dl" style="${holy&&!isSel?"color:#B71C1C;font-weight:700":""}">${DNAMES[i]}</div>
-        <div class="dn" style="${holy&&!isSel?"color:#B71C1C":""}">${d.split("-")[2]}</div>
+      const wknd=!holy&&isWeekend(d)
+      const bg=isSel?"":holy?"background:#FFCDD2;border-color:#C62828;border-width:2px":wknd?"background:#F3F4F6;border-color:#9CA3AF;border-width:1.5px":""
+      return `<div class="db ${isSel?"on":isT?"td":""}" onclick="selDate='${d}';rPlan()" style="${bg}">
+        <div class="dl" style="${holy&&!isSel?"color:#B71C1C;font-weight:700":wknd&&!isSel?"color:#6B7280;font-weight:600":""}">${DNAMES[i]}</div>
+        <div class="dn" style="${holy&&!isSel?"color:#B71C1C":wknd&&!isSel?"color:#6B7280":""}">${d.split("-")[2]}</div>
         ${holy?`<div style="font-size:8px;color:${isSel?"rgba(255,255,255,.95)":"#C62828"};font-weight:800;line-height:1.2;margin-top:1px">🚫 Férié</div>`:""}
+        ${wknd&&!isSel?`<div style="font-size:8px;color:#9CA3AF;font-weight:600;line-height:1.2;margin-top:1px">Week-end</div>`:""}
         ${cnt?`<span class="dc">${cnt}</span>`:""}
         ${techCount>0&&!isSel?`<div style="font-size:9px;color:var(--blue);margin-top:1px">👷${techCount}</div>`:""}
         ${done&&!isSel?`<div style="font-size:9px;color:#2E7D32;margin-top:1px">✓${done}</div>`:""}
@@ -2570,10 +2586,14 @@ function rPlanMonth(el){
       const techCount=new Set(ivs.filter(i=>i.date===date).map(i=>i.techId)).size
       const isSel=date===selDate,isT=date===TODAY
       const holy=isHoliday(date)
+      const wknd=!holy&&isWeekend(date)
       const dayNum=date.split("-")[2]
-      return `<div onclick="selDate='${date}';rPlan()" style="min-height:56px;background:${isSel?"var(--blue)":isT?"#DBEAFE":holy?"#FFCDD2":"var(--bg)"};border-radius:8px;padding:5px 6px;cursor:pointer;border:2px solid ${isSel?"var(--blue)":isT?"var(--blue)":holy?"#C62828":"transparent"};transition:all .1s" onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.1)'" onmouseout="this.style.boxShadow='none'">
-          <div style="font-size:13px;font-weight:${isT||isSel||holy?700:400};color:${isSel?"#fff":isT?"var(--blue)":holy?"#B71C1C":"var(--dark)"}">${dayNum}</div>
+      const cellBg=isSel?"var(--blue)":isT?"#DBEAFE":holy?"#FFCDD2":wknd?"#F3F4F6":"var(--bg)"
+      const cellBd=isSel?"var(--blue)":isT?"var(--blue)":holy?"#C62828":wknd?"#9CA3AF":"transparent"
+      return `<div onclick="selDate='${date}';rPlan()" style="min-height:56px;background:${cellBg};border-radius:8px;padding:5px 6px;cursor:pointer;border:2px solid ${cellBd};transition:all .1s" onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.1)'" onmouseout="this.style.boxShadow='none'">
+          <div style="font-size:13px;font-weight:${isT||isSel||holy?700:400};color:${isSel?"#fff":isT?"var(--blue)":holy?"#B71C1C":wknd?"#9CA3AF":"var(--dark)"}">${dayNum}</div>
           ${holy&&!isSel?`<div style="font-size:9px;color:#C62828;font-weight:800;line-height:1.2">🚫 ${holy}</div>`:""}
+          ${wknd&&!isSel?`<div style="font-size:9px;color:#9CA3AF;font-weight:600;line-height:1.2">${wknd}</div>`:""}
           ${cnt?`<div style="display:flex;flex-direction:column;gap:2px;margin-top:2px">
             <span style="font-size:10px;font-weight:600;background:${isSel?"rgba(255,255,255,.25)":"var(--blue)"};color:#fff;border-radius:3px;padding:1px 5px;display:inline-block">${cnt} interv.</span>
             ${techCount>0?`<span style="font-size:10px;color:${isSel?"rgba(255,255,255,.7)":"var(--blue)"}">👷 ${techCount} tech${techCount>1?"s":""}</span>`:""}
@@ -5394,8 +5414,16 @@ function onDateChange(){
     if(dateInput) dateInput.parentNode.appendChild(holyWarn)
   }
   const holy = date ? isHoliday(date) : null
-  if(holy){ holyWarn.style.display="block"; holyWarn.textContent="🚫 "+holy+" — Jour férié" }
-  else { holyWarn.style.display="none" }
+  const wknd = date && !holy ? isWeekend(date) : null
+  if(holy){
+    holyWarn.style.background="#FFCDD2"; holyWarn.style.borderColor="#C62828"; holyWarn.style.color="#B71C1C"
+    holyWarn.style.display="block"; holyWarn.textContent="🚫 "+holy+" — Jour férié"
+  } else if(wknd){
+    holyWarn.style.background="#F3F4F6"; holyWarn.style.borderColor="#9CA3AF"; holyWarn.style.color="#4B5563"
+    holyWarn.style.display="block"; holyWarn.textContent="🏖️ "+wknd+" — Pas d'intervention prévue"
+  } else {
+    holyWarn.style.display="none"
+  }
   if(editId || !date || !addr) return
   // Si la date choisie a déjà des interventions → cocher détour auto
   const existing = ivs.filter(i=>i.date===date)
