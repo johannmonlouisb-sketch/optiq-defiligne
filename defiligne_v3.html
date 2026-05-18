@@ -38,6 +38,15 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);display:flex;h
 .sr-item:hover{background:var(--blueLight)}
 .sr-item .sr-name{font-weight:500;color:var(--dark)}
 .sr-item .sr-addr{color:var(--gray);font-size:11px}
+/* ADDR AUTOCOMPLETE */
+.addr-wrap{position:relative}
+.addr-drop{position:absolute;left:0;right:0;top:calc(100% + 3px);background:#fff;border:1.5px solid var(--blue);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,0.13);z-index:1100;max-height:220px;overflow-y:auto;display:none}
+.addr-drop.open{display:block}
+.addr-opt{padding:9px 13px;cursor:pointer;border-bottom:1px solid var(--border);font-size:13px;line-height:1.35}
+.addr-opt:last-child{border-bottom:none}
+.addr-opt:hover,.addr-opt.ac-focused{background:var(--blueLight)}
+.addr-opt .ao-main{font-weight:500;color:var(--dark)}
+.addr-opt .ao-ctx{font-size:11px;color:var(--gray);margin-top:1px}
 /* PANELS */
 .vp{display:none;flex:1;overflow-y:auto;flex-direction:column}
 .vp.on{display:flex}
@@ -429,7 +438,12 @@ tr:hover td{background:var(--bg)}
       <div><label class="lbl">Client *</label><input id="m-client" placeholder="Nom du client"/></div>
       <div>
         <label class="lbl">Adresse *</label>
-        <input id="m-addr" placeholder="Adresse complète (avec code postal)" oninput="suggestDates()" onblur="suggestDates()"/>
+        <div class="addr-wrap">
+          <input id="m-addr" placeholder="Adresse complète (avec code postal)" autocomplete="off"
+                 oninput="onAddrInput('m-addr','addr-drop-main')"
+                 onkeydown="onAddrKey(event,'addr-drop-main','m-addr')"/>
+          <div id="addr-drop-main" class="addr-drop"></div>
+        </div>
       </div>
       <!-- Suggestions de dates -->
       <div id="date-suggestions" style="display:none;background:var(--blueLight);border-radius:8px;padding:10px 12px">
@@ -535,7 +549,14 @@ tr:hover td{background:var(--bg)}
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px">
           <div><label class="lbl">Email site</label><input id="m-cemail" placeholder="contact@client.fr" type="email"/></div>
-          <div><label class="lbl">Adresse siège</label><input id="m-siege" placeholder="Siège social du client"/></div>
+          <div><label class="lbl">Adresse siège</label>
+            <div class="addr-wrap">
+              <input id="m-siege" placeholder="Siège social du client" autocomplete="off"
+                     oninput="onAddrInput('m-siege','addr-drop-siege')"
+                     onkeydown="onAddrKey(event,'addr-drop-siege','m-siege')"/>
+              <div id="addr-drop-siege" class="addr-drop"></div>
+            </div>
+          </div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:8px">
           <div><label class="lbl">Contact siège</label><input id="m-cscontact" placeholder="Nom contact siège"/></div>
@@ -3968,6 +3989,87 @@ async function _geocodeNominatim(q){
   }catch(e){}
   return null
 }
+
+// ── Autocomplete adresse — API Adresse data.gouv.fr ──────────────────────────
+const _acTimer = {}
+const _acFocus = {}
+
+async function _addrSuggestions(q){
+  try{
+    const r = await fetch('https://api-adresse.data.gouv.fr/search/?q='+encodeURIComponent(q)+'&limit=6&autocomplete=1')
+    const d = await r.json()
+    return d.features || []
+  }catch(e){ return [] }
+}
+
+function onAddrInput(inputId, dropId){
+  const inp = document.getElementById(inputId)
+  const drop = document.getElementById(dropId)
+  const q = inp?.value.trim()
+  if(!q || q.length < 3){ drop?.classList.remove('open'); if(drop) drop.innerHTML=''; return }
+
+  clearTimeout(_acTimer[inputId])
+  _acTimer[inputId] = setTimeout(async ()=>{
+    const feats = await _addrSuggestions(q)
+    if(!feats.length){ drop.classList.remove('open'); return }
+    _acFocus[dropId] = -1
+    drop.innerHTML = feats.map((f,i)=>{
+      const p = f.properties
+      const main = p.name || p.label
+      const ctx  = [p.postcode, p.city].filter(Boolean).join(' ')
+      const full = p.label
+      const [lng, lat] = f.geometry.coordinates
+      return `<div class="addr-opt" data-addr="${full.replace(/"/g,'&quot;')}" data-lat="${lat}" data-lng="${lng}" data-idx="${i}"
+        onmousedown="selectAddrOpt('${inputId}','${dropId}','${full.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}',${lat},${lng})">
+        <div class="ao-main">${main}</div>${ctx?`<div class="ao-ctx">${ctx}</div>`:''}
+      </div>`
+    }).join('')
+    drop.classList.add('open')
+  }, 280)
+
+  if(inputId==='m-addr') suggestDates()
+}
+
+function selectAddrOpt(inputId, dropId, fullAddr, lat, lng){
+  const inp = document.getElementById(inputId)
+  if(inp){ inp.value = fullAddr }
+  gcache[fullAddr] = {lat, lng}
+  document.getElementById(dropId)?.classList.remove('open')
+  if(inputId==='m-addr'){ _lastSuggestAddr=''; suggestDates() }
+}
+
+function onAddrKey(e, dropId, inputId){
+  const drop = document.getElementById(dropId)
+  if(!drop?.classList.contains('open')) return
+  const opts = drop.querySelectorAll('.addr-opt')
+  if(!opts.length) return
+  if(e.key==='ArrowDown'){
+    e.preventDefault()
+    _acFocus[dropId] = Math.min((_acFocus[dropId]??-1)+1, opts.length-1)
+    opts.forEach((o,i)=>o.classList.toggle('ac-focused',i===_acFocus[dropId]))
+  } else if(e.key==='ArrowUp'){
+    e.preventDefault()
+    _acFocus[dropId] = Math.max((_acFocus[dropId]??0)-1, 0)
+    opts.forEach((o,i)=>o.classList.toggle('ac-focused',i===_acFocus[dropId]))
+  } else if(e.key==='Enter'){
+    const idx = (_acFocus[dropId]??-1) >= 0 ? _acFocus[dropId] : 0
+    const opt = opts[idx]
+    if(opt){
+      e.preventDefault()
+      const addr = opt.getAttribute('data-addr')
+      const lat  = parseFloat(opt.getAttribute('data-lat'))
+      const lng  = parseFloat(opt.getAttribute('data-lng'))
+      selectAddrOpt(inputId, dropId, addr, lat, lng)
+    }
+  } else if(e.key==='Escape'){
+    drop.classList.remove('open')
+  }
+}
+
+document.addEventListener('click', e=>{
+  if(!e.target.closest('.addr-wrap'))
+    document.querySelectorAll('.addr-drop').forEach(d=>d.classList.remove('open'))
+})
 
 // ── Géocode principal : cascade sur 3 moteurs ─────────────────────────────────
 async function geocode(addr){
