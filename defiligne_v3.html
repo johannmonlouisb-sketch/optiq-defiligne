@@ -6367,24 +6367,37 @@ async function pullFromNotion(dateFrom, dateTo, mode='merge'){
 // PUSH NOTION — Synchroniser tous les champs éditables
 // ══════════════════════════════════════════════════════════════
 async function pushEditToNotion(iv, obj){
-  if(!isDeployedApp) return
-  if(!iv.notionId) return
+  if(!isDeployedApp){ console.log('[Notion] mode local — push ignoré'); return }
+  if(!iv.notionId){   console.log('[Notion] pas de notionId — push ignoré pour', iv.client); return }
+
   const techName = techNotionNames[obj.techId] || TECHS.find(t => t.id === obj.techId)?.name || ''
-  const properties = {
+  console.log('[Notion] push →', iv.client, '| techId:', obj.techId, '| nom Notion:', techName, '| pageId:', iv.notionId)
+
+  // ── 1. Technicien en priorité (champ isolé pour éviter qu'une autre erreur bloque)
+  if(techName){
+    try {
+      const r = await notionCall('update_page', {pageId: iv.notionId, properties: {'Commercial': {select: {name: techName}}}})
+      console.log('[Notion] technicien OK', r)
+    } catch(e){
+      console.error('[Notion] ERREUR technicien:', e.message)
+      showToast('❌ Notion — technicien non sync : ' + e.message, '#C62828')
+      return
+    }
+  }
+
+  // ── 2. Autres champs (statut, notes, date)
+  const props2 = {
     'Date intervention': {date: {start: obj.date}},
     'Terminer':          {checkbox: obj.status === 'completed'},
     'Echec':             {checkbox: obj.status === 'not_responded'},
     'INFO':              {rich_text: [{text: {content: obj.notes || ''}}]},
-    'Contact site':      {rich_text: [{text: {content: obj.contact || ''}}]},
-    'Téléphone':         {phone_number: obj.cphone || null},
   }
-  if(techName) properties['Commercial'] = {select: {name: techName}}
   try {
-    await notionCall('update_page', {pageId: iv.notionId, properties})
+    await notionCall('update_page', {pageId: iv.notionId, properties: props2})
     showToast('✅ Notion synchronisé')
-  } catch(e) {
-    console.warn('Notion pushEdit error:', e.message)
-    showToast('⚠️ Sync Notion échouée — ' + e.message)
+  } catch(e){
+    console.warn('[Notion] champs secondaires échoués (technicien OK):', e.message)
+    showToast('⚠️ Notion — champs secondaires non sync', '#E65100')
   }
 }
 
