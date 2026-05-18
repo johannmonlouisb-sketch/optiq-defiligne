@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>OptiQ — OptiQ</title>
+<title>OptiTechX — OptiTechX</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -243,7 +243,7 @@ tr:hover td{background:var(--bg)}
       <line x1="20" y1="15.5" x2="22" y2="15.5" stroke="rgba(255,255,255,.92)" stroke-width="2" stroke-linecap="round"/>
     </svg>
     <div>
-      <div style="font-size:18px;font-weight:800;color:#fff;letter-spacing:-.5px;line-height:1.1">OptiQ</div>
+      <div style="font-size:18px;font-weight:800;color:#fff;letter-spacing:-.5px;line-height:1.1">OptiTechX</div>
       <div style="font-size:10px;color:rgba(255,255,255,.55);letter-spacing:.5px;text-transform:uppercase">Gestion DEA</div>
     </div>
   </div>
@@ -258,7 +258,7 @@ tr:hover td{background:var(--bg)}
   <div class="ni" onclick="SV('notifications')" id="n-notifications"><span class="ic">🔔</span><span>Notifications</span></div>
   <div class="ni" onclick="SV('parametres')" id="n-parametres"><span class="ic">⚙️</span><span>Paramètres</span></div>
   <div id="sb-foot">
-    <p>OptiQ · v1.0</p>
+    <p>OptiTechX · v1.0</p>
     <span id="sb-count">1 209 interventions</span>
   </div>
 </div>
@@ -593,7 +593,7 @@ tr:hover td{background:var(--bg)}
     <!-- Mapping des colonnes -->
     <div id="col-mapping" style="display:none;margin-top:14px">
       <h3 style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--dark)">🔗 Association des colonnes</h3>
-      <p style="font-size:12px;color:var(--gray);margin-bottom:10px">Vérifiez que les colonnes de votre fichier correspondent aux champs OptiQ :</p>
+      <p style="font-size:12px;color:var(--gray);margin-bottom:10px">Vérifiez que les colonnes de votre fichier correspondent aux champs OptiTechX :</p>
       <table style="width:100%;font-size:12px;border-collapse:collapse" id="mapping-table"></table>
       <div style="display:flex;gap:10px;margin-top:12px;justify-content:flex-end">
         <button class="bg bsm" onclick="closeImport()">Annuler</button>
@@ -3790,7 +3790,7 @@ function rParam(){
   </div>
   <div class="ss">
     <h2>ℹ️ À propos</h2>
-    <p style="font-size:13px;color:var(--gray);line-height:1.8"><strong>OptiQ</strong> — Plateforme de gestion technicien DEA<br>Phase 1 · Développé pour <strong>OptiQ</strong></p>
+    <p style="font-size:13px;color:var(--gray);line-height:1.8"><strong>OptiTechX</strong> — Plateforme de gestion technicien DEA<br>Phase 1 · Développé pour <strong>OptiTechX</strong></p>
   </div>`
 }
 function saveTech(id){
@@ -4453,7 +4453,7 @@ rDash()
 let notifCfg = {
   brevoApiKey: "",
   senderEmail: "contact@defiligne.fr",
-  senderName:  "OptiQ",
+  senderName:  "OptiTechX",
   emailSubject: "Rappel maintenance défibrillateur — {{client}}",
   emailBody: `Bonjour {{contact}},
 
@@ -4464,8 +4464,8 @@ Cette intervention prend environ {{duree}} minutes et ne nécessite aucune prép
 En cas d'empêchement, merci de nous contacter au 01 XX XX XX XX ou par retour de mail.
 
 Cordialement,
-L'équipe OptiQ`,
-  smsBody: "OptiQ : rappel maintenance DEA le {{date}}. Technicien : {{technicien}}. Contact : 01 XX XX XX XX"
+L'équipe OptiTechX`,
+  smsBody: "OptiTechX : rappel maintenance DEA le {{date}}. Technicien : {{technicien}}. Contact : 01 XX XX XX XX"
 }
 
 // Charger config depuis localStorage si disponible
@@ -4575,7 +4575,7 @@ async function sendSMS(iv, preview=false){
       method:"POST",
       headers:{"Content-Type":"application/json","api-key":notifCfg.brevoApiKey},
       body:JSON.stringify({
-        sender:"OptiQ",
+        sender:"OptiTechX",
         recipient:phone,
         content:body,
         type:"transactional"
@@ -5630,7 +5630,7 @@ function showKizeoPreview(preview, rawRecords){
     </div>`).join("")}
   </div>`:"<p style='font-size:13px;color:var(--gray);margin-bottom:10px'>Aucune mise à jour nécessaire — tout est déjà à jour.</p>"}
   ${noMatch.length?`<div style="margin-bottom:10px;padding:8px 12px;background:#FFEBEE;border-radius:8px;font-size:12px;color:#C62828">
-    ⚠️ ${noMatch.length} fiche${noMatch.length>1?"s":""} Kizeo sans correspondance dans OptiQ — vérifiez le nom du client / adresse
+    ⚠️ ${noMatch.length} fiche${noMatch.length>1?"s":""} Kizeo sans correspondance dans OptiTechX — vérifiez le nom du client / adresse
   </div>`:""}
   <div style="display:flex;gap:8px">
     ${updates.length?`<button class="bb" onclick="applyKizeoSync()">✅ Appliquer ${updates.length} mise${updates.length>1?"s":""} à jour</button>`:""}
@@ -6185,7 +6185,7 @@ function nProp(props, ...keys){
   return ''
 }
 
-// ── Convertir une page Notion en intervention OptiQ ────────────
+// ── Convertir une page Notion en intervention OptiTechX ────────────
 function notionPageToIv(page, existingIds){
   const p = page.properties || {}
   const client  = nProp(p, 'Société')
@@ -6341,7 +6341,7 @@ async function pushStatusToNotion(ivId, newStatus){
   const iv = ivs.find(i=>i.id===ivId)
   if(!iv||!iv.notionId) return
 
-  // Mapping statut OptiQ → Notion
+  // Mapping statut OptiTechX → Notion
   const notionStatus = {
     completed:'Yes', not_responded:'Yes', pending:'No', confirmed:'No'
   }
@@ -6446,7 +6446,7 @@ function showNotionPanel(){
       <button class="bb bsm" onclick="(async()=>{const f=document.getElementById('notion-date-from').value,t=document.getElementById('notion-date-to').value||f;if(f)await pullFromNotion(f,t||f)})()">↓ Pull</button>
     </div>
     <div style="border-top:1px solid #F0F0F0;padding-top:12px;font-size:12px;color:#757575">
-      ⚡ Les statuts validés/échec dans OptiQ sont <strong>automatiquement mis à jour dans Notion</strong> lors de chaque changement.
+      ⚡ Les statuts validés/échec dans OptiTechX sont <strong>automatiquement mis à jour dans Notion</strong> lors de chaque changement.
     </div>
   </div>
 </div>
@@ -6701,7 +6701,7 @@ function renderTechManTab(client) {
         <div class="tm-avatar">🤖</div>
         <div style="flex:1">
           <div class="tm-name">TechMan</div>
-          <div class="tm-subtitle">Agent IA · Coordinateur OptiQ · Defiligne</div>
+          <div class="tm-subtitle">Agent IA · Coordinateur OptiTechX · Defiligne</div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <div class="mode-badge mode-validation" id="tm-mode-display">🔒 Mode Validation</div>
