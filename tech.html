@@ -1685,12 +1685,13 @@ async function silentPollNotion(){
   if(now-_lastPollTs<55000) return  // anti-double si visibilitychange + timer coincident
   _lastPollTs=now
 
-  const today=new Date().toLocaleDateString('fr-CA')
+  const d0=new Date(); d0.setDate(d0.getDate()-7)
+  const from=d0.toLocaleDateString('fr-CA')
   const d2=new Date(); d2.setDate(d2.getDate()+30)
   const to=d2.toLocaleDateString('fr-CA')
 
   try{
-    const data=await notionCall('query_range',{dateFrom:today,dateTo:to})
+    const data=await notionCall('query_range',{dateFrom:from,dateTo:to})
     const pages=data.results||[]
     let changed=0
 
