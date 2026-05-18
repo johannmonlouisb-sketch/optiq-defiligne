@@ -109,6 +109,61 @@ exports.handler = async (event) => {
         return { statusCode: r.status, headers: CORS, body: JSON.stringify(await r.json()) }
       }
 
+      // ── SYNC COMPLETION → BASE KIZEO ────────────────────────────────────
+      // Quand une intervention est marquée terminée, met à jour (ou crée) la fiche
+      // dans la base Kizeo (suivi des sites) avec la date de dernière intervention.
+      case 'sync_kizeo_completion': {
+        const { client, addr, date, techName } = body
+        const kizeoDbId = process.env.NOTION_DB_KIZEO || '4326bdb2994b42509759a897ff7a4a1f'
+
+        // Calculer la prochaine maintenance annuelle (date + 1 an)
+        const next = new Date(date)
+        next.setFullYear(next.getFullYear() + 1)
+        const nextAnnual = next.toISOString().split('T')[0]
+
+        // Chercher le site existant dans la base Kizeo (par nom client)
+        const sq = await fetch(`${NOTION_BASE}/databases/${kizeoDbId}/query`, {
+          method: 'POST', headers,
+          body: JSON.stringify({
+            page_size: 5,
+            filter: { or: [
+              { property: 'Nom Site', title:       { contains: (client||'').substring(0,100) } },
+              { property: 'Société',  rich_text:   { contains: (client||'').substring(0,100) } }
+            ]}
+          })
+        })
+        const sd = await sq.json()
+        if (!sq.ok) return { statusCode: sq.status, headers: CORS, body: JSON.stringify(sd) }
+
+        const existing = sd.results?.[0]
+
+        const updateProps = {
+          'Dernière Intervention Kizeo':    { date: { start: date } },
+          'Prochaine Maintenance Annuelle': { date: { start: nextAnnual } },
+        }
+        if (techName) updateProps['Technicien référent'] = { rich_text: [{ text: { content: techName } }] }
+
+        if (existing) {
+          const ur = await fetch(`${NOTION_BASE}/pages/${existing.id}`, {
+            method: 'PATCH', headers, body: JSON.stringify({ properties: updateProps })
+          })
+          const ud = await ur.json()
+          return { statusCode: ur.status, headers: CORS, body: JSON.stringify({ action: 'updated', pageId: existing.id, client, ...ud }) }
+        } else {
+          const createProps = {
+            'Nom Site':  { title:     [{ text: { content: (client||'Inconnu').substring(0,2000) } }] },
+            'Société':   { rich_text: [{ text: { content: (client||'').substring(0,2000) } }] },
+            ...updateProps
+          }
+          if (addr) createProps['Adresse'] = { rich_text: [{ text: { content: addr.substring(0,2000) } }] }
+          const cr = await fetch(`${NOTION_BASE}/pages`, {
+            method: 'POST', headers, body: JSON.stringify({ parent: { database_id: kizeoDbId }, properties: createProps })
+          })
+          const cd = await cr.json()
+          return { statusCode: cr.status, headers: CORS, body: JSON.stringify({ action: 'created', client, ...cd }) }
+        }
+      }
+
       default:
         return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: `Action inconnue: ${action}` }) }
     }

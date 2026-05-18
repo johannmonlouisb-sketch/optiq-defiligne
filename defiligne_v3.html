@@ -3640,6 +3640,10 @@ function saveEdit(){
     }
     // Sync Notion si l'intervention a un notionId
     if(prev?.notionId) pushEditToNotion(prev, obj)
+    // Si passée en terminée → mettre à jour la fiche dans la base Kizeo
+    if(obj.status==='completed' && prev?.status!=='completed'){
+      syncCompletionToKizeo({...prev,...obj})
+    }
   } else {
     const newIv={...obj,id:nextId++}
     ivs.push(newIv)
@@ -3668,15 +3672,22 @@ function deleteIv(){
 function updSt(id,s){
   const prev=ivs.find(i=>i.id===id)
   ivs=ivs.map(i=>i.id===id?{...i,status:s}:i)
+  const iv=ivs.find(i=>i.id===id)
   // Auto-planifier maintenance si installation vient d'être terminée
   if(prev&&prev.type==="installation"&&s==="completed"){
     autoMaintFromInstall(prev)
+  }
+  // Sync statut → Notion interventions
+  pushStatusToNotion(id, s)
+  // Si passée en terminée → mettre à jour la base Kizeo
+  if(s==='completed' && prev?.status!=='completed' && iv){
+    syncCompletionToKizeo(iv)
   }
   if(curView==="dashboard")rDash()
   else if(curView==="interventions")rIv()
   else if(curView==="depart")rDepart()
   if(curView==="analyse") rAnalyse()
-  cloudSave()  // sync cloud après chaque changement
+  cloudSave()
 }
 
 function autoMaintFromInstall(iv){
@@ -6491,10 +6502,6 @@ async function pushStatusToNotion(ivId, newStatus){
   const iv = ivs.find(i=>i.id===ivId)
   if(!iv||!iv.notionId) return
 
-  // Mapping statut OptiTechX → Notion
-  const notionStatus = {
-    completed:'Yes', not_responded:'Yes', pending:'No', confirmed:'No'
-  }
   const properties = {
     'Terminer': {checkbox: newStatus==='completed'},
     'Echec':    {checkbox: newStatus==='not_responded'}
@@ -6505,6 +6512,31 @@ async function pushStatusToNotion(ivId, newStatus){
     console.log('✅ Notion mis à jour:', iv.client, newStatus)
   } catch(e){
     console.warn('Notion push error:', e.message)
+  }
+
+  // Si terminée → synchroniser aussi la base Kizeo (suivi des sites)
+  if(newStatus === 'completed') syncCompletionToKizeo(iv)
+}
+
+// ══════════════════════════════════════════════════════════════
+// SYNC BASE KIZEO — Mettre à jour la fiche site quand intervention terminée
+// ══════════════════════════════════════════════════════════════
+async function syncCompletionToKizeo(iv){
+  if(!isDeployedApp) return
+  const techName = techNotionNames[iv.techId] || TECHS.find(t=>t.id===iv.techId)?.name || ''
+  try {
+    const r = await notionCall('sync_kizeo_completion', {
+      client:   iv.client,
+      addr:     iv.addr || '',
+      date:     iv.date,
+      techName
+    })
+    const action = r.action === 'created' ? 'créée' : 'mise à jour'
+    console.log('[Kizeo Base] fiche', action, ':', iv.client)
+    showToast(`✅ Base Kizeo — fiche ${action} : ${iv.client}`, '#1B5E20')
+  } catch(e){
+    console.warn('[Kizeo Base] sync error:', e.message)
+    showToast('⚠️ Base Kizeo non sync : ' + e.message, '#E65100')
   }
 }
 
