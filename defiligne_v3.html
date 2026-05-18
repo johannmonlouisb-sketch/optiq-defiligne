@@ -1898,6 +1898,7 @@ function clearDepTechs(e){
 // ═══════════════════════════════════════════════════════
 const VT={dashboard:"Tableau de bord",depart:"Départ du jour",planning:"Planning de la semaine",carte:"Carte & Itinéraire",interventions:"Toutes les interventions",materiel:"Matériel du jour",previsions:"Prévisions maintenances",notifications:"Notifications clients",parametres:"Paramètres"}
 function SV(v){
+  sessionStorage.setItem('optiq_active_view', v)
   curView=v
   document.querySelectorAll(".ni").forEach(e=>e.classList.remove("on"))
   const ni=document.getElementById("n-"+v);if(ni)ni.classList.add("on")
@@ -6055,6 +6056,10 @@ function initCloud(){
   const el = document.getElementById('cloud-status')
   if(el) el.innerHTML = `💾 <span style="color:#1B5E20">${ivs.length} interventions</span>`
   rDash()
+
+  // Restaurer l'onglet actif si l'utilisateur a rechargé la page (sessionStorage survit au F5 mais pas à la fermeture)
+  const _savedView = sessionStorage.getItem('optiq_active_view')
+  if(_savedView && _savedView !== 'dashboard') SV(_savedView)
 
   // Sync temps réel quand l'app tech modifie les données dans un autre onglet
   window.addEventListener('storage',e=>{
