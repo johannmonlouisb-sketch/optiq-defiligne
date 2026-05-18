@@ -482,7 +482,7 @@ try{const s=localStorage.getItem("techCfg2");if(s)Object.assign(techCfg,JSON.par
 // ════════════════════════════════════════════
 // HELPERS
 // ════════════════════════════════════════════
-function TODAY(){return new Date().toISOString().split("T")[0]}
+function TODAY(){return new Date().toLocaleDateString('fr-CA')}
 function addDays(d,n){const dt=new Date(d+"T12:00:00");dt.setDate(dt.getDate()+n);return dt.toISOString().split("T")[0]}
 function addYears(d,n){const dt=new Date(d+"T12:00:00");dt.setFullYear(dt.getFullYear()+n);return dt.toISOString().split("T")[0]}
 const MS=["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"]
@@ -644,7 +644,7 @@ function renderDepart(){
       const prevLeave=idx===0
         ? tToMin(depStartTime())
         : tToMin(techETAs[dayIvs[idx-1]?.id]?.leave)
-      if(prevLeave!==null) travelMin=etaThis-prevLeave
+      if(prevLeave!==null) travelMin=Math.max(0,etaThis-prevLeave)
     }
     const workMin=dur(iv.type,iv.form)
     return `<div class="dc ${done?"vdone":fail?"vfail":""}" id="dc-${iv.id}"
@@ -1605,22 +1605,23 @@ async function pullFromNotion(dateFrom, dateTo){
 }
 
 async function pullNotionTomorrow(){
-  const today=new Date().toISOString().split('T')[0]
+  const today=new Date().toLocaleDateString('fr-CA')
   const d=new Date();d.setDate(d.getDate()+1)
-  return pullFromNotion(today, d.toISOString().split('T')[0])
+  return pullFromNotion(today, d.toLocaleDateString('fr-CA'))
 }
 
 async function pullNotionWeek(){
   const d=new Date()
-  const from=d.toISOString().split('T')[0]
-  const to=new Date(d.setDate(d.getDate()+7)).toISOString().split('T')[0]
+  const from=d.toLocaleDateString('fr-CA')
+  d.setDate(d.getDate()+7)
+  const to=d.toLocaleDateString('fr-CA')
   return pullFromNotion(from,to)
 }
 
 async function pullNotionFullYear(){
   const now=new Date()
-  const from=new Date(now.getFullYear()-1,0,1).toISOString().split('T')[0]  // 1 jan année passée
-  const to=new Date(now.getFullYear(),11,31).toISOString().split('T')[0]    // 31 déc année en cours
+  const from=new Date(now.getFullYear()-1,0,1).toLocaleDateString('fr-CA')
+  const to=new Date(now.getFullYear(),11,31).toLocaleDateString('fr-CA')
   return pullFromNotion(from, to)
 }
 
@@ -1628,13 +1629,13 @@ async function pullNotionLastMonth(){
   const now=new Date()
   const first=new Date(now.getFullYear(),now.getMonth()-1,1)
   const last=new Date(now.getFullYear(),now.getMonth(),0)
-  return pullFromNotion(first.toISOString().split('T')[0],last.toISOString().split('T')[0])
+  return pullFromNotion(first.toLocaleDateString('fr-CA'),last.toLocaleDateString('fr-CA'))
 }
 
 function showNotionPanelTech(){
-  const today=new Date().toISOString().split('T')[0]
+  const today=new Date().toLocaleDateString('fr-CA')
   const d=new Date();d.setDate(d.getDate()+1)
-  const tomorrow=d.toISOString().split('T')[0]
+  const tomorrow=d.toLocaleDateString('fr-CA')
   const f=document.getElementById('notion-date-from-tech')
   const t=document.getElementById('notion-date-to-tech')
   if(f)f.value=today
@@ -1668,9 +1669,9 @@ async function silentPollNotion(){
   if(now-_lastPollTs<55000) return  // anti-double si visibilitychange + timer coincident
   _lastPollTs=now
 
-  const today=new Date().toISOString().split('T')[0]
+  const today=new Date().toLocaleDateString('fr-CA')
   const d2=new Date(); d2.setDate(d2.getDate()+30)
-  const to=d2.toISOString().split('T')[0]
+  const to=d2.toLocaleDateString('fr-CA')
 
   try{
     const data=await notionCall('query_range',{dateFrom:today,dateTo:to})
@@ -1764,12 +1765,12 @@ updateBadges()
   if(profilEl) profilEl.innerHTML='⏳ Chargement en cours...'
   setTopbarSync('⏳ Chargement Notion...')
   const todayD=new Date()
-  const today=todayD.toISOString().split('T')[0]
+  const today=todayD.toLocaleDateString('fr-CA')
   // Chargement large : 1 an en arrière + 90 jours en avance
   const fromD=new Date(); fromD.setFullYear(fromD.getFullYear()-1)
-  const from=fromD.toISOString().split('T')[0]
+  const from=fromD.toLocaleDateString('fr-CA')
   const toD=new Date(); toD.setDate(toD.getDate()+90)
-  const to=toD.toISOString().split('T')[0]
+  const to=toD.toLocaleDateString('fr-CA')
   console.log('[OPTIQ] Chargement Notion de '+from+' à '+to)
   try{
     await pullFromNotion(from, to)

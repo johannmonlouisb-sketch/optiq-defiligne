@@ -1717,8 +1717,8 @@ let ivs=[
 ]
 let nextId=1096
 let curView="dashboard"
-let selDate=new Date().toISOString().split("T")[0]
-let mapDate=new Date().toISOString().split("T")[0]
+let selDate=new Date().toLocaleDateString('fr-CA')
+let mapDate=new Date().toLocaleDateString('fr-CA')
 let depot="7 rue des entrepreneurs, 78540 Vernouillet"
 let fStatus="all",fTech=0,fClient=""
 let depValidated={}
@@ -1731,7 +1731,7 @@ let depETAs={}        // {ivId:{eta:"08:32",leave:"08:47"}} calculé lors du der
 let _dragId=null,_dragTechId=null
 // Map state
 let mapObj=null,rGroup=null,gcache={},building=false
-const TODAY=new Date().toISOString().split("T")[0]
+const TODAY=new Date().toLocaleDateString('fr-CA')
 const WEEK=(()=>{
   const d=new Date();d.setHours(12,0,0,0)
   const day=d.getDay();const mon=new Date(d)
