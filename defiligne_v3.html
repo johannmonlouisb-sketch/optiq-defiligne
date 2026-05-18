@@ -3650,9 +3650,9 @@ function autoMaintFromInstall(iv){
   showToast("🔧 Maintenance automatiquement planifiée pour "+iv.client+" le "+fd(nextDate))
 }
 
-function showToast(msg){
+function showToast(msg, bg){
   const t=document.createElement("div")
-  t.style.cssText="position:fixed;bottom:24px;right:24px;background:#1565C0;color:#fff;padding:12px 18px;border-radius:10px;font-size:13px;font-weight:500;z-index:999;box-shadow:0 4px 16px rgba(0,0,0,.2);max-width:340px;line-height:1.4"
+  t.style.cssText=`position:fixed;bottom:24px;right:24px;background:${bg||'#1565C0'};color:#fff;padding:12px 18px;border-radius:10px;font-size:13px;font-weight:500;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.2);max-width:340px;line-height:1.4;transition:opacity .5s`
   t.textContent=msg
   document.body.appendChild(t)
   setTimeout(()=>t.style.opacity="0",3500)
@@ -6333,7 +6333,16 @@ async function pullFromNotion(dateFrom, dateTo, mode='merge'){
     pages.forEach(page=>{
       const iv = notionPageToIv(page, existingMap)
       if(!iv) return
-      const existIdx = ivs.findIndex(i=>i.notionId===page.id)
+      // 1. Chercher par notionId exact
+      let existIdx = ivs.findIndex(i=>i.notionId===page.id)
+      // 2. Sinon chercher une entrée Kizeo sans notionId, même client + même date → lier
+      if(existIdx<0){
+        existIdx = ivs.findIndex(i=>
+          !i.notionId &&
+          i.client.trim().toLowerCase()===iv.client.trim().toLowerCase() &&
+          i.date===iv.date
+        )
+      }
       if(existIdx>=0){
         ivs[existIdx] = {...ivs[existIdx], ...iv, id:ivs[existIdx].id}
         updated++
@@ -6368,7 +6377,7 @@ async function pullFromNotion(dateFrom, dateTo, mode='merge'){
 // ══════════════════════════════════════════════════════════════
 async function pushEditToNotion(iv, obj){
   if(!isDeployedApp){ console.log('[Notion] mode local — push ignoré'); return }
-  if(!iv.notionId){   console.log('[Notion] pas de notionId — push ignoré pour', iv.client); return }
+  if(!iv.notionId){   console.log('[Notion] pas de notionId — push ignoré pour', iv.client); showToast('⚠️ Fiche non liée à Notion — sync impossible','#E65100'); return }
 
   const techName = techNotionNames[obj.techId] || TECHS.find(t => t.id === obj.techId)?.name || ''
   console.log('[Notion] push →', iv.client, '| techId:', obj.techId, '| nom Notion:', techName, '| pageId:', iv.notionId)
