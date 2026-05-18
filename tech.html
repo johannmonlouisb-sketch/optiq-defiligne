@@ -638,13 +638,27 @@ function renderDepart(){
     const col=done?"#2E7D32":fail?"#C62828":TYPES[iv.type].color
     const lbl=done?"✓":fail?"✗":(idx+1)
     // Temps de trajet = ETA(ce stop) - leave(stop précédent ou départ)
-    let travelMin=null
+    let travelMin=null, waitMin=null
     const etaThis=tToMin(techETAs[iv.id]?.eta)
     if(etaThis!==null){
       const prevLeave=idx===0
         ? tToMin(depStartTime())
         : tToMin(techETAs[dayIvs[idx-1]?.id]?.leave)
-      if(prevLeave!==null) travelMin=Math.max(0,etaThis-prevLeave)
+      if(prevLeave!==null){
+        const totalGap=Math.max(0,etaThis-prevLeave)
+        // Estimer le vrai trajet (Haversine) pour détecter une attente créneau
+        const prevCoord=idx===0?null:gCache[dayIvs[idx-1]?.addr]
+        const curCoord=gCache[iv.addr]
+        if(iv.timeStart&&prevCoord&&curCoord){
+          const dLat=(curCoord.lat-prevCoord.lat)*Math.PI/180,dLng=(curCoord.lng-prevCoord.lng)*Math.PI/180
+          const a=Math.sin(dLat/2)**2+Math.cos(prevCoord.lat*Math.PI/180)*Math.cos(curCoord.lat*Math.PI/180)*Math.sin(dLng/2)**2
+          const estTravel=Math.round(6371*2*Math.asin(Math.sqrt(a))*1.3/50*60)
+          travelMin=estTravel
+          waitMin=Math.max(0,totalGap-estTravel)
+        } else {
+          travelMin=totalGap
+        }
+      }
     }
     const workMin=dur(iv.type,iv.form)
     return `<div class="dc ${done?"vdone":fail?"vfail":""}" id="dc-${iv.id}"
@@ -674,6 +688,7 @@ function renderDepart(){
       </div>
       <div class="dc-tags">
         ${travelMin!==null?`<span class="tag" style="background:#E3F2FD;color:#1565C0;font-weight:600">🚗 ${fmin(travelMin)} de trajet</span>`:""}
+        ${waitMin?`<span class="tag" style="background:#FFF3E0;color:#E65100;font-weight:600">⏰ Attente ${fmin(waitMin)} (créneau ${iv.timeStart})</span>`:""}
         <span class="tag tag-info">🔧 ${fmin(workMin)} · ${TYPES[iv.type].label}</span>
         ${techETAs[iv.id]?`<span class="tag" style="background:#E8F5E9;color:#2E7D32;font-weight:600">🕐 ${techETAs[iv.id].eta} → ${techETAs[iv.id].leave}</span>`:""}
         ${iv.padPak?`<span class="tag tag-warn">⚡ Pad Pak</span>`:""}
@@ -1556,6 +1571,7 @@ function notionPageToIvTech(page){
     arm:0, dea:0, bat:0, padPak:false, padPakDate:'',
     notes:nProp(p,'INFO '), contact:nProp(p,'Contact site'),
     cphone:nProp(p,'Téléphone'), cemail:nProp(p,'E-mail'),
+    timeStart:'', timeEnd:'',
     notionId
   }
 }
