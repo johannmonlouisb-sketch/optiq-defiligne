@@ -5967,8 +5967,8 @@ function parseKizeoCSV(text, filename, sheetName=''){
     const colSiegeTel = col("Siege:Télé")
     const colSiegeMail= col("Siege:Email")
     const colDate     = col("DATE PASSAGE") >= 0 ? col("DATE PASSAGE") : col("date")
-    const colNom      = col("Nom") >= 0 ? col("Nom") : col("technicien")
-    const colPrenom   = col("Prénom")
+    const colNom      = col("referent") >= 0 ? col("referent") : col("Nom") >= 0 ? col("Nom") : col("technicien")
+    const colPrenom   = col("referent") >= 0 ? -1 : col("Prénom")
     const colType     = col("Types de Maintenance")
     const colPadChg   = col("Changement du Pack pad")
     const colPadDate  = col("Péremption des électrodes")
@@ -6052,7 +6052,8 @@ function parseKizeoCSV(text, filename, sheetName=''){
         email_siege: siegeMail,
         phone_siege: siegeTel,
         unplanned: false,
-        kizeoId: kizeoId || ''
+        kizeoId: kizeoId || '',
+        notionId: existing?.notionId || ''
       }
       parsed.push(iv)
     })
@@ -6094,6 +6095,19 @@ function applyCSVImport(){
   const kept = ivs.filter(iv=>!iv.kizeoId || !kizeoIds.has(iv.kizeoId))
   ivs = [...kept, ..._csvImportData]
   nextId = Math.max(...ivs.map(i=>i.id)) + 1
+
+  // Sync technicien vers Notion pour les interventions mises à jour qui ont un notionId
+  _csvImportData.forEach(iv => {
+    if(iv.notionId) {
+      const techName = techNotionNames[iv.techId] || TECHS.find(t=>t.id===iv.techId)?.name || ''
+      if(techName) notionCall('update_page', {
+        pageId: iv.notionId,
+        properties: { 'Commercial': {select: {name: techName}} }
+      }).then(()=>console.log('✅ Kizeo→Notion tech sync:', iv.client))
+        .catch(e=>console.warn('Kizeo→Notion tech sync failed:', e.message))
+    }
+  })
+
   cloudSave(true)
   _csvImportData = null
   document.getElementById('csv-apply-btn').style.display='none'
