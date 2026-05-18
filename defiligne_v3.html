@@ -3581,6 +3581,8 @@ function saveEdit(){
     if(prev&&prev.type==="installation"&&obj.status==="completed"&&prev.status!=="completed"){
       autoMaintFromInstall({...prev,...obj})
     }
+    // Sync Notion si l'intervention a un notionId
+    if(prev?.notionId) pushEditToNotion(prev, obj)
   } else {
     const newIv={...obj,id:nextId++}
     ivs.push(newIv)
@@ -6330,6 +6332,31 @@ async function pullFromNotion(dateFrom, dateTo, mode='merge'){
     if(statusEl) statusEl.innerHTML = msg
     showToast(msg, '#C62828')
     return {error: e.message}
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// PUSH NOTION — Synchroniser tous les champs éditables
+// ══════════════════════════════════════════════════════════════
+async function pushEditToNotion(iv, obj){
+  if(!isDeployedApp) return
+  if(!iv.notionId) return
+  const techName = TECHS.find(t => t.id === obj.techId)?.name || ''
+  const properties = {
+    'Date intervention': {date: {start: obj.date}},
+    'Terminer':          {checkbox: obj.status === 'completed'},
+    'Echec':             {checkbox: obj.status === 'not_responded'},
+    'INFO':              {rich_text: [{text: {content: obj.notes || ''}}]},
+    'Contact site':      {rich_text: [{text: {content: obj.contact || ''}}]},
+    'Téléphone':         {phone_number: obj.cphone || null},
+  }
+  if(techName) properties['Commercial'] = {select: {name: techName}}
+  try {
+    await notionCall('update_page', {pageId: iv.notionId, properties})
+    showToast('✅ Notion synchronisé')
+  } catch(e) {
+    console.warn('Notion pushEdit error:', e.message)
+    showToast('⚠️ Sync Notion échouée — ' + e.message)
   }
 }
 
