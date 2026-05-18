@@ -614,9 +614,18 @@ let TECHS=[
   {id:1,name:"Cindy",     init:"CI",vehicle:"Renault Trafic",conso:7.5,avail:true, color:"#1565C0"},
   {id:2,name:"Priscillia",init:"PR",vehicle:"Citroën Jumpy", conso:7.0,avail:true, color:"#7B1FA2"},
   {id:3,name:"Yaniss",    init:"YA",vehicle:"Peugeot Expert",conso:6.8,avail:false,color:"#00695C"},
+  {id:4,name:"Nathan",    init:"NA",vehicle:"",              conso:7.0,avail:true, color:"#E65100"},
+  {id:5,name:"Johann",    init:"JO",vehicle:"",              conso:7.0,avail:true, color:"#00796B"},
 ]
-// Noms exacts des options select Notion pour "Commercial" — rempli au premier pull
-const techNotionNames = {}
+// Noms exacts des options select Notion pour "Commercial"
+// Mis à jour automatiquement au pull — valeurs initiales à confirmer avec Notion
+const techNotionNames = {
+  1: 'Cindy Herbet',
+  2: 'Priscillia Beuzelin',
+  3: 'Yaniss Bouvet',
+  4: 'Nathan Salah',
+  5: 'Johann Monlouis'
+}
 const TYPES={
   maintenance_simple: {label:"Maintenance",   dur:15,color:"#1565C0"},
   maintenance_complex:{label:"Maintenance +", dur:25,color:"#6A1B9A"},
@@ -5988,9 +5997,11 @@ function parseKizeoCSV(text, filename, sheetName=''){
     }
     const getTech = (nom, prenom) => {
       const n=(nom+' '+prenom).toLowerCase()
-      if(n.includes('cindy')||n.includes('herbet')) return 1
-      if(n.includes('priscill')||n.includes('delannoy')) return 2
-      if(n.includes('yaniss')) return 3
+      if(n.includes('cindy')||n.includes('herbet'))           return 1
+      if(n.includes('priscill')||n.includes('beuzelin')||n.includes('delannoy')) return 2
+      if(n.includes('yaniss')||n.includes('bouvet'))           return 3
+      if(n.includes('nathan')||n.includes('salah'))            return 4
+      if(n.includes('johann')||n.includes('monlouis'))         return 5
       return 1
     }
     const getType = t => {
