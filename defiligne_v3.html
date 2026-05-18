@@ -6197,7 +6197,7 @@ function notionPageToIv(page, existingIds){
   if(!client || !dateStr) return null
 
   // Technicien → id (Commercial  = select Notion)
-  const techName = nProp(p, 'Commercial ', 'Commercial')
+  const techName = nProp(p, 'Commercial')
   const techId   = getTechIdFromName(techName)
 
   // Statut (checkboxes)
@@ -6229,7 +6229,7 @@ function notionPageToIv(page, existingIds){
     form,
     arm: 0, dea: 0, bat: 0,
     padPak: false, padPakDate: '',
-    notes:          nProp(p, 'INFO ', 'INFO'),
+    notes:          nProp(p, 'INFO'),
     motif:          nProp(p, 'Motif'),
     contact:        nProp(p, 'Contact site'),
     cphone:         nProp(p, 'Téléphone'),

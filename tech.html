@@ -1555,7 +1555,7 @@ function notionPageToIvTech(page){
   const addr     = addrSite||addrSiege||''
   const dateStr  = nProp(p,'Date intervention')
   if(!client||!dateStr) return null
-  const techId   = getTechIdFromName(nProp(p,'Commercial ','Commercial'))
+  const techId   = getTechIdFromName(nProp(p,'Commercial'))
   const terminer = nProp(p,'Terminer')
   const echec    = nProp(p,'Echec')
   let status='pending'
@@ -1569,7 +1569,7 @@ function notionPageToIvTech(page){
     date:dateStr.substring(0,10), type:getTypeFromStr(nProp(p,'INTERVENTION')),
     status, techId, form:nProp(p,'Fichier')===true,
     arm:0, dea:0, bat:0, padPak:false, padPakDate:'',
-    notes:nProp(p,'INFO '), contact:nProp(p,'Contact site'),
+    notes:nProp(p,'INFO'), contact:nProp(p,'Contact site'),
     cphone:nProp(p,'Téléphone'), cemail:nProp(p,'E-mail'),
     timeStart:'', timeEnd:'',
     notionId
