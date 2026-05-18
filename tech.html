@@ -1557,7 +1557,7 @@ function notionPageToIvTech(page){
   if(!client||!dateStr) return null
   const techId   = getTechIdFromName(nProp(p,'Commercial ','Commercial'))
   const terminer = nProp(p,'Terminer')
-  const echec    = nProp(p,'Échec','Echec')
+  const echec    = nProp(p,'Echec')
   let status='pending'
   if(terminer===true) status='completed'
   else if(echec===true) status='not_responded'
@@ -1669,7 +1669,6 @@ async function pushStatusToNotion(ivId,newStatus){
       pageId:iv.notionId,
       properties:{
         'Terminer':{checkbox:newStatus==='completed'},
-        'Échec':{checkbox:newStatus==='not_responded'},
         'Echec':{checkbox:newStatus==='not_responded'}
       }
     })
