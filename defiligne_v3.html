@@ -6387,6 +6387,20 @@ async function pullFromNotion(dateFrom, dateTo, mode='merge'){
     const existingMap = {}
     ivs.forEach(iv=>{ if(iv.notionId) existingMap[iv.notionId]=iv.id })
 
+    // IDs Notion retournés pour cette plage de dates
+    const returnedNotionIds = new Set(pages.map(p=>p.id))
+
+    // Supprimer les interventions locales avec notionId qui n'existent plus dans Notion
+    // (uniquement dans la plage de dates tirée — ne pas toucher aux autres dates)
+    const deletedIds = []
+    ivs = ivs.filter(iv => {
+      if(!iv.notionId) return true                          // pas de lien Notion → garder
+      if(iv.date < dateFrom || iv.date > dateTo) return true // hors plage → garder
+      if(returnedNotionIds.has(iv.notionId)) return true    // existe encore dans Notion → garder
+      deletedIds.push(iv.id)                                // supprimé dans Notion → retirer
+      return false
+    })
+
     let added=0, updated=0
     pages.forEach(page=>{
       const iv = notionPageToIv(page, existingMap)
@@ -6417,10 +6431,11 @@ async function pullFromNotion(dateFrom, dateTo, mode='merge'){
     else if(curView==='interventions') rIv()
     else if(curView==='planning') rPlan()
 
-    const msg = `✅ Notion : +${added} nouvelles, ${updated} mises à jour`
+    const deleted = deletedIds.length
+    const msg = `✅ Notion : +${added} nouvelles, ${updated} mises à jour${deleted?`, ${deleted} supprimée${deleted>1?"s":""} (retirées de Notion)`:""}`
     if(statusEl) statusEl.innerHTML = msg
     showToast(msg, '#1B5E20')
-    return {added, updated, total:pages.length}
+    return {added, updated, deleted, total:pages.length}
 
   } catch(e) {
     const msg = '❌ Erreur Notion : ' + e.message
