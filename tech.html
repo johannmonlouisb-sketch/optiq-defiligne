@@ -1551,13 +1551,13 @@ function notionPageToIvTech(page){
   const p=page.properties||{}
   const client   = nProp(p,'Société')
   const addrSite = nProp(p,'Adresse Site')
-  const addrSiege= nProp(p,'Adresse Siéges')
+  const addrSiege= nProp(p,'Adresse Siéges','Adresse Sièges')
   const addr     = addrSite||addrSiege||''
   const dateStr  = nProp(p,'Date intervention')
   if(!client||!dateStr) return null
-  const techId   = getTechIdFromName(nProp(p,'Commercial '))
+  const techId   = getTechIdFromName(nProp(p,'Commercial ','Commercial'))
   const terminer = nProp(p,'Terminer')
-  const echec    = nProp(p,'Echec')
+  const echec    = nProp(p,'Échec','Echec')
   let status='pending'
   if(terminer===true) status='completed'
   else if(echec===true) status='not_responded'
@@ -1669,6 +1669,7 @@ async function pushStatusToNotion(ivId,newStatus){
       pageId:iv.notionId,
       properties:{
         'Terminer':{checkbox:newStatus==='completed'},
+        'Échec':{checkbox:newStatus==='not_responded'},
         'Echec':{checkbox:newStatus==='not_responded'}
       }
     })

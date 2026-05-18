@@ -6190,19 +6190,19 @@ function notionPageToIv(page, existingIds){
   const p = page.properties || {}
   const client  = nProp(p, 'Société')
   const addrSite  = nProp(p, 'Adresse Site')
-  const addrSiege = nProp(p, 'Adresse Siéges')
+  const addrSiege = nProp(p, 'Adresse Siéges', 'Adresse Sièges')
   const addr    = addrSite || addrSiege || ''
   const dateStr = nProp(p, 'Date intervention')
 
   if(!client || !dateStr) return null
 
   // Technicien → id (Commercial  = select Notion)
-  const techName = nProp(p, 'Commercial ')
+  const techName = nProp(p, 'Commercial ', 'Commercial')
   const techId   = getTechIdFromName(techName)
 
   // Statut (checkboxes)
   const terminer = nProp(p, 'Terminer')
-  const echec    = nProp(p, 'Echec')
+  const echec    = nProp(p, 'Échec', 'Echec')
   let status = 'pending'
   if(terminer === true)  status = 'completed'
   else if(echec === true) status = 'not_responded'
@@ -6229,15 +6229,15 @@ function notionPageToIv(page, existingIds){
     form,
     arm: 0, dea: 0, bat: 0,
     padPak: false, padPakDate: '',
-    notes:          nProp(p, 'INFO '),
+    notes:          nProp(p, 'INFO ', 'INFO'),
     motif:          nProp(p, 'Motif'),
     contact:        nProp(p, 'Contact site'),
     cphone:         nProp(p, 'Téléphone'),
     cphone1:        nProp(p, 'Téléphone 1'),
     cemail:         nProp(p, 'E-mail'),
-    contact_siege:  nProp(p, 'Contact sieges'),
-    email_siege:    nProp(p, 'E-mail Siéges'),
-    phone_siege:    nProp(p, 'Téléphone  siéges'),
+    contact_siege:  nProp(p, 'Contact sieges', 'Contact Sieges'),
+    email_siege:    nProp(p, 'E-mail Siéges', 'E-mail Sièges'),
+    phone_siege:    nProp(p, 'Téléphone siéges', 'Téléphone  siéges', 'Téléphone Sièges'),
     urgent:         !!(nProp(p, 'Urgent')),
     exter:          nProp(p, 'EXTER') === true,
     validePar:      nProp(p, 'valider par'),
@@ -6347,6 +6347,7 @@ async function pushStatusToNotion(ivId, newStatus){
   }
   const properties = {
     'Terminer': {checkbox: newStatus==='completed'},
+    'Échec':    {checkbox: newStatus==='not_responded'},
     'Echec':    {checkbox: newStatus==='not_responded'}
   }
 
