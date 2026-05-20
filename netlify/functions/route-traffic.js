@@ -1,6 +1,7 @@
 // netlify/functions/route-traffic.js
-// Routing routier avec trafic temps réel
-// Priorité : Mapbox driving-traffic → Google Directions → OSRM (fallback sans trafic)
+// Routing routier avec modélisation de trafic par heure de la journée
+// Source : OSRM (géométrie réelle) + coefficients heure de pointe France
+// Fallback Google Directions si GOOGLE_MAPS_KEY est défini (trafic live)
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -9,39 +10,70 @@ const CORS = {
   'Content-Type': 'application/json'
 }
 
-const MAPBOX_BASE = 'https://api.mapbox.com/directions/v5/mapbox/driving-traffic/'
-const GOOGLE_DIR  = 'https://maps.googleapis.com/maps/api/directions/json'
-const OSRM_BASE   = 'https://router.project-osrm.org/route/v1/driving/'
+const OSRM_BASE  = 'https://router.project-osrm.org/route/v1/driving/'
+const GOOGLE_DIR = 'https://maps.googleapis.com/maps/api/directions/json'
 
-// ── Mapbox driving-traffic ────────────────────────────────────────────────────
-// Profil driving-traffic = trafic temps réel + historique intégré nativement
-async function routeMapbox(waypoints, token) {
-  // Max 25 waypoints par requête Mapbox
-  const coords = waypoints.map(p => `${p.lng},${p.lat}`).join(';')
-  const url = `${MAPBOX_BASE}${coords}?overview=full&geometries=geojson&access_token=${token}`
-  const r = await fetch(url, { signal: AbortSignal.timeout(8000) })
-  const d = await r.json()
-  if (d.code !== 'Ok' || !d.routes?.[0]) return null
+// ── Modèle de trafic heure de la journée (France, mix urbain/périurbain) ──────
+// Inspiré des données Waze / TomTom pour les zones Île-de-France et régionales
+function trafficFactor(hhMM) {
+  if (!hhMM) return 1.10
+  const [h, m] = hhMM.split(':').map(Number)
+  const t = h * 60 + m
+  if (t >= 390  && t < 570)  return 1.50  // 6h30–9h30  heure de pointe matin
+  if (t >= 570  && t < 690)  return 1.20  // 9h30–11h30 fin de pointe matin
+  if (t >= 690  && t < 840)  return 1.15  // 11h30–14h  heure de déjeuner
+  if (t >= 840  && t < 1020) return 1.10  // 14h–17h    après-midi fluide
+  if (t >= 1020 && t < 1200) return 1.45  // 17h–20h    heure de pointe soir
+  if (t >= 1200 && t < 1320) return 1.20  // 20h–22h    soirée dégagement
+  if (t >= 330  && t < 390)  return 1.05  // 5h30–6h30  très tôt
+  return 1.00                              // nuit        circulation libre
+}
 
-  const route = d.routes[0]
-  const legs = route.legs.map(leg => ({
+// Libellé lisible de la période de trafic
+function trafficLabel(factor) {
+  if (factor >= 1.40) return 'Heure de pointe'
+  if (factor >= 1.20) return 'Trafic modéré'
+  if (factor >= 1.10) return 'Trafic fluide+'
+  return 'Trafic libre'
+}
+
+// ── OSRM + modèle heure de la journée ────────────────────────────────────────
+async function routeOSRM(waypoints, departureHHMM) {
+  const cs = waypoints.map(p => `${p.lng},${p.lat}`).join(';')
+  const r  = await fetch(`${OSRM_BASE}${cs}?overview=full&geometries=geojson`, { signal: AbortSignal.timeout(8000) })
+  const d  = await r.json()
+  if (!d.routes?.[0]) return null
+
+  const rt     = d.routes[0]
+  const factor = trafficFactor(departureHHMM)
+
+  // Applique le facteur sur chaque leg individuellement
+  // (les legs OSRM varient en longueur selon les stops)
+  const legs = (rt.legs || []).map(leg => ({
     distanceKm:        Math.round(leg.distance / 100) / 10,
     durationMin:       Math.round(leg.duration / 60),
-    trafficDurationMin: Math.round(leg.duration / 60)  // driving-traffic inclut déjà le trafic
+    trafficDurationMin: Math.round(leg.duration / 60 * factor)
   }))
 
+  const totalDistanceKm   = Math.round(rt.distance / 100) / 10
+  const totalDurationMin  = Math.round(rt.duration / 60)
+  const trafficDurationMin = Math.round(rt.duration / 60 * factor)
+
   return {
-    polylineGeoJson:   route.geometry,
-    totalDistanceKm:   Math.round(route.distance / 100) / 10,
-    totalDurationMin:  Math.round(route.duration / 60),
-    trafficDurationMin: Math.round(route.duration / 60),
+    polylineGeoJson:  rt.geometry,
+    totalDistanceKm,
+    totalDurationMin,
+    trafficDurationMin,
+    delayMin:   trafficDurationMin - totalDurationMin,   // retard estimé en minutes
+    trafficLabel: trafficLabel(factor),
+    factor,
     legs,
     hasTraffic: true,
-    source: 'mapbox'
+    source: 'osrm+heuristique'
   }
 }
 
-// ── Google Maps Directions ────────────────────────────────────────────────────
+// ── Google Directions (optionnel, si clé dispo) ───────────────────────────────
 function decodePolyline(enc) {
   const coords = []
   let i = 0, lat = 0, lng = 0
@@ -72,37 +104,18 @@ async function routeGoogle(waypoints, departureTimestamp, key) {
     durationMin:       Math.round(leg.duration.value / 60),
     trafficDurationMin: Math.round((leg.duration_in_traffic?.value ?? leg.duration.value) / 60)
   }))
+  const trafficDurationMin = legs.reduce((s, l) => s + l.trafficDurationMin, 0)
+  const totalDurationMin   = legs.reduce((s, l) => s + l.durationMin, 0)
   return {
-    polylineGeoJson:   decodePolyline(route.overview_polyline.points),
-    totalDistanceKm:   Math.round(legs.reduce((s, l) => s + l.distanceKm, 0) * 10) / 10,
-    totalDurationMin:  legs.reduce((s, l) => s + l.durationMin, 0),
-    trafficDurationMin: legs.reduce((s, l) => s + l.trafficDurationMin, 0),
+    polylineGeoJson:  decodePolyline(route.overview_polyline.points),
+    totalDistanceKm:  Math.round(legs.reduce((s, l) => s + l.distanceKm, 0) * 10) / 10,
+    totalDurationMin,
+    trafficDurationMin,
+    delayMin:   trafficDurationMin - totalDurationMin,
+    trafficLabel: trafficDurationMin > totalDurationMin * 1.3 ? 'Heure de pointe' : trafficDurationMin > totalDurationMin * 1.15 ? 'Trafic modéré' : 'Trafic fluide',
     legs,
     hasTraffic: true,
     source: 'google'
-  }
-}
-
-// ── OSRM (fallback sans trafic) ───────────────────────────────────────────────
-async function routeOSRM(waypoints) {
-  const cs = waypoints.map(p => `${p.lng},${p.lat}`).join(';')
-  const r  = await fetch(`${OSRM_BASE}${cs}?overview=full&geometries=geojson`, { signal: AbortSignal.timeout(8000) })
-  const d  = await r.json()
-  if (!d.routes?.[0]) return null
-  const rt = d.routes[0]
-  const legs = (rt.legs || []).map(leg => ({
-    distanceKm:        Math.round(leg.distance / 100) / 10,
-    durationMin:       Math.round(leg.duration / 60),
-    trafficDurationMin: Math.round(leg.duration / 60)
-  }))
-  return {
-    polylineGeoJson:   rt.geometry,
-    totalDistanceKm:   Math.round(rt.distance / 100) / 10,
-    totalDurationMin:  Math.round(rt.duration / 60),
-    trafficDurationMin: Math.round(rt.duration / 60),
-    legs,
-    hasTraffic: false,
-    source: 'osrm'
   }
 }
 
@@ -121,26 +134,20 @@ exports.handler = async (event) => {
 
   let result = null
 
-  // 1. Mapbox driving-traffic (trafic temps réel)
-  const mapboxToken = process.env.MAPBOX_TOKEN
-  if (mapboxToken) result = await routeMapbox(waypoints, mapboxToken).catch(() => null)
-
-  // 2. Google Directions (trafic temps réel, si clé disponible)
-  if (!result) {
-    const googleKey = process.env.GOOGLE_MAPS_KEY
-    if (googleKey) {
-      let departureTimestamp = 'now'
-      if (departureHHMM) {
-        const [h, m] = departureHHMM.split(':').map(Number)
-        const d = new Date(); d.setHours(h, m, 0, 0)
-        departureTimestamp = Math.max(Math.floor(d.getTime() / 1000), Math.floor(Date.now() / 1000) + 60)
-      }
-      result = await routeGoogle(waypoints, departureTimestamp, googleKey).catch(() => null)
+  // 1. Google Directions live (si clé disponible)
+  const googleKey = process.env.GOOGLE_MAPS_KEY
+  if (googleKey) {
+    let ts = 'now'
+    if (departureHHMM) {
+      const [h, m] = departureHHMM.split(':').map(Number)
+      const d = new Date(); d.setHours(h, m, 0, 0)
+      ts = Math.max(Math.floor(d.getTime() / 1000), Math.floor(Date.now() / 1000) + 60)
     }
+    result = await routeGoogle(waypoints, ts, googleKey).catch(() => null)
   }
 
-  // 3. OSRM (fallback sans trafic)
-  if (!result) result = await routeOSRM(waypoints).catch(() => null)
+  // 2. OSRM + modèle heure de la journée (toujours disponible)
+  if (!result) result = await routeOSRM(waypoints, departureHHMM).catch(() => null)
 
   if (!result) return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: 'Routing indisponible' }) }
   return { statusCode: 200, headers: CORS, body: JSON.stringify(result) }

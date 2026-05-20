@@ -2265,7 +2265,7 @@ async function initDepMap(){
     html:`<div style="width:${big?38:30}px;height:${big?38:30}px;background:${bg};color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:${big?15:12}px;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.4)">${l}</div>`,
     className:"",iconSize:[big?38:30,big?38:30],iconAnchor:[big?19:15,big?19:15],popupAnchor:[0,-18]
   })
-  let totalKm=0,totalTMin=0,totalWorkMin=0
+  let totalKm=0,totalTMin=0,totalWorkMin=0,totalDelayMin=0,depTrafficLabel=''
   const allBounds=[]
   const activeTechs=techIds.map(id=>TB(id)).filter(t=>dayIvs.some(i=>i.techId===t.id))
   const[depSH,depSM]=(document.getElementById('dep-time')?.value||'08:00').split(':').map(Number)
@@ -2360,7 +2360,7 @@ async function initDepMap(){
       mk.bindPopup(`<strong>${idx+1}. ${iv.client}</strong><br><small style="color:${techCol}">● ${tech.name}</small><br><small>${iv.addr}</small>${iv.notes?`<br><small style="color:#E65100">📝 ${iv.notes}</small>`:""}${iv.contact?`<br><small>👤 ${iv.contact}</small>`:""}`)
       depMarkers[iv.id]=mk
     })
-    // ── Route avec trafic temps réel ──
+    // ── Route avec modélisation trafic ──
     setP(65+Math.round(activeTechs.indexOf(tech)/activeTechs.length*30),`${tech.name} — Calcul itinéraire...`)
     try{
       const allP=[dc,...ivc.map(x=>x.coords),dc]
@@ -2370,8 +2370,10 @@ async function initDepMap(){
       if(data.polylineGeoJson){
         totalKm+=Math.round(data.totalDistanceKm)
         totalTMin+=data.trafficDurationMin
+        totalDelayMin+=(data.delayMin||0)
+        if(data.trafficLabel)depTrafficLabel=data.trafficLabel
         L.geoJSON(data.polylineGeoJson,{style:{color:techCol,weight:5,opacity:.85}}).addTo(depRGroup)
-        // Recalcul ETAs depuis les durées de trafic réelles par leg
+        // Recalcul ETAs depuis les durées de trafic par leg
         if(data.legs?.length&&ivc.length){
           const toHHMM=m=>`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`
           let curMin=depSH*60+depSM
@@ -2388,7 +2390,17 @@ async function initDepMap(){
   // ── Stats globales ──
   const sk=document.getElementById("dsk"),st=document.getElementById("dst"),sw=document.getElementById("dsw"),rs=document.getElementById("dep-rte-stats")
   if(sk)sk.textContent=totalKm+" km"
-  if(st)st.textContent=fmtMin(totalTMin)
+  if(st){
+    st.textContent=fmtMin(totalTMin)
+    const trafficCol=totalDelayMin>15?"#C62828":totalDelayMin>5?"#E65100":"#2E7D32"
+    if(totalDelayMin>2){
+      st.style.color=trafficCol
+      let sub=st.parentElement.querySelector('.dep-traffic-sub')
+      if(!sub){sub=document.createElement('div');sub.className='dep-traffic-sub';sub.style="font-size:11px;margin-top:2px;font-weight:500";st.parentElement.appendChild(sub)}
+      sub.style.color=trafficCol
+      sub.textContent=`+${totalDelayMin}min · ${depTrafficLabel}`
+    }
+  }
   if(sw)sw.textContent=fmtMin(totalWorkMin)
   if(rs&&(totalKm||totalWorkMin))rs.style.display="grid"
   if(allBounds.length)depMapObj.fitBounds(L.latLngBounds(allBounds),{padding:[40,40]})
@@ -4547,8 +4559,18 @@ async function _calcRouteInner(){
         const km=Math.round(data.totalDistanceKm)
         travelMin=data.trafficDurationMin
         const totalMin=travelMin+workMin
+        const delayMin=data.delayMin||0
+        const trafficCol=delayMin>15?"#C62828":delayMin>5?"#E65100":"#2E7D32"
         document.getElementById("sk").textContent=km+" km"
-        document.getElementById("st").textContent=fmtMin(travelMin)+(data.hasTraffic?' 🚦':'')
+        const stEl=document.getElementById("st")
+        if(stEl){
+          stEl.textContent=fmtMin(travelMin)
+          stEl.style.color=delayMin>2?trafficCol:'var(--purple)'
+          let sub=stEl.parentElement.querySelector('.rte-traffic-sub')
+          if(!sub){sub=document.createElement('div');sub.className='rte-traffic-sub';sub.style="font-size:11px;margin-top:2px;font-weight:500";stEl.parentElement.appendChild(sub)}
+          sub.style.color=delayMin>2?trafficCol:'var(--gray)'
+          sub.textContent=delayMin>2?`+${delayMin}min · ${data.trafficLabel}`:(data.trafficLabel||'')
+        }
         document.getElementById("sw").textContent=fmtMin(workMin)
         document.getElementById("stot").textContent=fmtMin(totalMin)
         document.getElementById("ss").textContent=ivc.length

@@ -1122,10 +1122,30 @@ async function calcMap(){
       if(data.polylineGeoJson){
         const km=Math.round(data.totalDistanceKm)
         const tmin=data.trafficDurationMin
+        const delayMin=data.delayMin||0
+        const trafficCol=delayMin>15?"#C62828":delayMin>5?"#E65100":"#2E7D32"
         document.getElementById("dep-km").textContent=km
-        document.getElementById("dep-dur").textContent=fmin(tmin)+(data.hasTraffic?' 🚦':'')
+        const durEl=document.getElementById("dep-dur")
+        if(durEl){
+          durEl.textContent=fmin(tmin)
+          durEl.style.color=delayMin>2?trafficCol:'var(--purple)'
+          durEl.title=delayMin>2?`+${delayMin}min · ${data.trafficLabel||''}`:''
+        }
         const kpiEl=document.getElementById("dep-kpi")
         if(kpiEl) kpiEl.style.display="flex"
+        // Bandeau trafic sous la KPI bar si heure de pointe
+        if(delayMin>5){
+          let trafficBanner=document.getElementById('dep-traffic-banner')
+          if(!trafficBanner){
+            trafficBanner=document.createElement('div')
+            trafficBanner.id='dep-traffic-banner'
+            trafficBanner.style="padding:5px 12px;font-size:12px;font-weight:500;display:flex;align-items:center;gap:6px"
+            kpiEl.parentElement.insertAdjacentElement('afterend',trafficBanner)
+          }
+          trafficBanner.style.color=trafficCol
+          trafficBanner.style.background=delayMin>15?"#FFEBEE":delayMin>8?"#FFF3E0":"#F1F8E9"
+          trafficBanner.innerHTML=`🚦 ${data.trafficLabel} — +${delayMin}min estimés`
+        }
         L.geoJSON(data.polylineGeoJson,{style:{color:"#1565C0",weight:5,opacity:.85}}).addTo(mapObj)
         mapObj.fitBounds(L.geoJSON(data.polylineGeoJson).getBounds(),{padding:[40,40]})
         // Recalcul ETAs depuis les durées de trafic réelles par leg
