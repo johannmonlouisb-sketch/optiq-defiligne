@@ -1045,61 +1045,71 @@ async function calcMap(){
     if(c) pts.push({iv:dayIvs[i],c})
   }
 
-  // ── Optimisation de l'ordre de tournée ──
+  // ── Ordre de tournée : priorité à l'ordre calculé par l'admin ──
   setProgress(68,"Optimisation...")
   let orderedPts=pts
   const[sh,sm]=depStartTime().split(':').map(Number)
   if(pts.length>1){
-    let apiOk=false
-    try{
-      const payload={techs:[{
-        id:curTech,depot:dc,startH:sh,startMin:sm,
-        stops:pts.map(p=>({
-          id:p.iv.id,lat:p.c.lat,lng:p.c.lng,label:p.iv.client,
-          duration:dur(p.iv.type,p.iv.form),
-          timeWindow:(p.iv.timeStart||p.iv.timeEnd)?{start:p.iv.timeStart||"00:00",end:p.iv.timeEnd||"23:59"}:null
-        }))
-      }]}
-      const res=await fetch('/api/optimize-route',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
-      if(res.ok){
-        const data=await res.json()
-        const r=data.results?.[curTech]
-        if(r?.orderedIds?.length){
-          const byId=Object.fromEntries(pts.map(p=>[p.iv.id,p]))
-          const reordered=r.orderedIds.map(id=>byId[id]).filter(Boolean)
-          if(reordered.length===pts.length){
-            orderedPts=reordered
-            apiOk=true
-            // Stocker les ETAs retournées par l'API
-            const arrs=r.estimatedArrivals||{}
-            techETAs={}
-            orderedPts.forEach(p=>{
-              const eta=arrs[p.iv.id]
-              if(eta) techETAs[p.iv.id]={eta,leave:addMinToTime(eta,dur(p.iv.type,p.iv.form))}
-            })
-            if(r.conflicts?.length){
-              const w=document.getElementById("dep-conflict-warn")
-              w.textContent="⚠️ Créneau difficile : "+r.conflicts.map(c=>c.label).join(", ")
-              w.style.display="block"
+    // 1. Charger l'ordre admin depuis localStorage (partagé admin ↔ tech)
+    loadRouteOrder(date)
+    const storedIds=techRouteOrder[date]
+    const byId=Object.fromEntries(pts.map(p=>[p.iv.id,p]))
+    const adminOrdered=storedIds?.length ? storedIds.map(id=>byId[id]).filter(Boolean) : []
+
+    if(adminOrdered.length===pts.length){
+      // Ordre admin complet → on l'utilise directement, pas besoin de recalculer
+      orderedPts=adminOrdered
+      setProgress(78,"Ordre admin appliqué...")
+    } else {
+      // Pas d'ordre admin → optimisation propre au technicien
+      let apiOk=false
+      try{
+        const payload={techs:[{
+          id:curTech,depot:dc,startH:sh,startMin:sm,
+          stops:pts.map(p=>({
+            id:p.iv.id,lat:p.c.lat,lng:p.c.lng,label:p.iv.client,
+            duration:dur(p.iv.type,p.iv.form),
+            timeWindow:(p.iv.timeStart||p.iv.timeEnd)?{start:p.iv.timeStart||"00:00",end:p.iv.timeEnd||"23:59"}:null
+          }))
+        }]}
+        const res=await fetch('/api/optimize-route',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+        if(res.ok){
+          const data=await res.json()
+          const r=data.results?.[curTech]
+          if(r?.orderedIds?.length){
+            const reordered=r.orderedIds.map(id=>byId[id]).filter(Boolean)
+            if(reordered.length===pts.length){
+              orderedPts=reordered
+              apiOk=true
+              const arrs=r.estimatedArrivals||{}
+              techETAs={}
+              orderedPts.forEach(p=>{
+                const eta=arrs[p.iv.id]
+                if(eta) techETAs[p.iv.id]={eta,leave:addMinToTime(eta,dur(p.iv.type,p.iv.form))}
+              })
+              if(r.conflicts?.length){
+                const w=document.getElementById("dep-conflict-warn")
+                w.textContent="⚠️ Créneau difficile : "+r.conflicts.map(c=>c.label).join(", ")
+                w.style.display="block"
+              }
             }
           }
         }
+      }catch(e){}
+      if(!apiOk){
+        orderedPts=localOptimizeRoute(dc,pts)
+        techETAs={}
+        let curMin=sh*60+sm,prev=dc
+        orderedPts.forEach(p=>{
+          const dLat=(p.c.lat-prev.lat)*Math.PI/180,dLng=(p.c.lng-prev.lng)*Math.PI/180
+          const a=Math.sin(dLat/2)**2+Math.cos(prev.lat*Math.PI/180)*Math.cos(p.c.lat*Math.PI/180)*Math.sin(dLng/2)**2
+          curMin+=Math.round(6371*2*Math.asin(Math.sqrt(a))*1.3/50*60)
+          const eta=`${String(Math.floor(curMin/60)).padStart(2,'0')}:${String(curMin%60).padStart(2,'0')}`
+          const workMin=dur(p.iv.type,p.iv.form)
+          techETAs[p.iv.id]={eta,leave:addMinToTime(eta,workMin)}
+          curMin+=workMin;prev=p.c
+        })
       }
-    }catch(e){}
-    if(!apiOk){
-      orderedPts=localOptimizeRoute(dc,pts)
-      // Calcul local des ETAs (Haversine 50km/h ×1.3)
-      techETAs={}
-      let curMin=sh*60+sm,prev=dc
-      orderedPts.forEach(p=>{
-        const dLat=(p.c.lat-prev.lat)*Math.PI/180,dLng=(p.c.lng-prev.lng)*Math.PI/180
-        const a=Math.sin(dLat/2)**2+Math.cos(prev.lat*Math.PI/180)*Math.cos(p.c.lat*Math.PI/180)*Math.sin(dLng/2)**2
-        curMin+=Math.round(6371*2*Math.asin(Math.sqrt(a))*1.3/50*60)
-        const eta=`${String(Math.floor(curMin/60)).padStart(2,'0')}:${String(curMin%60).padStart(2,'0')}`
-        const workMin=dur(p.iv.type,p.iv.form)
-        techETAs[p.iv.id]={eta,leave:addMinToTime(eta,workMin)}
-        curMin+=workMin;prev=p.c
-      })
     }
   } else if(pts.length===1){
     // Un seul stop : ETA simple
@@ -1616,9 +1626,19 @@ function notionPageToIvTech(page){
     arm:0, dea:0, bat:0, padPak:false, padPakDate:'',
     notes:nProp(p,'INFO'), contact:nProp(p,'Contact site'),
     cphone:nProp(p,'Téléphone'), cemail:nProp(p,'E-mail'),
-    timeStart:'', timeEnd:'',
+    timeStart: normalizeHHMM(nProp(p,'Heure début','Heure de début','Heure RDV','Créneau début','Heure')),
+    timeEnd:   normalizeHHMM(nProp(p,'Heure fin','Heure limite','Au plus tard','Heure de fin','Créneau fin')),
     notionId
   }
+}
+
+function normalizeHHMM(s){
+  if(!s) return ''
+  const m=(s+'').trim().match(/^(\d{1,2})[h:H](\d{2})$/)
+  if(m) return m[1].padStart(2,'0')+':'+m[2]
+  // Format "HH:MM" déjà correct
+  if(/^\d{2}:\d{2}$/.test(s)) return s
+  return ''
 }
 
 async function notionCall(action,extra={}){

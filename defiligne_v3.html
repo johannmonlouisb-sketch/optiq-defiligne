@@ -6520,8 +6520,18 @@ function notionPageToIv(page, existingIds){
     exter:          nProp(p, 'EXTER') === true,
     validePar:      nProp(p, 'valider par'),
     unplanned:      false,
+    timeStart: normalizeHHMM(nProp(p, 'Heure début', 'Heure de début', 'Heure RDV', 'Créneau début', 'Heure')),
+    timeEnd:   normalizeHHMM(nProp(p, 'Heure fin', 'Heure limite', 'Au plus tard', 'Heure de fin', 'Créneau fin')),
     notionId
   }
+}
+
+function normalizeHHMM(s){
+  if(!s) return ''
+  const m=(s+'').trim().match(/^(\d{1,2})[h:H](\d{2})$/)
+  if(m) return m[1].padStart(2,'0')+':'+m[2]
+  if(/^\d{2}:\d{2}$/.test(s)) return s
+  return ''
 }
 
 function getTechIdFromName(name){
