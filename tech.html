@@ -443,6 +443,22 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
 <!-- TOAST -->
 <div id="toast"></div>
 
+<!-- POPUP PROCHAINE DESTINATION -->
+<div id="next-dest-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000" onclick="closeNextClientPopup()"></div>
+<div id="next-dest-sheet" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#fff;border-radius:18px 18px 0 0;padding:20px 18px 32px;z-index:9001;box-shadow:0 -4px 24px rgba(0,0,0,.18);transform:translateY(100%);transition:transform .28s cubic-bezier(.4,0,.2,1)">
+  <div style="width:40px;height:4px;background:#ddd;border-radius:2px;margin:0 auto 16px"></div>
+  <div style="font-size:13px;color:var(--gray);font-weight:600;margin-bottom:10px">DESTINATION SUIVANTE</div>
+  <div id="next-dest-card" style="background:#F8FAFE;border-left:4px solid var(--blue);border-radius:10px;padding:12px 14px;margin-bottom:16px">
+    <div id="next-dest-name" style="font-size:17px;font-weight:700;color:var(--dark);margin-bottom:4px"></div>
+    <div id="next-dest-addr" style="font-size:13px;color:var(--gray)"></div>
+    <div id="next-dest-eta" style="font-size:12px;color:var(--blue);font-weight:600;margin-top:6px"></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    <button onclick="closeNextClientPopup()" style="padding:13px;border-radius:10px;border:1.5px solid var(--border);background:#fff;font-size:14px;font-weight:600;color:var(--gray);cursor:pointer">Plus tard</button>
+    <button id="next-dest-nav-btn" onclick="navigateToNextClient()" style="padding:13px;border-radius:10px;border:none;background:var(--blue);color:#fff;font-size:14px;font-weight:700;cursor:pointer">🗺️ Naviguer</button>
+  </div>
+</div>
+
 <script>
 // ════════════════════════════════════════════
 // DONNÉES — synchronisées avec l'app admin
@@ -487,6 +503,7 @@ let curTech=1, curTab="depart", planSel=TODAY(), gCache={}, mapObj=null, mapRout
 let mapMarkers={}, building=false, cmEditId=null, techRouteOrder={}, _dragId=null
 let validated={}, failed={}
 let techETAs={}  // { [ivId]: {eta:"08:32", leave:"08:47"} }
+let techRouteLegDurations=[], etaRefreshTimer=null, _nextDestAddr='', _routeOrderedPts=[]
 function syncVFFromIvs(){
   validated={};failed={}
   ivs.forEach(i=>{if(i.status==="completed")validated[i.id]=true;else if(i.status==="not_responded")failed[i.id]=true})
@@ -509,6 +526,57 @@ function fmin(m){if(m<60)return m+"min";return Math.floor(m/60)+"h"+(m%60>0?Stri
 function dur(t,f){return TYPES[t].dur+(f?10:0)}
 function TB(id){return TECHS.find(t=>t.id===id)||TECHS[0]}
 function addMinToTime(hhmm,mins){const[h,m]=hhmm.split(':').map(Number);const t=h*60+m+mins;return`${String(Math.floor(t/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`}
+function toHHMM(m){return`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`}
+function refreshLiveETAs(){
+  if(!techRouteLegDurations.length||!_routeOrderedPts.length) return
+  const startHHMM=depStartTime()
+  const[sh,sm]=startHHMM.split(':').map(Number)
+  const nowMin=new Date().getHours()*60+new Date().getMinutes()
+  let curMin=sh*60+sm
+  _routeOrderedPts.forEach((p,idx)=>{
+    curMin+=techRouteLegDurations[idx]?.trafficDurationMin||0
+    if(p.iv.timeStart){const[th,tm]=p.iv.timeStart.split(':').map(Number);if(curMin<th*60+tm)curMin=th*60+tm}
+    if(curMin<nowMin&&!validated[p.iv.id]&&!failed[p.iv.id]) curMin=nowMin
+    techETAs[p.iv.id]={eta:toHHMM(curMin),leave:toHHMM(curMin+dur(p.iv.type,p.iv.form))}
+    curMin+=dur(p.iv.type,p.iv.form)
+  })
+  renderDepart()
+}
+function startLiveETAs(){
+  clearInterval(etaRefreshTimer)
+  etaRefreshTimer=setInterval(refreshLiveETAs,60000)
+}
+function showNextClientPopup(currentId){
+  const date=depDate()
+  const order=techRouteOrder[date]||myIvs(date).map(i=>i.id)
+  const currentIdx=order.indexOf(currentId)
+  const nextId=order.slice(currentIdx+1).find(id=>!validated[id]&&!failed[id])
+  if(!nextId) return
+  const nextIv=ivs.find(i=>i.id===nextId)
+  if(!nextIv) return
+  _nextDestAddr=nextIv.addr||''
+  document.getElementById('next-dest-name').textContent=nextIv.client||'Client'
+  document.getElementById('next-dest-addr').textContent=_nextDestAddr
+  const eta=techETAs[nextId]?.eta||''
+  document.getElementById('next-dest-eta').textContent=eta?`Arrivée estimée : ${eta}`:''
+  const ov=document.getElementById('next-dest-overlay')
+  const sh=document.getElementById('next-dest-sheet')
+  ov.style.display='block'
+  sh.style.display='block'
+  setTimeout(()=>sh.style.transform='translateY(0)',10)
+}
+function closeNextClientPopup(){
+  const sh=document.getElementById('next-dest-sheet')
+  sh.style.transform='translateY(100%)'
+  setTimeout(()=>{
+    document.getElementById('next-dest-overlay').style.display='none'
+    sh.style.display='none'
+  },300)
+}
+function navigateToNextClient(){
+  if(_nextDestAddr) window.open(`https://maps.google.com/maps?q=${encodeURIComponent(_nextDestAddr)}`,'_blank')
+  closeNextClientPopup()
+}
 function depStartTime(){return document.getElementById('dep-time')?.value||techCfg.startTime||'08:00'}
 function myIvs(date){return ivs.filter(i=>i.date===date&&i.techId===curTech)}
 function saveCfg(){try{localStorage.setItem("techCfg2",JSON.stringify(techCfg))}catch(e){}}
@@ -774,6 +842,7 @@ function validateIv(id){
     pushToKizeo(id,"completed")
     pushStatusToNotion(id,"completed")
     toast("✅ Validé — sync Kizeo + Notion","#2E7D32")
+    refreshLiveETAs();showNextClientPopup(id)
   } else {
     updIvStatus(id,"pending")
   }
@@ -789,6 +858,7 @@ function failIv(id){
     pushToKizeo(id,"not_responded")
     pushStatusToNotion(id,"not_responded")
     toast("Échec enregistré","#C62828")
+    refreshLiveETAs();showNextClientPopup(id)
   } else {
     updIvStatus(id,"pending")
   }
@@ -1145,6 +1215,8 @@ async function calcMap(){
       const startHHMM=depStartTime()
       const res=await fetch('/api/route-traffic',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({waypoints:all,departureHHMM:startHHMM})})
       const data=await res.json()
+      techRouteLegDurations=data.legs||[]
+      _routeOrderedPts=[...orderedPts]
       if(data.polylineGeoJson){
         const km=Math.round(data.totalDistanceKm)
         const tmin=data.trafficDurationMin
@@ -1174,7 +1246,6 @@ async function calcMap(){
         mapObj.fitBounds(L.geoJSON(data.polylineGeoJson).getBounds(),{padding:[40,40]})
         // Recalcul ETAs depuis les durées de trafic réelles par leg
         if(data.legs?.length&&orderedPts.length){
-          const toHHMM=m=>`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`
           const[sh,sm]=startHHMM.split(':').map(Number)
           let curMin=sh*60+sm
           orderedPts.forEach((p,idx)=>{
@@ -1194,6 +1265,7 @@ async function calcMap(){
   building=false
   document.getElementById("btn-reoptimize").style.display="flex"
   if(window.innerWidth<640) showDepMap()
+  if(techRouteLegDurations.length) startLiveETAs()
 }
 
 function showDepMap(){
