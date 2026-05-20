@@ -249,6 +249,22 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
       <!-- Avertissement créneau impossible -->
       <div id="dep-conflict-warn" style="display:none;background:#FFF3E0;color:#E65100;padding:6px 14px;font-size:12px;font-weight:600;border-bottom:1px solid #FFCC80"></div>
 
+      <!-- Stats tournée (identiques admin) -->
+      <div id="dep-rte-stats" style="display:none;grid-template-columns:repeat(3,1fr);gap:8px;padding:8px 12px;background:#fff;border-bottom:1px solid var(--border)">
+        <div style="border-left:3px solid var(--blue);background:#F8FAFE;border-radius:8px;padding:8px 10px;display:flex;align-items:center;gap:8px">
+          <span style="font-size:16px">🛣️</span>
+          <div><div style="font-size:10px;color:var(--gray);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Distance</div><div id="tech-sk" style="font-size:15px;font-weight:700;color:var(--blue)">—</div></div>
+        </div>
+        <div style="border-left:3px solid #7B1FA2;background:#F8F4FF;border-radius:8px;padding:8px 10px;display:flex;align-items:center;gap:8px">
+          <span style="font-size:16px">🚗</span>
+          <div><div style="font-size:10px;color:var(--gray);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Trajet</div><div id="tech-st" style="font-size:15px;font-weight:700;color:#7B1FA2">—</div><div id="tech-st-sub" style="font-size:10px;font-weight:500;margin-top:1px"></div></div>
+        </div>
+        <div style="border-left:3px solid var(--green);background:#F1F8E9;border-radius:8px;padding:8px 10px;display:flex;align-items:center;gap:8px">
+          <span style="font-size:16px">📍</span>
+          <div><div style="font-size:10px;color:var(--gray);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Arrêts</div><div id="tech-ss" style="font-size:15px;font-weight:700;color:var(--green)">—</div></div>
+        </div>
+      </div>
+
       <!-- SPLIT CARTE + LISTE -->
       <div id="dep-split">
 
@@ -1124,27 +1140,25 @@ async function calcMap(){
         const tmin=data.trafficDurationMin
         const delayMin=data.delayMin||0
         const trafficCol=delayMin>15?"#C62828":delayMin>5?"#E65100":"#2E7D32"
+        // ── KPI bar inline (inchangée) ──
         document.getElementById("dep-km").textContent=km
         const durEl=document.getElementById("dep-dur")
-        if(durEl){
-          durEl.textContent=fmin(tmin)
-          durEl.style.color=delayMin>2?trafficCol:'var(--purple)'
-          durEl.title=delayMin>2?`+${delayMin}min · ${data.trafficLabel||''}`:''
-        }
+        if(durEl){durEl.textContent=fmin(tmin);durEl.style.color=delayMin>2?trafficCol:'var(--purple)'}
         const kpiEl=document.getElementById("dep-kpi")
         if(kpiEl) kpiEl.style.display="flex"
-        // Bandeau trafic sous la KPI bar si heure de pointe
-        if(delayMin>5){
-          let trafficBanner=document.getElementById('dep-traffic-banner')
-          if(!trafficBanner){
-            trafficBanner=document.createElement('div')
-            trafficBanner.id='dep-traffic-banner'
-            trafficBanner.style="padding:5px 12px;font-size:12px;font-weight:500;display:flex;align-items:center;gap:6px"
-            kpiEl.parentElement.insertAdjacentElement('afterend',trafficBanner)
+        // ── Cartes stats identiques admin ──
+        const rts=document.getElementById("dep-rte-stats")
+        if(rts){
+          document.getElementById("tech-sk").textContent=km+" km"
+          const stEl=document.getElementById("tech-st")
+          const subEl=document.getElementById("tech-st-sub")
+          if(stEl){stEl.textContent=fmin(tmin);stEl.style.color=delayMin>2?trafficCol:'#7B1FA2'}
+          if(subEl){
+            subEl.textContent=delayMin>2?`+${delayMin}min · ${data.trafficLabel||''}`:(data.trafficLabel||'')
+            subEl.style.color=delayMin>2?trafficCol:'var(--gray)'
           }
-          trafficBanner.style.color=trafficCol
-          trafficBanner.style.background=delayMin>15?"#FFEBEE":delayMin>8?"#FFF3E0":"#F1F8E9"
-          trafficBanner.innerHTML=`🚦 ${data.trafficLabel} — +${delayMin}min estimés`
+          document.getElementById("tech-ss").textContent=orderedPts.length+" arrêt"+(orderedPts.length>1?"s":"")
+          rts.style.display="grid"
         }
         L.geoJSON(data.polylineGeoJson,{style:{color:"#1565C0",weight:5,opacity:.85}}).addTo(mapObj)
         mapObj.fitBounds(L.geoJSON(data.polylineGeoJson).getBounds(),{padding:[40,40]})
