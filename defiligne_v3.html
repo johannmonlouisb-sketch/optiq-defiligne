@@ -2360,17 +2360,28 @@ async function initDepMap(){
       mk.bindPopup(`<strong>${idx+1}. ${iv.client}</strong><br><small style="color:${techCol}">● ${tech.name}</small><br><small>${iv.addr}</small>${iv.notes?`<br><small style="color:#E65100">📝 ${iv.notes}</small>`:""}${iv.contact?`<br><small>👤 ${iv.contact}</small>`:""}`)
       depMarkers[iv.id]=mk
     })
-    // ── Route OSRM ──
+    // ── Route avec trafic temps réel ──
     setP(65+Math.round(activeTechs.indexOf(tech)/activeTechs.length*30),`${tech.name} — Calcul itinéraire...`)
     try{
       const allP=[dc,...ivc.map(x=>x.coords),dc]
-      const cs=allP.map(c=>c.lng+","+c.lat).join(";")
-      const res=await fetch("https://router.project-osrm.org/route/v1/driving/"+cs+"?overview=full&geometries=geojson")
+      const depHHMM=document.getElementById('dep-time')?.value||'08:00'
+      const res=await fetch('/api/route-traffic',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({waypoints:allP,departureHHMM:depHHMM})})
       const data=await res.json()
-      if(data.routes?.[0]){
-        totalKm+=Math.round(data.routes[0].distance/1000)
-        totalTMin+=Math.round(data.routes[0].duration/60)
-        L.geoJSON(data.routes[0].geometry,{style:{color:techCol,weight:5,opacity:.85}}).addTo(depRGroup)
+      if(data.polylineGeoJson){
+        totalKm+=Math.round(data.totalDistanceKm)
+        totalTMin+=data.trafficDurationMin
+        L.geoJSON(data.polylineGeoJson,{style:{color:techCol,weight:5,opacity:.85}}).addTo(depRGroup)
+        // Recalcul ETAs depuis les durées de trafic réelles par leg
+        if(data.legs?.length&&ivc.length){
+          const toHHMM=m=>`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`
+          let curMin=depSH*60+depSM
+          ivc.forEach(({iv},idx)=>{
+            curMin+=data.legs[idx]?.trafficDurationMin||0
+            if(iv.timeStart){const[th,tm]=iv.timeStart.split(':').map(Number);if(curMin<th*60+tm)curMin=th*60+tm}
+            depETAs[iv.id]={eta:toHHMM(curMin),leave:toHHMM(curMin+dur(iv.type,iv.form))}
+            curMin+=dur(iv.type,iv.form)
+          })
+        }
       }
     }catch(e){}
   }
@@ -4523,22 +4534,21 @@ async function _calcRouteInner(){
       .bindPopup(`<strong>🏁 Retour dépôt</strong><br><small>${depot}</small>`)
   }
 
-  // OSRM routing
+  // Routing avec trafic temps réel
   sp(75,"Calcul de l'itinéraire routier...")
   const allPts=[dc,...ivc.map(x=>x.coords),...(doReturn?[dc]:[])]
   let travelMin=0
   if(allPts.length>=2){
     try{
-      const cs=allPts.map(c=>c.lng+","+c.lat).join(";")
-      const res=await fetch("https://router.project-osrm.org/route/v1/driving/"+cs+"?overview=full&geometries=geojson")
+      const mapHHMM=document.getElementById('map-time')?.value||'08:00'
+      const res=await fetch('/api/route-traffic',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({waypoints:allPts,departureHHMM:mapHHMM})})
       const data=await res.json()
-      if(data.routes?.[0]){
-        const rt=data.routes[0]
-        const km=Math.round(rt.distance/1000)
-        travelMin=Math.round(rt.duration/60)
+      if(data.polylineGeoJson){
+        const km=Math.round(data.totalDistanceKm)
+        travelMin=data.trafficDurationMin
         const totalMin=travelMin+workMin
         document.getElementById("sk").textContent=km+" km"
-        document.getElementById("st").textContent=fmtMin(travelMin)
+        document.getElementById("st").textContent=fmtMin(travelMin)+(data.hasTraffic?' 🚦':'')
         document.getElementById("sw").textContent=fmtMin(workMin)
         document.getElementById("stot").textContent=fmtMin(totalMin)
         document.getElementById("ss").textContent=ivc.length
@@ -4548,8 +4558,20 @@ async function _calcRouteInner(){
         if(totEl) totEl.style.color=totalMin>720?"#C62828":totalMin>600?"#E65100":"#1B5E20"
         const skEl=document.getElementById("sk")
         if(skEl) skEl.style.color=km>400?"#C62828":km>250?"#E65100":"#1565C0"
-        L.geoJSON(rt.geometry,{style:{color:"#1565C0",weight:4,opacity:.85}}).addTo(rGroup)
-        mapObj.fitBounds(L.geoJSON(rt.geometry).getBounds(),{padding:[50,50]})
+        L.geoJSON(data.polylineGeoJson,{style:{color:"#1565C0",weight:4,opacity:.85}}).addTo(rGroup)
+        mapObj.fitBounds(L.geoJSON(data.polylineGeoJson).getBounds(),{padding:[50,50]})
+        // Recalcul ETAs depuis les durées de trafic réelles par leg
+        if(data.legs?.length&&ivc.length){
+          const toHHMM=m=>`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`
+          const[sh,sm]=mapHHMM.split(':').map(Number)
+          let curMin=sh*60+sm
+          ivc.forEach(({iv},idx)=>{
+            curMin+=data.legs[idx]?.trafficDurationMin||0
+            if(iv.timeStart){const[th,tm]=iv.timeStart.split(':').map(Number);if(curMin<th*60+tm)curMin=th*60+tm}
+            depETAs[iv.id]={eta:toHHMM(curMin),leave:toHHMM(curMin+dur(iv.type,iv.form))}
+            curMin+=dur(iv.type,iv.form)
+          })
+        }
       }
     }catch(e){
       if(allPts.length) mapObj.fitBounds(L.latLngBounds(allPts.map(c=>[c.lat,c.lng])),{padding:[60,60]})

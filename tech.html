@@ -1112,23 +1112,34 @@ async function calcMap(){
     mapMarkers[p.iv.id]=mk
   })
 
-  setProgress(80,"Itinéraire OSRM...")
+  setProgress(80,"Calcul itinéraire avec trafic...")
   if(orderedPts.length>0){
     const all=[dc,...orderedPts.map(p=>p.c),dc]
     try{
-      const cs=all.map(p=>p.lng+","+p.lat).join(";")
-      const res=await fetch("https://router.project-osrm.org/route/v1/driving/"+cs+"?overview=full&geometries=geojson")
+      const startHHMM=depStartTime()
+      const res=await fetch('/api/route-traffic',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({waypoints:all,departureHHMM:startHHMM})})
       const data=await res.json()
-      if(data.routes?.[0]){
-        const rt=data.routes[0]
-        const km=Math.round(rt.distance/1000)
-        const tmin=Math.round(rt.duration/60)
+      if(data.polylineGeoJson){
+        const km=Math.round(data.totalDistanceKm)
+        const tmin=data.trafficDurationMin
         document.getElementById("dep-km").textContent=km
-        document.getElementById("dep-dur").textContent=fmin(tmin)
+        document.getElementById("dep-dur").textContent=fmin(tmin)+(data.hasTraffic?' 🚦':'')
         const kpiEl=document.getElementById("dep-kpi")
         if(kpiEl) kpiEl.style.display="flex"
-        L.geoJSON(rt.geometry,{style:{color:"#1565C0",weight:5,opacity:.85}}).addTo(mapObj)
-        mapObj.fitBounds(L.geoJSON(rt.geometry).getBounds(),{padding:[40,40]})
+        L.geoJSON(data.polylineGeoJson,{style:{color:"#1565C0",weight:5,opacity:.85}}).addTo(mapObj)
+        mapObj.fitBounds(L.geoJSON(data.polylineGeoJson).getBounds(),{padding:[40,40]})
+        // Recalcul ETAs depuis les durées de trafic réelles par leg
+        if(data.legs?.length&&orderedPts.length){
+          const toHHMM=m=>`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`
+          const[sh,sm]=startHHMM.split(':').map(Number)
+          let curMin=sh*60+sm
+          orderedPts.forEach((p,idx)=>{
+            curMin+=data.legs[idx]?.trafficDurationMin||0
+            if(p.iv.timeStart){const[th,tm]=p.iv.timeStart.split(':').map(Number);if(curMin<th*60+tm)curMin=th*60+tm}
+            techETAs[p.iv.id]={eta:toHHMM(curMin),leave:toHHMM(curMin+dur(p.iv.type,p.iv.form))}
+            curMin+=dur(p.iv.type,p.iv.form)
+          })
+        }
       }
     }catch(e){
       if(orderedPts.length) mapObj.fitBounds(L.latLngBounds(orderedPts.map(p=>[p.c.lat,p.c.lng])),{padding:[50,50]})

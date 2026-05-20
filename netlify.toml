@@ -124,3 +124,8 @@
   from   = "/api/agent-directif"
   to     = "/.netlify/functions/agent-directif"
   status = 200
+
+[[redirects]]
+  from   = "/api/route-traffic"
+  to     = "/.netlify/functions/route-traffic"
+  status = 200
