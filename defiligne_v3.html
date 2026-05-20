@@ -3730,9 +3730,13 @@ function deleteIv(){
   const id=parseInt(document.getElementById("m-id").value)
   if(!id)return
   if(!confirm("Supprimer cette intervention ?"))return
+  const iv=ivs.find(i=>i.id===id)
   ivs=ivs.filter(i=>i.id!==id)
   closeEdit()
   SV(curView)
+  if(iv?.notionId && isDeployedApp){
+    notionCall('archive_page',{pageId:iv.notionId}).catch(e=>console.warn('Notion archive error:',e.message))
+  }
 }
 function updSt(id,s){
   const prev=ivs.find(i=>i.id===id)

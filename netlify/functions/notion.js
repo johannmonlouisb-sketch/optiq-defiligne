@@ -99,6 +99,15 @@ exports.handler = async (event) => {
         return { statusCode: r.status, headers: CORS, body: JSON.stringify(await r.json()) }
       }
 
+      // ── ARCHIVE PAGE : suppression (archivage Notion) ──────────────────
+      case 'archive_page': {
+        const r = await fetch(`${NOTION_BASE}/pages/${pageId}`, {
+          method: 'PATCH', headers,
+          body: JSON.stringify({ archived: true })
+        })
+        return { statusCode: r.status, headers: CORS, body: JSON.stringify(await r.json()) }
+      }
+
       // ── CREATE PAGE : nouvelle intervention ─────────────────────────────
       case 'create_page': {
         const { properties } = body
