@@ -453,10 +453,11 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
     <div id="next-dest-addr" style="font-size:13px;color:var(--gray)"></div>
     <div id="next-dest-eta" style="font-size:12px;color:var(--blue);font-weight:600;margin-top:6px"></div>
   </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-    <button onclick="closeNextClientPopup()" style="padding:13px;border-radius:10px;border:1.5px solid var(--border);background:#fff;font-size:14px;font-weight:600;color:var(--gray);cursor:pointer">Plus tard</button>
-    <button id="next-dest-nav-btn" onclick="navigateToNextClient()" style="padding:13px;border-radius:10px;border:none;background:var(--blue);color:#fff;font-size:14px;font-weight:700;cursor:pointer">🗺️ Naviguer</button>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+    <button onclick="navigateToNextClient('google')" style="padding:13px;border-radius:10px;border:none;background:#1565C0;color:#fff;font-size:14px;font-weight:700;cursor:pointer">🗺️ Google Maps</button>
+    <button onclick="navigateToNextClient('waze')" style="padding:13px;border-radius:10px;border:none;background:#33CCFF;color:#fff;font-size:14px;font-weight:700;cursor:pointer">🚗 Waze</button>
   </div>
+  <button onclick="closeNextClientPopup()" style="width:100%;padding:13px;border-radius:10px;border:1.5px solid var(--border);background:#fff;font-size:14px;font-weight:600;color:var(--gray);cursor:pointer">Plus tard</button>
 </div>
 
 <script>
@@ -573,8 +574,13 @@ function closeNextClientPopup(){
     sh.style.display='none'
   },300)
 }
-function navigateToNextClient(){
-  if(_nextDestAddr) window.open(`https://maps.google.com/maps?q=${encodeURIComponent(_nextDestAddr)}`,'_blank')
+function navigateToNextClient(provider){
+  if(!_nextDestAddr){closeNextClientPopup();return}
+  const addr=encodeURIComponent(_nextDestAddr)
+  const url=provider==='waze'
+    ?`https://waze.com/ul?q=${addr}&navigate=yes`
+    :`https://www.google.com/maps/dir/?api=1&destination=${addr}`
+  window.open(url,'_blank')
   closeNextClientPopup()
 }
 function depStartTime(){return document.getElementById('dep-time')?.value||techCfg.startTime||'08:00'}
