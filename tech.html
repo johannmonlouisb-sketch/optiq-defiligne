@@ -241,7 +241,7 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
         <button id="btn-notion-pull" class="btn btn-sm" style="background:#F3E5F5;color:#6A1B9A;border:1.5px solid #CE93D8" onclick="showNotionPanelTech()">🔄 Notion</button>
         <button id="btn-start-tour" class="btn btn-sm" style="background:#4CAF50;color:#fff;border:1.5px solid #4CAF50;font-weight:700" onclick="startTournee()" title="Démarrer le minuteur de la tournée">▶️ Démarrer</button>
         <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:var(--gray)">
-          <input type="checkbox" id="tech-opt-return" checked style="width:auto" onchange="techRoundTrip=this.checked"/> Retour dépôt
+          <input type="checkbox" id="tech-opt-return" checked style="width:auto" onchange="techRoundTrip=this.checked;calcMap()"/> Retour dépôt
         </label>
         <div id="dep-kpi" style="display:none;margin-left:auto;gap:14px;font-size:13px">
           <span><strong id="dep-km" style="color:var(--blue)">—</strong> km</span>
