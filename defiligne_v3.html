@@ -1760,6 +1760,8 @@ let depSelectedTechs=[]
 let depTechDropdownOpen=false
 let depRouteOrder={}  // {techId:[iv,...]} ordre optimisé de la dernière carte calculée
 let depETAs={}        // {ivId:{eta:"08:32",leave:"08:47"}} calculé lors du dernier initDepMap
+let depRouteLegDurations=[], depETARefreshTimer=null, depRouteOrderedPts=[]
+let depRouteLegsByTechId={}, depRouteOrderedByTechId={}
 let _dragId=null,_dragTechId=null
 // Map state
 let mapObj=null,rGroup=null,gcache={},building=false
@@ -1777,6 +1779,30 @@ const DAYS=["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"]
 // ═══════════════════════════════════════════════════════
 function fmtMin(m){if(m<60)return m+"min";const h=Math.floor(m/60),mn=m%60;return mn>0?h+"h"+String(mn).padStart(2,"0"):h+"h00"}
 function addMinToTime(hhmm,mins){const[h,m]=hhmm.split(':').map(Number);const t=h*60+m+mins;return`${String(Math.floor(t/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`}
+function toHHMM(m){return`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`}
+function refreshDepETAs(){
+  if(!Object.keys(depRouteLegsByTechId).length) return
+  const depStartTimeStr=document.getElementById('dep-time')?.value||'08:00'
+  const[sh,sm]=depStartTimeStr.split(':').map(Number)
+  const nowMin=new Date().getHours()*60+new Date().getMinutes()
+  for(const techId in depRouteLegsByTechId){
+    const legs=depRouteLegsByTechId[techId]
+    const orderedIvs=depRouteOrderedByTechId[techId]||[]
+    let curMin=sh*60+sm
+    orderedIvs.forEach((iv,idx)=>{
+      curMin+=legs[idx]?.trafficDurationMin||0
+      if(iv.timeStart){const[th,tm]=iv.timeStart.split(':').map(Number);if(curMin<th*60+tm)curMin=th*60+tm}
+      if(curMin<nowMin&&!depValidated[iv.id]&&!depFailed[iv.id]) curMin=nowMin
+      depETAs[iv.id]={eta:toHHMM(curMin),leave:toHHMM(curMin+dur(iv.type,iv.form))}
+      curMin+=dur(iv.type,iv.form)
+    })
+  }
+  rDepart()
+}
+function startDepETAs(){
+  clearInterval(depETARefreshTimer)
+  depETARefreshTimer=setInterval(refreshDepETAs,60000)
+}
 function dur(t,f){return TYPES[t].dur+(f?10:0)}
 function bdg(label,color,bg,click=""){return `<span class="bdg${click?" bdg-click":""}" style="background:${bg};color:${color}"${click?` onclick="${click}"`:""}>${label}</span>`}
 function tBdg(t){const tp=TYPES[t];return bdg(tp.label+" · "+tp.dur+"min",tp.color,tp.color+"18")}
@@ -2375,7 +2401,10 @@ async function initDepMap(){
         L.geoJSON(data.polylineGeoJson,{style:{color:techCol,weight:5,opacity:.85}}).addTo(depRGroup)
         // Recalcul ETAs depuis les durées de trafic par leg
         if(data.legs?.length&&ivc.length){
-          const toHHMM=m=>`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`
+          if(!depRouteLegsByTechId)depRouteLegsByTechId={}
+          if(!depRouteOrderedByTechId)depRouteOrderedByTechId={}
+          depRouteLegsByTechId[tech.id]=data.legs
+          depRouteOrderedByTechId[tech.id]=ivc.map(x=>x.iv)
           let curMin=depSH*60+depSM
           ivc.forEach(({iv},idx)=>{
             curMin+=data.legs[idx]?.trafficDurationMin||0
@@ -2406,6 +2435,7 @@ async function initDepMap(){
   if(allBounds.length)depMapObj.fitBounds(L.latLngBounds(allBounds),{padding:[40,40]})
   setP(100,"✓ Tournée calculée")
   setTimeout(()=>{if(pb)pb.style.display="none";rDepart()},1200)
+  if(Object.keys(depRouteLegsByTechId).length) startDepETAs()
   depBuilding=false
 }
 
