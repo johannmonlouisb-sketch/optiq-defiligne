@@ -320,7 +320,7 @@ tr:hover td{background:var(--bg)}
         <button class="bb bsm" onclick="initDepMap()">🗺️ Calculer carte</button>
         <button class="bg bsm" onclick="openGoogleMaps()">📍 Ouvrir dans GPS</button>
         <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:var(--gray);margin-left:auto">
-          <input type="checkbox" id="dep-opt-return" checked style="width:auto" onchange="depRoundTrip=this.checked;initDepMap()"/> Retour dépôt
+          <input type="checkbox" id="dep-opt-return" checked style="width:auto" onchange="toggleDepRoundTrip()"/> Retour dépôt
         </label>
       </div>
       <div id="dep-depots" style="display:none;gap:8px;flex-wrap:wrap"></div>
@@ -2443,6 +2443,11 @@ async function initDepMap(){
   depBuilding=false
 }
 
+function toggleDepRoundTrip(){
+  depRoundTrip=document.getElementById("dep-opt-return").checked
+  depBuilding=false
+  initDepMap()
+}
 
 function openGoogleMaps(){
   const date=document.getElementById("dep-date")?.value||selDate
