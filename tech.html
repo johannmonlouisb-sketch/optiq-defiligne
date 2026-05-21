@@ -240,6 +240,9 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
         <button id="btn-reoptimize" class="btn btn-green btn-sm" style="display:none" onclick="reoptimizeFromGPS()" title="Recalculer la tournée depuis votre position GPS">📍 Recalculer</button>
         <button id="btn-notion-pull" class="btn btn-sm" style="background:#F3E5F5;color:#6A1B9A;border:1.5px solid #CE93D8" onclick="showNotionPanelTech()">🔄 Notion</button>
         <button id="btn-start-tour" class="btn btn-sm" style="background:#4CAF50;color:#fff;border:1.5px solid #4CAF50;font-weight:700" onclick="startTournee()" title="Démarrer le minuteur de la tournée">▶️ Démarrer</button>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:var(--gray)">
+          <input type="checkbox" id="tech-opt-return" checked style="width:auto" onchange="techRoundTrip=this.checked"/> Retour dépôt
+        </label>
         <div id="dep-kpi" style="display:none;margin-left:auto;gap:14px;font-size:13px">
           <span><strong id="dep-km" style="color:var(--blue)">—</strong> km</span>
           <span><strong id="dep-dur" style="color:var(--purple)">—</strong> trajet</span>
@@ -527,6 +530,7 @@ let validated={}, failed={}
 let techETAs={}  // { [ivId]: {eta:"08:32", leave:"08:47"} }
 let techRouteLegDurations=[], etaRefreshTimer=null, _nextDestAddr='', _routeOrderedPts=[]
 let tourStartTime=null, tourTimer=null, tourRunning=false, tourneesData={}
+let techRoundTrip=true
 try{const s=localStorage.getItem("techTourneesData");if(s)tourneesData=JSON.parse(s)}catch(e){}
 function syncVFFromIvs(){
   validated={};failed={}
@@ -1275,7 +1279,7 @@ async function calcMap(){
 
   setProgress(80,"Calcul itinéraire avec trafic...")
   if(orderedPts.length>0){
-    const all=[dc,...orderedPts.map(p=>p.c),dc]
+    const all=techRoundTrip?[dc,...orderedPts.map(p=>p.c),dc]:[dc,...orderedPts.map(p=>p.c)]
     try{
       const startHHMM=depStartTime()
       const res=await fetch('/api/route-traffic',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({waypoints:all,departureHHMM:startHHMM})})
