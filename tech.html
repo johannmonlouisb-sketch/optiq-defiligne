@@ -295,6 +295,13 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
             <span id="dep-list-badge" style="background:rgba(255,255,255,.2);border-radius:8px;padding:2px 8px;font-size:11px"></span>
           </div>
           <div id="dep-list-scroll">
+            <div id="dep-tour-timer" style="display:none;background:linear-gradient(135deg,#E8F5E9,#F1F8E9);border-left:4px solid #2E7D32;border-radius:8px;padding:14px;margin:8px;display:flex;gap:12px;align-items:center">
+              <div>
+                <div style="font-size:12px;color:var(--gray);font-weight:600;margin-bottom:4px">⏱️ TOURNÉE EN COURS</div>
+                <div style="font-size:28px;font-weight:700;color:#2E7D32;font-family:monospace" id="tour-timer">0min</div>
+              </div>
+              <button onclick="endTournee()" style="padding:10px 16px;background:#2E7D32;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;flex-shrink:0">✓ Fin tournée</button>
+            </div>
             <div id="dep-list-empty" style="padding:32px 12px;text-align:center;color:var(--gray);font-size:14px">
               Aucune intervention ce jour
             </div>
@@ -388,6 +395,16 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
       </div>
     </div>
 
+    <!-- ═══ ANALYSE ═══ -->
+    <div id="v-analyse" class="view" style="overflow-y:auto">
+      <div style="padding:14px 14px 0">
+        <div class="card" style="margin:0 0 12px">
+          <div style="font-size:16px;font-weight:700;margin-bottom:12px">📊 Suivi des tournées</div>
+          <div id="analyse-list" style="display:grid;gap:8px"></div>
+        </div>
+      </div>
+    </div>
+
   </div><!-- /content -->
 
   <!-- TABS -->
@@ -405,6 +422,9 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
     </button>
     <button class="tab" onclick="goTab('profil')" id="tab-profil">
       <span class="ti">👤</span><span class="tl">Profil</span>
+    </button>
+    <button class="tab" onclick="goTab('analyse')" id="tab-analyse">
+      <span class="ti">📊</span><span class="tl">Analyse</span>
     </button>
   </div>
 </div><!-- /app -->
@@ -505,6 +525,8 @@ let mapMarkers={}, building=false, cmEditId=null, techRouteOrder={}, _dragId=nul
 let validated={}, failed={}
 let techETAs={}  // { [ivId]: {eta:"08:32", leave:"08:47"} }
 let techRouteLegDurations=[], etaRefreshTimer=null, _nextDestAddr='', _routeOrderedPts=[]
+let tourStartTime=null, tourTimer=null, tourRunning=false, tourneesData={}
+try{const s=localStorage.getItem("techTourneesData");if(s)tourneesData=JSON.parse(s)}catch(e){}
 function syncVFFromIvs(){
   validated={};failed={}
   ivs.forEach(i=>{if(i.status==="completed")validated[i.id]=true;else if(i.status==="not_responded")failed[i.id]=true})
@@ -546,6 +568,37 @@ function refreshLiveETAs(){
 function startLiveETAs(){
   clearInterval(etaRefreshTimer)
   etaRefreshTimer=setInterval(refreshLiveETAs,60000)
+}
+function fmtDuration(mins){const h=Math.floor(mins/60);const m=mins%60;return h>0?`${h}h${String(m).padStart(2,'0')}`:`${m}min`}
+function startTournee(){
+  if(tourRunning) return
+  tourStartTime=new Date()
+  tourRunning=true
+  tourTimer=setInterval(()=>{
+    const elapsed=Math.floor((new Date()-tourStartTime)/60000)
+    const el=document.getElementById('tour-timer')
+    if(el) el.textContent=fmtDuration(elapsed)
+    renderDepart()
+  },1000)
+  renderDepart()
+}
+function endTournee(){
+  if(!tourRunning) return
+  clearInterval(tourTimer)
+  const date=depDate()
+  const endTime=new Date()
+  const durationMin=Math.floor((endTime-tourStartTime)/60000)
+  const startTimeStr=tourStartTime.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})
+  const endTimeStr=endTime.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})
+  const validatedCnt=Object.values(validated).filter(Boolean).length
+  const failedCnt=Object.values(failed).filter(Boolean).length
+  const dayIvs=myIvs(date).length
+  tourneesData[date]={startTime:startTimeStr,endTime:endTimeStr,duration:durationMin,validated:validatedCnt,failed:failedCnt,totalClients:dayIvs}
+  try{localStorage.setItem("techTourneesData",JSON.stringify(tourneesData))}catch(e){}
+  tourRunning=false
+  tourStartTime=null
+  toast("✅ Tournée terminée — "+fmtDuration(durationMin),"#2E7D32")
+  renderDepart()
 }
 function showNextClientPopup(currentId){
   const date=depDate()
@@ -647,6 +700,7 @@ function goTab(tab){
   else if(tab==="planning")renderPlanning()
   else if(tab==="materiel")renderMateriel()
   else if(tab==="profil")renderProfil()
+  else if(tab==="analyse")renderAnalyse()
 }
 
 // ════════════════════════════════════════════
@@ -719,8 +773,10 @@ function renderDepart(){
 
   const empty=document.getElementById("dep-list-empty")
   const list=document.getElementById("dep-list")
-  if(!dayIvs.length){if(empty)empty.style.display="block";if(list)list.innerHTML="";return}
+  const timer=document.getElementById("dep-tour-timer")
+  if(!dayIvs.length){if(empty)empty.style.display="block";if(list)list.innerHTML="";if(timer)timer.style.display="none";return}
   if(empty)empty.style.display="none"
+  if(timer)timer.style.display=tourRunning?"flex":"none"
 
   const tToMin=hhmm=>{if(!hhmm)return null;const[h,m]=hhmm.split(':').map(Number);return h*60+m}
   list.innerHTML=dayIvs.map((iv,idx)=>{
@@ -842,6 +898,7 @@ function validateIv(id){
   const wasValidated=validated[id]
   validated[id]=!wasValidated
   if(validated[id]){
+    if(!tourRunning) startTournee()
     failed[id]=false
     updIvStatus(id,"completed")
     autoNextMaintenance(id)
@@ -1542,6 +1599,44 @@ function renderProfil(){
   document.getElementById("cfg-form").value=techCfg.formId||""
   document.getElementById("cfg-uid").value=techCfg.userId||""
 }
+
+function renderAnalyse(){
+  const dates=Object.keys(tourneesData).sort().reverse()
+  const list=document.getElementById("analyse-list")
+  if(!dates.length){list.innerHTML=`<div style="padding:24px;text-align:center;color:var(--gray)">Aucune tournée enregistrée</div>`;return}
+  list.innerHTML=dates.map(date=>{
+    const t=tourneesData[date]
+    const dateStr=new Date(date+"T12:00:00").toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"})
+    const avgDuration=t.duration
+    const totalClients=t.totalClients
+    const completionRate=totalClients>0?Math.round((t.validated/(t.validated+t.failed))*100):0
+    return `<div style="background:#f8fafe;border-left:4px solid var(--blue);border-radius:10px;padding:12px 14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-weight:700;color:var(--dark)">${dateStr}</div>
+        <div style="font-size:12px;color:var(--gray)">${t.startTime} → ${t.endTime}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;font-size:12px">
+        <div style="background:#E8F5E9;padding:8px;border-radius:6px;text-align:center">
+          <div style="color:#2E7D32;font-weight:700;font-size:16px">${fmtDuration(avgDuration)}</div>
+          <div style="color:var(--gray);font-size:10px">Durée totale</div>
+        </div>
+        <div style="background:#E3F2FD;padding:8px;border-radius:6px;text-align:center">
+          <div style="color:#1565C0;font-weight:700;font-size:16px">${t.validated}</div>
+          <div style="color:var(--gray);font-size:10px">Validés</div>
+        </div>
+        <div style="background:#FCE4EC;padding:8px;border-radius:6px;text-align:center">
+          <div style="color:#C62828;font-weight:700;font-size:16px">${t.failed}</div>
+          <div style="color:var(--gray);font-size:10px">Échoués</div>
+        </div>
+        <div style="background:#FFF3E0;padding:8px;border-radius:6px;text-align:center">
+          <div style="color:#E65100;font-weight:700;font-size:16px">${completionRate}%</div>
+          <div style="color:var(--gray);font-size:10px">Réussite</div>
+        </div>
+      </div>
+    </div>`
+  }).join("")
+}
+
 function getWeek(ref){
   const d=new Date(ref+"T12:00:00"),wd=d.getDay()
   const mon=new Date(d);mon.setDate(d.getDate()-(wd===0?6:wd-1))
