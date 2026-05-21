@@ -239,6 +239,7 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
         <button id="btn-map-toggle" class="btn btn-gray btn-sm" style="display:none" onclick="toggleDepMap()">📋 Liste</button>
         <button id="btn-reoptimize" class="btn btn-green btn-sm" style="display:none" onclick="reoptimizeFromGPS()" title="Recalculer la tournée depuis votre position GPS">📍 Recalculer</button>
         <button id="btn-notion-pull" class="btn btn-sm" style="background:#F3E5F5;color:#6A1B9A;border:1.5px solid #CE93D8" onclick="showNotionPanelTech()">🔄 Notion</button>
+        <button id="btn-start-tour" class="btn btn-sm" style="background:#4CAF50;color:#fff;border:1.5px solid #4CAF50;font-weight:700" onclick="startTournee()" title="Démarrer le minuteur de la tournée">▶️ Démarrer</button>
         <div id="dep-kpi" style="display:none;margin-left:auto;gap:14px;font-size:13px">
           <span><strong id="dep-km" style="color:var(--blue)">—</strong> km</span>
           <span><strong id="dep-dur" style="color:var(--purple)">—</strong> trajet</span>
@@ -774,9 +775,11 @@ function renderDepart(){
   const empty=document.getElementById("dep-list-empty")
   const list=document.getElementById("dep-list")
   const timer=document.getElementById("dep-tour-timer")
-  if(!dayIvs.length){if(empty)empty.style.display="block";if(list)list.innerHTML="";if(timer)timer.style.display="none";return}
+  const btnStart=document.getElementById("btn-start-tour")
+  if(!dayIvs.length){if(empty)empty.style.display="block";if(list)list.innerHTML="";if(timer)timer.style.display="none";if(btnStart)btnStart.style.display="none";return}
   if(empty)empty.style.display="none"
   if(timer)timer.style.display=tourRunning?"flex":"none"
+  if(btnStart)btnStart.style.display=tourRunning?"none":"block"
 
   const tToMin=hhmm=>{if(!hhmm)return null;const[h,m]=hhmm.split(':').map(Number);return h*60+m}
   list.innerHTML=dayIvs.map((iv,idx)=>{
@@ -898,7 +901,6 @@ function validateIv(id){
   const wasValidated=validated[id]
   validated[id]=!wasValidated
   if(validated[id]){
-    if(!tourRunning) startTournee()
     failed[id]=false
     updIvStatus(id,"completed")
     autoNextMaintenance(id)
