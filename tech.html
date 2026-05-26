@@ -10,6 +10,8 @@
 <link rel="manifest" href="/manifest.json">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="/supabase-config.js"></script>
+<script src="/supabase-realtime.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
@@ -2171,6 +2173,64 @@ if ('serviceWorker' in navigator) {
     })
   })
 }
+
+// Supabase Realtime — écouter les changements en temps réel
+document.addEventListener('DOMContentLoaded', async () => {
+  // Attendre que Supabase soit initialisé
+  let attempts = 0
+  while (!supabase && attempts < 10) {
+    await new Promise(r => setTimeout(r, 500))
+    attempts++
+  }
+
+  if (!supabase) {
+    console.warn('⚠️ Supabase non disponible — fonctionnement mode offline')
+    return
+  }
+
+  console.log('🔄 Initialisation Supabase Realtime...')
+
+  // Écouter les mises à jour d'interventions
+  subscribeToInterventions(({ type, data, oldData }) => {
+    if (type === 'INSERT') {
+      console.log('➕ Nouvelle intervention:', data)
+      // Ajouter à ivs et re-render
+      if (!ivs.find(i => i.id === data.id)) {
+        ivs.push({
+          id: data.id,
+          client: data.client,
+          addr: data.addr,
+          date: data.date,
+          techId: data.tech_id,
+          type: data.type,
+          status: data.status,
+          notes: data.notes,
+          contact: data.contact,
+          cphone: data.contact_phone,
+          cemail: data.contact_email,
+          notionId: data.notion_id,
+          kizeoId: data.kizeo_id
+        })
+        if (curTab === 'depart') renderDepart()
+        updateBadges()
+      }
+    } else if (type === 'UPDATE') {
+      console.log('🔄 Intervention mise à jour:', data)
+      const idx = ivs.findIndex(i => i.id === data.id)
+      if (idx >= 0) {
+        ivs[idx] = { ...ivs[idx], ...data }
+        if (curTab === 'depart') renderDepart()
+      }
+    } else if (type === 'DELETE') {
+      console.log('❌ Intervention supprimée:', data.id)
+      ivs = ivs.filter(i => i.id !== data.id)
+      if (curTab === 'depart') renderDepart()
+    }
+    saveIvs()
+  })
+
+  console.log('✓ Realtime listeners actifs')
+})
 </script>
 
 </body>
