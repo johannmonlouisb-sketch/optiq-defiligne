@@ -265,6 +265,7 @@ tr:hover td{background:var(--bg)}
   <div class="ni" onclick="SV('previsions')" id="n-previsions"><span class="ic">📊</span><span>Prévisions</span></div>
   <div class="ni" onclick="SV('analyse')" id="n-analyse"><span class="ic">📈</span><span>Analyse</span></div>
   <div class="ni" onclick="SV('notifications')" id="n-notifications"><span class="ic">🔔</span><span>Notifications</span></div>
+  <div class="ni" onclick="SV('import')" id="n-import"><span class="ic">📥</span><span>Import</span></div>
   <div class="ni" onclick="SV('parametres')" id="n-parametres"><span class="ic">⚙️</span><span>Paramètres</span></div>
   <div id="sb-foot">
     <p>OptiTechX · v1.0</p>
@@ -414,6 +415,7 @@ tr:hover td{background:var(--bg)}
   <!-- PARAMÈTRES -->
   <div id="p-analyse" class="vp" style="padding:0;overflow:hidden;flex-direction:column"><div id="d-analyse" style="flex:1;overflow-y:auto;padding:18px"></div></div>
   <div id="p-notifications" class="vp" style="padding:18px;gap:14px;overflow-y:auto"><div id="d-notif"></div></div>
+  <div id="p-import" class="vp" style="padding:18px;overflow-y:auto"><div id="d-import" style="max-width:900px"></div></div>
   <div id="p-parametres" class="vp" style="padding:18px;overflow-y:auto"><div id="d-param" style="max-width:700px"></div></div>
 </div>
 
@@ -1925,7 +1927,7 @@ function clearDepTechs(e){
 // ═══════════════════════════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════════════════════════
-const VT={dashboard:"Tableau de bord",depart:"Départ du jour",planning:"Planning de la semaine",carte:"Carte & Itinéraire",interventions:"Toutes les interventions",materiel:"Matériel du jour",previsions:"Prévisions maintenances",notifications:"Notifications clients",parametres:"Paramètres"}
+const VT={dashboard:"Tableau de bord",depart:"Départ du jour",planning:"Planning de la semaine",carte:"Carte & Itinéraire",interventions:"Toutes les interventions",materiel:"Matériel du jour",previsions:"Prévisions maintenances",notifications:"Notifications clients",import:"Import de données",parametres:"Paramètres"}
 function SV(v){
   sessionStorage.setItem('optiq_active_view', v)
   curView=v
@@ -1943,6 +1945,7 @@ function SV(v){
   else if(v==="previsions")rPrev()
   else if(v==="analyse")rAnalyse()
   else if(v==="notifications")rNotif()
+  else if(v==="import")rImport()
   else if(v==="parametres")rParam()
   else if(v==="carte"){
     mapDate=selDate
@@ -3884,10 +3887,10 @@ drop.addEventListener("dragleave",()=>drop.classList.remove("drag"))
 drop.addEventListener("drop",e=>{e.preventDefault();drop.classList.remove("drag");const f=e.dataTransfer.files[0];if(f){const fi=document.getElementById("csv-file");fi.files=e.dataTransfer.files;handleCSV(fi)}})
 
 // ═══════════════════════════════════════════════════════
-// PARAMÈTRES
+// IMPORT
 // ═══════════════════════════════════════════════════════
-function rParam(){
-  document.getElementById("d-param").innerHTML=`
+function rImport(){
+  document.getElementById("d-import").innerHTML=`
   <!-- ── IMPORT CSV KIZEO ──────────────────────────────── -->
   <div class="ss" style="border:2px dashed var(--blue);background:var(--blueLight)">
     <h2>📂 Import base de données Kizeo</h2>
@@ -3907,9 +3910,31 @@ function rParam(){
     <div style="margin-top:12px;display:flex;gap:8px">
       <button class="bg bsm" onclick="exportCSV()">⬇️ Exporter CSV actuel</button>
       <button class="bg bsm" id="csv-apply-btn" style="display:none;background:#E8F5E9;color:#1B5E20;border-color:#1B5E20" onclick="applyCSVImport()">✅ Appliquer l'import</button>
-      <button class="bg bsm" style="color:#C62828" onclick="if(confirm('Remettre la base par défaut ?')){ivs=[];nextId=1;cloudSave(true);rParam();rDash()}">🗑 Vider la base</button>
+      <button class="bg bsm" style="color:#C62828" onclick="if(confirm('Remettre la base par défaut ?')){ivs=[];nextId=1;cloudSave(true);rImport();rDash()}">🗑 Vider la base</button>
     </div>
   </div>
+  <div class="ss">
+    <h2>📂 Import de données</h2>
+    <button class="bb" onclick="document.getElementById('m-csv').classList.add('open')">📂 Importer un fichier</button>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+      <span class="bdg" style="background:var(--blueLight);color:var(--blue)">📊 Excel .xlsx/.xls</span>
+      <span class="bdg" style="background:#E8F5E9;color:var(--green)">📄 CSV .csv</span>
+      <span class="bdg" style="background:#FFF3E0;color:var(--orange)">📋 ODS .ods</span>
+      <span class="bdg" style="background:#EDE7F6;color:#6A1B9A">🔧 JSON .json</span>
+      <span class="bdg" style="background:var(--bg);color:var(--gray)">📝 TSV .tsv</span>
+    </div>
+    <p style="font-size:12px;color:var(--gray);margin-top:8px">Mapping automatique des colonnes + interface de vérification</p>
+    <div style="margin-top:12px">
+      <button class="bg bsm" onclick="clearGeo()">${Object.keys(gcache).length} adresses en cache · Effacer</button>
+    </div>
+  </div>`
+}
+
+// ═══════════════════════════════════════════════════════
+// PARAMÈTRES
+// ═══════════════════════════════════════════════════════
+function rParam(){
+  document.getElementById("d-param").innerHTML=`
   <div class="ss">
     <h2>🏠 Dépôt & départ</h2>
     <div class="srow"><label>Adresse du dépôt</label>
@@ -3953,21 +3978,6 @@ function rParam(){
         <span style="font-size:13px;color:var(--gray)">min</span>
       </div>
     </div>`).join("")}
-  </div>
-  <div class="ss">
-    <h2>📂 Import de données</h2>
-    <button class="bb" onclick="document.getElementById('m-csv').classList.add('open')">📂 Importer un fichier</button>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
-      <span class="bdg" style="background:var(--blueLight);color:var(--blue)">📊 Excel .xlsx/.xls</span>
-      <span class="bdg" style="background:#E8F5E9;color:var(--green)">📄 CSV .csv</span>
-      <span class="bdg" style="background:#FFF3E0;color:var(--orange)">📋 ODS .ods</span>
-      <span class="bdg" style="background:#EDE7F6;color:#6A1B9A">🔧 JSON .json</span>
-      <span class="bdg" style="background:var(--bg);color:var(--gray)">📝 TSV .tsv</span>
-    </div>
-    <p style="font-size:12px;color:var(--gray);margin-top:8px">Mapping automatique des colonnes + interface de vérification</p>
-    <div style="margin-top:12px">
-      <button class="bg bsm" onclick="clearGeo()">${Object.keys(gcache).length} adresses en cache · Effacer</button>
-    </div>
   </div>
   <div class="ss">
     <h2>ℹ️ À propos</h2>
