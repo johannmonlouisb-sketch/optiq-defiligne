@@ -363,17 +363,6 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
           </div>
         </div>
 
-        <!-- Export -->
-        <div class="card" style="margin:0 0 20px">
-          <div style="font-size:14px;font-weight:700;margin-bottom:10px">📤 Exporter</div>
-          <button class="btn btn-gray btn-sm" style="width:100%" onclick="exportJournee()">Exporter ma journée (.txt)</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- ═══ IMPORT ═══ -->
-    <div id="v-import" class="view" style="overflow-y:auto">
-      <div style="padding:14px 14px 0">
         <!-- Config Kizeo -->
         <div class="card" style="margin:0 0 12px">
           <div style="font-size:14px;font-weight:700;margin-bottom:12px">🔗 Kizeo Forms</div>
@@ -394,7 +383,7 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
         </div>
 
         <!-- Config Notion -->
-        <div class="card" style="margin:0 0 20px">
+        <div class="card" style="margin:0 0 12px">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
             <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="14" height="14" rx="2" fill="#fff" stroke="#000"/><path d="M3 4.5C3 4.22 3.22 4 3.5 4h4.25l4.25 5.5V11.5c0 .28-.22.5-.5.5H3.5A.5.5 0 0 1 3 11.5v-7z" fill="#000"/></svg>
             <span style="font-size:14px;font-weight:700">Notion</span>
@@ -403,6 +392,12 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
           <button class="btn btn-sm" style="width:100%;background:#000;color:#fff;border-radius:10px;padding:10px;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px" onclick="showNotionPanelTech()">
             🔗 Synchroniser avec Notion
           </button>
+        </div>
+
+        <!-- Export -->
+        <div class="card" style="margin:0 0 20px">
+          <div style="font-size:14px;font-weight:700;margin-bottom:10px">📤 Exporter</div>
+          <button class="btn btn-gray btn-sm" style="width:100%" onclick="exportJournee()">Exporter ma journée (.txt)</button>
         </div>
       </div>
     </div>
@@ -434,9 +429,6 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
     </button>
     <button class="tab" onclick="goTab('profil')" id="tab-profil">
       <span class="ti">👤</span><span class="tl">Profil</span>
-    </button>
-    <button class="tab" onclick="goTab('import')" id="tab-import">
-      <span class="ti">📥</span><span class="tl">Import</span>
     </button>
     <button class="tab" onclick="goTab('analyse')" id="tab-analyse">
       <span class="ti">📊</span><span class="tl">Analyse</span>
@@ -716,7 +708,6 @@ function goTab(tab){
   else if(tab==="planning")renderPlanning()
   else if(tab==="materiel")renderMateriel()
   else if(tab==="profil")renderProfil()
-  else if(tab==="import")renderImport()
   else if(tab==="analyse")renderAnalyse()
 }
 
@@ -1613,12 +1604,10 @@ function renderProfil(){
   document.getElementById("prof-sync-status").innerHTML=isDemo
     ?`<span class="sync-tag sync-demo">🔬 Mode démo</span>`
     :`<span class="sync-tag sync-ok">🔗 Kizeo configuré</span>`
-}
-
-function renderImport(){
   document.getElementById("cfg-token").value=techCfg.token||""
   document.getElementById("cfg-form").value=techCfg.formId||""
   document.getElementById("cfg-uid").value=techCfg.userId||""
+}
 
 function renderAnalyse(){
   const dates=Object.keys(tourneesData).sort().reverse()
