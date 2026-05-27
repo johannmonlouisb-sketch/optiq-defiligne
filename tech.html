@@ -12,6 +12,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="/supabase-config.js"></script>
 <script src="/supabase-realtime.js"></script>
+<script src="/hybrid-sync.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
@@ -906,7 +907,7 @@ function focusClient(id){
 // ════════════════════════════════════════════
 // VALIDATION + KIZEO + PROCHAINE MAINTENANCE
 // ════════════════════════════════════════════
-function validateIv(id){
+async function validateIv(id){
   const wasValidated=validated[id]
   validated[id]=!wasValidated
   if(validated[id]){
@@ -914,8 +915,8 @@ function validateIv(id){
     updIvStatus(id,"completed")
     autoNextMaintenance(id)
     pushToKizeo(id,"completed")
-    pushStatusToNotion(id,"completed")
-    toast("✅ Validé — sync Kizeo + Notion","#2E7D32")
+    await validateIvHybrid(id)
+    toast("✅ Validé — sync Notion + Supabase","#2E7D32")
     refreshLiveETAs();showNextClientPopup(id)
   } else {
     updIvStatus(id,"pending")
@@ -923,14 +924,14 @@ function validateIv(id){
   saveVF();updateMarkerCol(id);renderDepart()
 }
 
-function failIv(id){
+async function failIv(id){
   const wasFailed=failed[id]
   failed[id]=!wasFailed
   if(failed[id]){
     validated[id]=false
     updIvStatus(id,"not_responded")
     pushToKizeo(id,"not_responded")
-    pushStatusToNotion(id,"not_responded")
+    await updateIvHybrid(id, {status: "not_responded"})
     toast("Échec enregistré","#C62828")
     refreshLiveETAs();showNextClientPopup(id)
   } else {
@@ -1020,7 +1021,7 @@ function closeContactModal(){
   document.getElementById("contact-modal").classList.remove("open")
   cmEditId=null
 }
-function saveContactModal(){
+async function saveContactModal(){
   if(!cmEditId) return
   const contact=document.getElementById("cm-contact").value.trim()
   const cphone=document.getElementById("cm-phone").value.trim()
@@ -1029,9 +1030,11 @@ function saveContactModal(){
   // Mettre à jour dans le localStorage (partagé avec admin)
   ivs=ivs.map(i=>i.id===cmEditId?{...i,contact,cphone,cemail,notes}:i)
   saveIvs()
+  // Sync hybride Notion + Supabase
+  await updateIvHybrid(cmEditId, {contact, cphone, cemail, notes})
   // Push vers Kizeo avec les nouvelles infos
   pushToKizeo(cmEditId,ivs.find(i=>i.id===cmEditId)?.status||"pending")
-  toast("✅ Contact mis à jour — sync Kizeo","#1565C0")
+  toast("✅ Contact mis à jour — sync Notion + Supabase","#1565C0")
   closeContactModal()
   renderDepart()
 }

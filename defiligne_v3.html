@@ -9,6 +9,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="/supabase-config.js"></script>
 <script src="/supabase-realtime.js"></script>
+<script src="/hybrid-sync.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--blue:#1565C0;--blueDark:#0D47A1;--blueLight:#E3F2FD;--green:#1B5E20;--greenLight:#E8F5E9;--orange:#E65100;--red:#C62828;--purple:#6A1B9A;--gray:#757575;--border:#E0E0E0;--bg:#F5F5F5;--white:#fff;--dark:#1A1A1A}
@@ -6742,23 +6743,18 @@ async function pushEditToNotion(iv, obj){
 }
 
 // ══════════════════════════════════════════════════════════════
-// PUSH NOTION — Mettre à jour le statut d'une intervention
+// PUSH NOTION + SUPABASE — Mettre à jour le statut d'une intervention
 // ══════════════════════════════════════════════════════════════
 async function pushStatusToNotion(ivId, newStatus){
   if(!isDeployedApp) return
   const iv = ivs.find(i=>i.id===ivId)
-  if(!iv||!iv.notionId) return
+  if(!iv) return
 
-  const properties = {
-    'Terminer': {checkbox: newStatus==='completed'},
-    'Echec':    {checkbox: newStatus==='not_responded'}
-  }
-
-  try {
-    await notionCall('update_page', {pageId:iv.notionId, properties})
-    console.log('✅ Notion mis à jour:', iv.client, newStatus)
-  } catch(e){
-    console.warn('Notion push error:', e.message)
+  // Sync hybride avec Notion + Supabase
+  if(newStatus==='completed'){
+    await validateIvHybrid(ivId)
+  } else {
+    await updateIvHybrid(ivId, {status: newStatus})
   }
 
   // Si terminée → synchroniser aussi la base Kizeo (suivi des sites)
