@@ -1819,6 +1819,7 @@ function ava(init,sz=28,col="#1565C0"){return `<div class="ava" style="width:${s
 function TB(id){return TECHS.find(t=>t.id===id)||{name:"?",init:"?"}}
 function fd(d){return new Date(d+"T12:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"short"})}
 function fdl(d){return new Date(d+"T12:00:00").toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}
+function formatYMD(d){return d instanceof Date?d.toISOString().split("T")[0]:d}
 function addYears(d,n){const dt=new Date(d+"T12:00:00");dt.setFullYear(dt.getFullYear()+n);return dt.toISOString().split("T")[0]}
 function daysUntil(d){return Math.round((new Date(d+"T12:00:00")-new Date())/(1000*60*60*24))}
 
@@ -3777,14 +3778,121 @@ function saveEdit(){
 function deleteIv(){
   const id=parseInt(document.getElementById("m-id").value)
   if(!id)return
-  if(!confirm("Supprimer cette intervention ?"))return
   const iv=ivs.find(i=>i.id===id)
-  ivs=ivs.filter(i=>i.id!==id)
-  closeEdit()
-  SV(curView)
-  if(iv?.notionId && isDeployedApp){
-    notionCall('archive_page',{pageId:iv.notionId}).catch(e=>console.warn('Notion archive error:',e.message))
+  if(!iv)return
+
+  // Créer le modal de suppression
+  const modal=document.createElement('div')
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:999;display:flex;align-items:center;justify-content:center'
+
+  const container=document.createElement('div')
+  container.style.cssText='background:#fff;border-radius:12px;padding:24px;max-width:420px;width:90%;box-shadow:0 10px 40px rgba(0,0,0,.2)'
+
+  const moveOpt=document.createElement('div')
+  moveOpt.style.cssText='border:2px solid #E0E0E0;border-radius:10px;padding:14px;cursor:pointer;transition:all .2s'
+
+  const deleteOpt=document.createElement('div')
+  deleteOpt.style.cssText='border:2px solid #E0E0E0;border-radius:10px;padding:14px;cursor:pointer;transition:all .2s'
+
+  const dateInput=document.createElement('input')
+  dateInput.type='date'
+  dateInput.style.cssText='flex:1;padding:8px;border:1px solid #E0E0E0;border-radius:6px'
+
+  const deleteConfirm=document.createElement('div')
+  deleteConfirm.style.cssText='display:none;margin-top:10px;gap:8px;flex-direction:column'
+
+  moveOpt.innerHTML=`
+    <div style="font-weight:600;margin-bottom:6px">📅 Déplacer à une autre date</div>
+    <div style="display:none;margin-top:10px;gap:8px;display:flex;flex-direction:column" id="move-inputs"></div>
+  `
+
+  const moveInputs=moveOpt.querySelector('#move-inputs')
+  moveInputs.appendChild(dateInput)
+
+  const autoBtn=document.createElement('button')
+  autoBtn.textContent='Auto'
+  autoBtn.style.cssText='padding:8px 12px;background:#2E7D32;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600'
+  autoBtn.onclick=()=>{
+    let nextDate=new Date(iv.date+'T12:00:00')
+    while(ivs.filter(i=>i.date===formatYMD(nextDate)).length>0||nextDate<=new Date(iv.date+'T12:00:00')){
+      nextDate.setDate(nextDate.getDate()+1)
+    }
+    dateInput.value=formatYMD(nextDate)
   }
+
+  const moveBtn=document.createElement('button')
+  moveBtn.textContent='Déplacer'
+  moveBtn.style.cssText='padding:10px;background:#1565C0;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600'
+  moveBtn.onclick=()=>{
+    if(!dateInput.value)return alert('Sélectionne une date')
+    iv.date=dateInput.value
+    cloudSave()
+    closeEdit()
+    SV(curView)
+    modal.remove()
+  }
+
+  moveInputs.style.display='flex'
+  moveInputs.style.flexDirection='column'
+  moveInputs.style.gap='8px'
+
+  const dateDiv=document.createElement('div')
+  dateDiv.style.cssText='display:flex;gap:8px'
+  dateDiv.appendChild(dateInput)
+  dateDiv.appendChild(autoBtn)
+
+  moveInputs.innerHTML=''
+  moveInputs.appendChild(dateDiv)
+  moveInputs.appendChild(moveBtn)
+
+  deleteOpt.innerHTML=`<div style="font-weight:600;color:#C62828;margin-bottom:6px">🗑️ Supprimer définitivement</div>`
+  deleteConfirm.innerHTML=`<div style="color:#666;font-size:13px">Cette action est irréversible</div>`
+
+  const deleteBtn=document.createElement('button')
+  deleteBtn.textContent='Confirmer la suppression'
+  deleteBtn.style.cssText='padding:10px;background:#C62828;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600'
+  deleteBtn.onclick=()=>{
+    ivs=ivs.filter(i=>i.id!==id)
+    closeEdit()
+    SV(curView)
+    if(iv?.notionId && isDeployedApp){
+      notionCall('archive_page',{pageId:iv.notionId}).catch(e=>console.warn('Notion archive error:',e.message))
+    }
+    cloudSave()
+    modal.remove()
+  }
+
+  deleteConfirm.appendChild(deleteBtn)
+  deleteOpt.appendChild(deleteConfirm)
+
+  moveOpt.onclick=(e)=>{
+    if(e.target===moveOpt || e.target.parentElement===moveOpt){
+      moveOpt.style.borderColor='#1565C0'
+      moveInputs.style.display='flex'
+      deleteConfirm.style.display='none'
+    }
+  }
+
+  deleteOpt.onclick=(e)=>{
+    if(e.target===deleteOpt || e.target.parentElement===deleteOpt){
+      deleteOpt.style.borderColor='#C62828'
+      deleteConfirm.style.display='flex'
+      moveInputs.style.display='none'
+    }
+  }
+
+  container.innerHTML=`
+    <h3 style="font-size:18px;font-weight:700;margin-bottom:12px">Que faire de cette intervention?</h3>
+    <p style="color:#666;font-size:14px;margin-bottom:20px">${iv.client} - ${iv.addr} (${iv.date})</p>
+    <div style="display:flex;flex-direction:column;gap:12px" id="opts-container"></div>
+    <button style="width:100%;margin-top:16px;padding:10px;background:#F5F5F5;border:none;border-radius:6px;cursor:pointer;font-weight:600" onclick="this.closest('[style*=inset]').parentElement.remove()">Annuler</button>
+  `
+
+  container.querySelector('#opts-container').appendChild(moveOpt)
+  container.querySelector('#opts-container').appendChild(deleteOpt)
+
+  modal.appendChild(container)
+  document.body.appendChild(modal)
 }
 function updSt(id,s){
   const prev=ivs.find(i=>i.id===id)
