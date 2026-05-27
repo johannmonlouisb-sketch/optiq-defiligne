@@ -13,26 +13,29 @@ async function subscribeToInterventions(onChanged) {
   }
 
   const subscription = supabase
-    .from('interventions')
-    .on('*', (payload) => {
-      console.log('Realtime update:', payload)
+    .channel('interventions_changes')
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'interventions'
+    }, (payload) => {
+      console.log('Realtime intervention update:', payload)
       const { eventType, new: newData, old: oldData } = payload
 
       if (eventType === 'INSERT') {
-        // Nouvelle intervention ajoutée
         onChanged({ type: 'INSERT', data: newData })
       } else if (eventType === 'UPDATE') {
-        // Intervention modifiée (statut, etc)
         onChanged({ type: 'UPDATE', data: newData, oldData })
       } else if (eventType === 'DELETE') {
-        // Intervention supprimée/archivée
         onChanged({ type: 'DELETE', id: oldData.id })
       }
     })
-    .subscribe()
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') console.log('✓ Subscribed to interventions')
+      if (status === 'CHANNEL_ERROR') console.error('Channel error:', status)
+    })
 
   supabaseRealtimeSubscriptions.interventions = subscription
-  console.log('✓ Subscribed to interventions realtime')
   return subscription
 }
 
@@ -41,15 +44,20 @@ async function subscribeToTechniciens(onChanged) {
   if (!supabase) return
 
   const subscription = supabase
-    .from('techniciens')
-    .on('*', (payload) => {
+    .channel('techniciens_changes')
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'techniciens'
+    }, (payload) => {
       console.log('Technicien update:', payload)
       onChanged(payload)
     })
-    .subscribe()
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') console.log('✓ Subscribed to techniciens')
+    })
 
   supabaseRealtimeSubscriptions.techniciens = subscription
-  console.log('✓ Subscribed to techniciens realtime')
   return subscription
 }
 
@@ -58,15 +66,20 @@ async function subscribeToTournees(onChanged) {
   if (!supabase) return
 
   const subscription = supabase
-    .from('tournees')
-    .on('*', (payload) => {
+    .channel('tournees_changes')
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'tournees'
+    }, (payload) => {
       console.log('Tournée update:', payload)
       onChanged(payload)
     })
-    .subscribe()
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') console.log('✓ Subscribed to tournees')
+    })
 
   supabaseRealtimeSubscriptions.tournees = subscription
-  console.log('✓ Subscribed to tournees realtime')
   return subscription
 }
 

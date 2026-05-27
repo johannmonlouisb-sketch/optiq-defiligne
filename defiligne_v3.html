@@ -7595,6 +7595,87 @@ function tmToggleAuto() {
     }
   }
 }
+
+// ═══════════════════════════════════════════════════════
+// SUPABASE REALTIME SYNC (Admin App)
+// ═══════════════════════════════════════════════════════
+
+async function initSupabaseRealtimeAdmin() {
+  if (!supabase) {
+    console.warn('⚠️ Supabase non disponible — fonctionnement mode offline')
+    return
+  }
+
+  console.log('🔄 Initialisation Supabase Realtime Admin...')
+
+  subscribeToInterventions(({ type, data, oldData }) => {
+    if (type === 'INSERT') {
+      console.log('➕ Nouvelle intervention:', data)
+      if (!ivs.find(i => i.id === data.id)) {
+        const newIv = {
+          id: data.id,
+          client: data.client,
+          addr: data.addr,
+          siege: data.siege,
+          date: data.date,
+          type: data.type,
+          status: data.status,
+          techId: data.tech_id,
+          notes: data.notes,
+          contact: data.contact,
+          cphone: data.contact_phone,
+          cemail: data.contact_email,
+          notionId: data.notion_id,
+          kizeoId: data.kizeo_id,
+          padPak: data.pad_pak || false,
+          padPakDate: data.pad_pak_date
+        }
+        ivs.push(newIv)
+        saveIvs()
+        rDepart()
+      }
+    } else if (type === 'UPDATE') {
+      console.log('🔄 Intervention mise à jour:', data)
+      const idx = ivs.findIndex(i => i.id === data.id)
+      if (idx >= 0) {
+        ivs[idx] = {
+          ...ivs[idx],
+          client: data.client || ivs[idx].client,
+          addr: data.addr || ivs[idx].addr,
+          siege: data.siege || ivs[idx].siege,
+          date: data.date || ivs[idx].date,
+          type: data.type || ivs[idx].type,
+          status: data.status || ivs[idx].status,
+          techId: data.tech_id !== undefined ? data.tech_id : ivs[idx].techId,
+          notes: data.notes || ivs[idx].notes,
+          contact: data.contact || ivs[idx].contact,
+          cphone: data.contact_phone || ivs[idx].cphone,
+          cemail: data.contact_email || ivs[idx].cemail,
+          notionId: data.notion_id || ivs[idx].notionId,
+          kizeoId: data.kizeo_id || ivs[idx].kizeoId,
+          padPak: data.pad_pak !== undefined ? data.pad_pak : ivs[idx].padPak,
+          padPakDate: data.pad_pak_date || ivs[idx].padPakDate
+        }
+        saveIvs()
+        rDepart()
+      }
+    } else if (type === 'DELETE') {
+      console.log('❌ Intervention supprimée:', data.id)
+      ivs = ivs.filter(i => i.id !== data.id)
+      saveIvs()
+      rDepart()
+    }
+  })
+
+  console.log('✓ Realtime listeners actifs (Admin)')
+}
+
+// Initialiser Supabase Realtime quand le DOM est prêt
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initSupabaseRealtimeAdmin)
+} else {
+  initSupabaseRealtimeAdmin()
+}
 </script>
 </body>
 </html>
