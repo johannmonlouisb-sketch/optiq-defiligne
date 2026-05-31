@@ -3,6 +3,7 @@ node_modules/
 
 # Local Netlify folder
 .netlify
+deno.lock
 
 # Electron build artifacts
 desktop/dist/
