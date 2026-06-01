@@ -518,6 +518,7 @@ try{
     }
   }
 }catch(e){}
+const TZ='Europe/Paris'
 const TYPES={
   maintenance_simple:{label:"Maintenance",dur:15,color:"#1565C0"},
   maintenance_complex:{label:"Maintenance+",dur:25,color:"#6A1B9A"},
@@ -550,7 +551,6 @@ try{const s=localStorage.getItem("techCfg2");if(s)Object.assign(techCfg,JSON.par
 // ════════════════════════════════════════════
 // HELPERS
 // ════════════════════════════════════════════
-const TZ='Europe/Paris'
 function TODAY(){return new Date().toLocaleDateString('fr-CA',{timeZone:TZ})}
 function nowMinParis(){const[h,m]=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:TZ,hour12:false}).split(':').map(Number);return h*60+(m||0)}
 function addDays(d,n){const dt=new Date(d+"T12:00:00");dt.setDate(dt.getDate()+n);return dt.toISOString().split("T")[0]}
