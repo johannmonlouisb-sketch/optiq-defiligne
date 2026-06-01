@@ -1886,6 +1886,73 @@ function shiftPlanWeek(n){
 const NOTION_ENDPOINT='/api/notion'
 const isDeployedApp=location.protocol!=='file:'
 
+// ════════════════════════════════════════════
+// ENRICHISSEMENT KIZEO — Base Sites & PAD PAK
+// ════════════════════════════════════════════
+let _kizeoCache=null, _kizeoFetchTs=0
+
+async function fetchKizeoSites(){
+  if(_kizeoCache&&Date.now()-_kizeoFetchTs<30*60000) return _kizeoCache
+  try{
+    const data=await notionCall('query_kizeo',{})
+    if(data.sites?.length){_kizeoCache=data.sites;_kizeoFetchTs=Date.now()}
+  }catch(e){console.warn('Kizeo fetch:',e.message)}
+  return _kizeoCache||[]
+}
+
+function matchKizeoSite(iv,sites){
+  if(!sites?.length) return null
+  const n=s=>(s||'').toLowerCase().trim().replace(/\s+/g,' ').replace(/[,.-]/g,'')
+  const ivS=n(iv.client), ivA=n(iv.addr)
+  // 1. Exact société + adresse (12 premiers chars)
+  let m=sites.find(s=>n(s.societe)===ivS&&ivA&&n(s.adresse).startsWith(ivA.substring(0,12)))
+  if(m) return m
+  // 2. Exact société + ville
+  const ivCity=ivA.split(' ').slice(-2).join(' ')
+  m=sites.find(s=>n(s.societe)===ivS&&n(s.adresse).includes(ivCity))
+  if(m) return m
+  // 3. Société seule (si unique)
+  const all=sites.filter(s=>n(s.societe)===ivS)
+  if(all.length===1) return all[0]
+  // 4. Nom site inclus dans client
+  m=sites.find(s=>s.nomSite&&ivS.includes(n(s.nomSite).substring(0,10)))
+  return m||null
+}
+
+function enrichIvWithKizeo(iv,site){
+  if(!site) return iv
+  const urgent=['expired','critical','urgent']
+  const needPadPak=urgent.includes(site.urgencePadPak)
+  const needBat=site.batDate&&new Date(site.batDate)<new Date(Date.now()+90*86400000)
+  const needElec=urgent.includes(site.urgenceElectrodes)
+  return {
+    ...iv,
+    dea:         iv.dea&&iv.dea!=='0'&&iv.dea!==0 ? iv.dea : (site.daeModele||''),
+    nSerie:      iv.nSerie||site.nSerie||'',
+    padPakDate:  iv.padPakDate||site.padPakDateAdulte||'',
+    padPakDatePed: site.padPakDatePed||'',
+    batDate:     iv.batDate||site.batDate||'',
+    electrodeDate: site.electrodeDate||'',
+    padPak:      iv.padPak||needPadPak,
+    batChange:   iv.batChange||!!needBat,
+    urgencePadPak:    site.urgencePadPak||'',
+    urgenceElectrodes: site.urgenceElectrodes||'',
+    urgenceAnnuelle:  site.urgenceAnnuelle||'',
+    pma:         site.pma||'',
+    // Coordonnées GPS pré-géocodées depuis Kizeo → skip geocoding
+    ...(site.lat&&site.lng&&!iv.lat ? {lat:parseFloat(site.lat),lng:parseFloat(site.lng)} : {}),
+    // Technicien depuis Kizeo si pas déjà défini
+    techId:      iv.techId||getTechIdFromName(site.technicien||site.commercial)||0,
+    kizeoSiteId: site.id,
+  }
+}
+
+async function enrichIvsWithKizeo(ivsArr){
+  const sites=await fetchKizeoSites()
+  if(!sites.length) return ivsArr
+  return ivsArr.map(iv=>enrichIvWithKizeo(iv,matchKizeoSite(iv,sites)))
+}
+
 function nProp(props,...keys){
   for(const k of keys){
     const v=props[k];if(!v)continue
@@ -1933,7 +2000,7 @@ function notionPageToIvTech(page){
   const addr     = addrSite||addrSiege||''
   const dateStr  = nProp(p,'Date intervention')
   if(!client||!dateStr) return null
-  const techId   = getTechIdFromName(nProp(p,'Commercial'))
+  const techId   = getTechIdFromName(nProp(p,'Technicien','Commercial ','Commercial'))
   const terminer = nProp(p,'Terminer')
   const echec    = nProp(p,'Echec')
   let status='pending'
@@ -1995,8 +2062,12 @@ async function pullFromNotion(dateFrom, dateTo){
       if(existIdx>=0){ivs[existIdx]={...ivs[existIdx],...iv,id:ivs[existIdx].id};updated++}
       else{ivs.push(iv);added++}
     })
+    // Enrichissement depuis la base Kizeo (DAE, PAD PAK, GPS…)
+    ivs=await enrichIvsWithKizeo(ivs)
     syncVFFromIvs()
     saveIvs()
+    // Injecter les coordonnées Kizeo dans le cache de geocoding
+    ivs.forEach(iv=>{if(iv.lat&&iv.lng&&iv.addr)gCache[iv.addr]={lat:iv.lat,lng:iv.lng}})
     const msg=`✅ Notion : +${added} ajouts, ${updated} mises à jour`
     setStatus(msg)
     toast(msg,'#2E7D32')
@@ -2099,6 +2170,8 @@ async function silentPollNotion(){
     })
 
     if(changed>0){
+      ivs=await enrichIvsWithKizeo(ivs)
+      ivs.forEach(iv=>{if(iv.lat&&iv.lng&&iv.addr)gCache[iv.addr]={lat:iv.lat,lng:iv.lng}})
       syncVFFromIvs()
       saveIvs()
       renderDepart();renderPlanning();updateBadges()

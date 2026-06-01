@@ -6638,6 +6638,66 @@ async function geocodeAllTechDepots(){
 const NOTION_ENDPOINT = '/api/notion'
 const isDeployedApp = location.protocol !== 'file:'
 
+// ════════════════════════════════════════════
+// ENRICHISSEMENT KIZEO — Base Sites & PAD PAK
+// ════════════════════════════════════════════
+let _kizeoCache=null, _kizeoFetchTs=0
+
+async function fetchKizeoSites(){
+  if(_kizeoCache&&Date.now()-_kizeoFetchTs<30*60000) return _kizeoCache
+  try{
+    const r=await fetch('/api/notion',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'query_kizeo'})})
+    if(r.ok){const data=await r.json();if(data.sites?.length){_kizeoCache=data.sites;_kizeoFetchTs=Date.now()}}
+  }catch(e){console.warn('Kizeo fetch:',e.message)}
+  return _kizeoCache||[]
+}
+
+function matchKizeoSite(iv,sites){
+  if(!sites?.length) return null
+  const n=s=>(s||'').toLowerCase().trim().replace(/\s+/g,' ').replace(/[,.-]/g,'')
+  const ivS=n(iv.client), ivA=n(iv.addr)
+  let m=sites.find(s=>n(s.societe)===ivS&&ivA&&n(s.adresse).startsWith(ivA.substring(0,12)))
+  if(m) return m
+  const ivCity=ivA.split(' ').slice(-2).join(' ')
+  m=sites.find(s=>n(s.societe)===ivS&&n(s.adresse).includes(ivCity))
+  if(m) return m
+  const all=sites.filter(s=>n(s.societe)===ivS)
+  if(all.length===1) return all[0]
+  m=sites.find(s=>s.nomSite&&ivS.includes(n(s.nomSite).substring(0,10)))
+  return m||null
+}
+
+function enrichIvWithKizeo(iv,site){
+  if(!site) return iv
+  const urgent=['expired','critical','urgent']
+  const needPadPak=urgent.includes(site.urgencePadPak)
+  const needBat=site.batDate&&new Date(site.batDate)<new Date(Date.now()+90*86400000)
+  return {
+    ...iv,
+    dea:         iv.dea&&iv.dea!=='0'&&iv.dea!==0 ? iv.dea : (site.daeModele||''),
+    nSerie:      iv.nSerie||site.nSerie||'',
+    padPakDate:  iv.padPakDate||site.padPakDateAdulte||'',
+    padPakDatePed: site.padPakDatePed||'',
+    batDate:     iv.batDate||site.batDate||'',
+    electrodeDate: site.electrodeDate||'',
+    padPak:      iv.padPak||needPadPak,
+    batChange:   iv.batChange||!!needBat,
+    urgencePadPak:     site.urgencePadPak||'',
+    urgenceElectrodes: site.urgenceElectrodes||'',
+    urgenceAnnuelle:   site.urgenceAnnuelle||'',
+    pma:         site.pma||'',
+    techId:      iv.techId||getTechIdFromName(site.technicien||site.commercial)||iv.techId,
+    kizeoSiteId: site.id,
+    ...(site.lat&&site.lng&&!iv.lat ? {lat:parseFloat(site.lat),lng:parseFloat(site.lng)} : {}),
+  }
+}
+
+async function enrichIvsWithKizeo(ivsArr){
+  const sites=await fetchKizeoSites()
+  if(!sites.length) return ivsArr
+  return ivsArr.map(iv=>enrichIvWithKizeo(iv,matchKizeoSite(iv,sites)))
+}
+
 // ── Extraction propriété Notion ────────────────────────────────
 function nProp(props, ...keys){
   for(const k of keys){
@@ -6670,10 +6730,10 @@ function notionPageToIv(page, existingIds){
 
   if(!client || !dateStr) return null
 
-  // Technicien → id (Commercial  = select Notion)
-  const techName = nProp(p, 'Commercial')
+  // Technicien → id (priorité : Technicien select, puis Commercial)
+  const techName = nProp(p, 'Technicien', 'Commercial ', 'Commercial')
   const techId   = getTechIdFromName(techName)
-  if(techId && techName) techNotionNames[techId] = techName  // mémoriser le nom exact Notion
+  if(techId && techName) techNotionNames[techId] = techName
 
   // Statut (checkboxes)
   const terminer = nProp(p, 'Terminer')
@@ -6822,6 +6882,8 @@ async function pullFromNotion(dateFrom, dateTo, mode='merge'){
       }
     })
 
+    // Enrichissement depuis la base Kizeo (DAE, PAD PAK, GPS…)
+    ivs = await enrichIvsWithKizeo(ivs)
     cloudSave()
     updateSbCount()
     if(curView==='dashboard') rDash()

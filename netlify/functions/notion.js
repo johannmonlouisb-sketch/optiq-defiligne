@@ -173,6 +173,73 @@ exports.handler = async (event) => {
         }
       }
 
+      // ── QUERY KIZEO : lecture base Sites & PAD PAK ─────────────────────
+      case 'query_kizeo': {
+        const kizeoDbId = process.env.NOTION_DB_KIZEO || '4326bdb2994b42509759a897ff7a4a1f'
+        let all = [], next = null
+        do {
+          const payload = { page_size: 100, ...(next ? { start_cursor: next } : {}) }
+          const r = await fetch(`${NOTION_BASE}/databases/${kizeoDbId}/query`, {
+            method: 'POST', headers, body: JSON.stringify(payload)
+          })
+          const d = await r.json()
+          if (!r.ok) return { statusCode: r.status, headers: CORS, body: JSON.stringify(d) }
+          all = all.concat(d.results || [])
+          next = d.has_more ? d.next_cursor : null
+        } while (next)
+
+        const nP = (p, k) => {
+          const v = p[k]; if (!v) return ''
+          if (v.type === 'title')        return v.title?.map(t => t.plain_text).join('') || ''
+          if (v.type === 'rich_text')    return v.rich_text?.map(t => t.plain_text).join('') || ''
+          if (v.type === 'date')         return v.date?.start || ''
+          if (v.type === 'select')       return v.select?.name || ''
+          if (v.type === 'number')       return v.number ?? null
+          if (v.type === 'phone_number') return v.phone_number || ''
+          if (v.type === 'email')        return v.email || ''
+          if (v.type === 'checkbox')     return !!v.checkbox
+          return ''
+        }
+
+        const sites = all.map(page => {
+          const p = page.properties || {}
+          return {
+            id:               page.id,
+            nomSite:          nP(p, 'Nom Site'),
+            societe:          nP(p, 'Société'),
+            adresse:          nP(p, 'Adresse'),
+            adresseSiege:     nP(p, 'Adresse siège'),
+            codePostal:       nP(p, 'Code Postal'),
+            ville:            nP(p, 'Ville'),
+            technicien:       nP(p, 'Technicien'),
+            commercial:       nP(p, 'Commercial'),
+            daeModele:        nP(p, 'Modèle DAE'),
+            nSerie:           nP(p, 'N° Série DAE'),
+            typeIntervention: nP(p, 'Type intervention'),
+            statut:           nP(p, 'Statut intervention'),
+            maintenancePlanifiee: nP(p, 'Maintenance planifiée'),
+            padPakDateAdulte: nP(p, 'Expiration PAD PAK Adulte'),
+            padPakDatePed:    nP(p, 'Expiration PAD PAK Pédiatrique'),
+            batDate:          nP(p, 'Expiration Batterie'),
+            electrodeDate:    nP(p, 'Expiration Électrodes'),
+            prochaineExpiration: nP(p, 'Prochaine Expiration'),
+            pma:              nP(p, 'Prochaine Maintenance Annuelle'),
+            derniereIntervention: nP(p, 'Dernière Intervention Kizeo'),
+            urgencePadPak:    nP(p, 'Urgence PAD PAK'),
+            urgenceElectrodes: nP(p, 'Urgence Électrodes'),
+            urgenceAnnuelle:  nP(p, 'Urgence Annuelle'),
+            lat:              nP(p, 'Latitude'),
+            lng:              nP(p, 'Longitude'),
+            contact:          nP(p, 'Contact sur site'),
+            phone:            nP(p, 'Téléphone site'),
+            email:            nP(p, 'Email site'),
+            notes:            nP(p, 'Notes'),
+          }
+        })
+
+        return { statusCode: 200, headers: CORS, body: JSON.stringify({ sites }) }
+      }
+
       default:
         return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: `Action inconnue: ${action}` }) }
     }
