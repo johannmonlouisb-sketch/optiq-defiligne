@@ -11,16 +11,22 @@ async function updateIvHybrid(id, data) {
   Object.assign(iv, data)
   saveIvs()
 
-  // 2. Envoyer à Notion (gardé pour compatibilité)
+  // 2. Envoyer à Notion — checkboxes Terminer/Echec + Commercial si technicien changé
   if (iv.notionId) {
     try {
-      await notionCall('update_page', {
-        pageId: iv.notionId,
-        properties: {
-          'Status': { select: { name: data.status } },
-          ...(data.techId && { 'Commercial': { select: { name: TB(data.techId).name } } })
-        }
-      })
+      const props = {}
+      if (data.status !== undefined) {
+        props['Terminer'] = { checkbox: data.status === 'completed' }
+        props['Echec']    = { checkbox: data.status === 'not_responded' }
+      }
+      if (data.techId) {
+        const techName = TB(data.techId)?.name
+        if (techName) props['Commercial'] = { select: { name: techName } }
+      }
+      if (data.notes !== undefined) props['INFO '] = { rich_text: [{ text: { content: String(data.notes || '') } }] }
+      if (Object.keys(props).length) {
+        await notionCall('update_page', { pageId: iv.notionId, properties: props })
+      }
     } catch (e) {
       console.warn('Notion update failed:', e.message)
     }
@@ -50,12 +56,15 @@ async function validateIvHybrid(id) {
   iv.status = 'completed'
   saveIvs()
 
-  // Sync Notion
+  // Sync Notion — Terminer=true, Echec=false
   if (iv.notionId) {
     try {
       await notionCall('update_page', {
         pageId: iv.notionId,
-        properties: { 'Status': { select: { name: 'completed' } } }
+        properties: {
+          'Terminer': { checkbox: true },
+          'Echec':    { checkbox: false }
+        }
       })
     } catch (e) {
       console.warn('Notion validation failed:', e.message)

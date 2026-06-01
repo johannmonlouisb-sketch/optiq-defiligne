@@ -2062,8 +2062,18 @@ function notionPageToIvTech(page){
     date:dateStr.substring(0,10), type:getTypeFromStr(nProp(p,'INTERVENTION')),
     status, techId, form:nProp(p,'Fichier')===true,
     arm:0, dea:0, bat:0, padPak:false, padPakDate:'',
-    notes:nProp(p,'INFO'), contact:nProp(p,'Contact site'),
-    cphone:nProp(p,'Téléphone'), cemail:nProp(p,'E-mail'),
+    notes:   nProp(p,'INFO','INFO '),
+    motif:   nProp(p,'Motif'),
+    contact: nProp(p,'Contact site'),
+    cphone:  nProp(p,'Téléphone'),
+    cphone1: nProp(p,'Téléphone 1'),
+    cemail:  nProp(p,'E-mail'),
+    contact_siege: nProp(p,'Contact sieges','Contact Sieges'),
+    email_siege:   nProp(p,'E-mail Siéges','E-mail Sièges'),
+    phone_siege:   nProp(p,'Téléphone siéges','Téléphone Sièges'),
+    urgent:  !!(nProp(p,'Urgent')),
+    exter:   nProp(p,'EXTER')===true,
+    unplanned: false,
     timeStart: normalizeHHMM(nProp(p,'Heure début','Heure de début','Heure RDV','Créneau début','Heure')),
     timeEnd:   normalizeHHMM(nProp(p,'Heure fin','Heure limite','Au plus tard','Heure de fin','Créneau fin')),
     notionId
@@ -2194,7 +2204,11 @@ function showNotionPanelTech(){
 async function pushStatusToNotion(ivId,newStatus){
   if(!isDeployedApp) return
   const iv=ivs.find(i=>i.id===ivId)
-  if(!iv||!iv.notionId) return
+  if(!iv) return
+  if(!iv.notionId){
+    console.warn('[Notion] Intervention sans notionId — sync impossible:',iv.client)
+    return
+  }
   try{
     await notionCall('update_page',{
       pageId:iv.notionId,
@@ -2203,7 +2217,16 @@ async function pushStatusToNotion(ivId,newStatus){
         'Echec':{checkbox:newStatus==='not_responded'}
       }
     })
-  }catch(e){console.warn('Notion push:',e.message)}
+    // Si terminé → mettre à jour la base Kizeo (Dernière intervention + Prochaine maintenance)
+    if(newStatus==='completed'){
+      const tc=TB(curTech)
+      notionCall('sync_kizeo_completion',{
+        client:iv.client, addr:iv.addr, date:iv.date, techName:tc?.name||''
+      }).catch(e=>console.warn('Kizeo sync:',e.message))
+    }
+  }catch(e){
+    console.warn('[Notion] push statut échoué:',e.message)
+  }
 }
 
 // ── Polling automatique Notion ────────────────────────────────────────────────
@@ -2232,8 +2255,11 @@ async function silentPollNotion(){
       const idx=ivs.findIndex(i=>i.notionId===page.id)
       if(idx>=0){
         const old=ivs[idx]
-        // Détecter un vrai changement (statut, notes, technicien...)
-        if(old.status!==fresh.status||old.notes!==fresh.notes||old.techId!==fresh.techId) changed++
+        // Détecter tout changement pertinent depuis Notion
+        if(old.status!==fresh.status||old.notes!==fresh.notes||old.techId!==fresh.techId||
+           old.timeStart!==fresh.timeStart||old.timeEnd!==fresh.timeEnd||
+           old.contact!==fresh.contact||old.addr!==fresh.addr||
+           old.urgent!==fresh.urgent||old.exter!==fresh.exter||old.motif!==fresh.motif) changed++
         ivs[idx]={...ivs[idx],...fresh,id:ivs[idx].id}
       } else {
         ivs.push(fresh)
