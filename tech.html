@@ -791,25 +791,70 @@ function onDepDateChange(){renderDepart();updateBadges()}
 // ════════════════════════════════════════════
 // ÉQUIPEMENT À PRENDRE — logique automatique par intervention
 // ════════════════════════════════════════════
+// Couleurs selon niveau d'urgence Kizeo
+function urgCol(level){
+  if(level==="expired")  return {col:"#C62828",bg:"#FFEBEE"}
+  if(level==="critical") return {col:"#E65100",bg:"#FFF3E0"}
+  if(level==="urgent")   return {col:"#F57F17",bg:"#FFFDE7"}
+  if(level==="soon")     return {col:"#1565C0",bg:"#E3F2FD"}
+  return {col:"#E65100",bg:"#FFF3E0"}
+}
+
 function getEquip(iv){
   const items=[]
   const inst=iv.type==="installation"
-  const arm=iv.arm&&iv.arm!=="0"&&iv.arm!==0?iv.arm:inst?"Armoire":""
-  const dea=iv.dea&&iv.dea!=="0"&&iv.dea!==0?iv.dea:inst?"Neuf":""
-  if(dea) items.push({icon:"🫀",text:"DAE "+(inst&&dea==="Neuf"?"neuf":"· "+dea),col:"#1B5E20",bg:"#E8F5E9"})
-  if(arm) items.push({icon:"🗄️",text:arm,col:"#1565C0",bg:"#E3F2FD"})
-  if(iv.padPak){
-    const exp=iv.padPakDate?` exp. ${fd(iv.padPakDate)}`:""
-    items.push({icon:"⚡",text:"Pad Pak"+exp,col:"#E65100",bg:"#FFF3E0"})
+  const arm=iv.arm&&iv.arm!=="0"&&iv.arm!==0?iv.arm:""
+  const dea=iv.dea&&iv.dea!=="0"&&iv.dea!==0?iv.dea:""
+
+  // DAE
+  if(inst){
+    const label=dea?`DAE neuf · ${dea}`:"DAE neuf (modèle à confirmer)"
+    items.push({icon:"🫀",text:label,col:"#1B5E20",bg:"#E8F5E9"})
+  } else if(dea){
+    // Maintenance : afficher le modèle en place + N° série si dispo
+    const serial=iv.nSerie?` #${iv.nSerie}`:""
+    items.push({icon:"🫀",text:`DAE · ${dea}${serial}`,col:"#1B5E20",bg:"#E8F5E9"})
   }
+
+  // Armoire / support
+  if(arm) items.push({icon:"🗄️",text:arm,col:"#1565C0",bg:"#E3F2FD"})
+  else if(inst) items.push({icon:"🗄️",text:"Support à confirmer",col:"#1565C0",bg:"#E3F2FD"})
+
+  // Pad Pak adulte
+  if(iv.padPak){
+    const urg=urgCol(iv.urgencePadPak)
+    const exp=iv.padPakDate?` (exp. ${fd(iv.padPakDate)})`:""
+    const label=iv.urgencePadPak==="expired"?"PAD PAK PÉRIMÉ":"Pad Pak adulte"+exp
+    items.push({icon:"⚡",text:label,...urg})
+  }
+
+  // Pad Pak pédiatrique
+  if(iv.padPakDatePed){
+    const today=new Date();const exp=new Date(iv.padPakDatePed+"T12:00:00")
+    const daysLeft=Math.round((exp-today)/86400000)
+    if(daysLeft<180) items.push({icon:"⚡",text:`Pad Pak péd. exp. ${fd(iv.padPakDatePed)}`,col:daysLeft<0?"#C62828":"#E65100",bg:daysLeft<0?"#FFEBEE":"#FFF3E0"})
+  }
+
+  // Électrodes
+  if(iv.urgenceElectrodes&&iv.urgenceElectrodes!=="ok"&&iv.urgenceElectrodes!=="unknown"){
+    const urg=urgCol(iv.urgenceElectrodes)
+    const exp=iv.electrodeDate?` (exp. ${fd(iv.electrodeDate)})`:""
+    items.push({icon:"🔌",text:`Électrodes${iv.urgenceElectrodes==="expired"?" PÉRIMÉES":exp}`,...urg})
+  }
+
+  // Batterie
   if(iv.batChange){
-    const exp=iv.batDate?` exp. ${fd(iv.batDate)}`:""
+    const exp=iv.batDate?` (exp. ${fd(iv.batDate)})`:""
     items.push({icon:"🔋",text:"Batterie"+exp,col:"#1B5E20",bg:"#F1F8E9"})
   }
-  if(inst&&!iv.padPak) items.push({icon:"⚡",text:"Pad Pak (inclus)",col:"#E65100",bg:"#FFF3E0"})
-  if(inst&&!iv.batChange) items.push({icon:"🔋",text:"Batterie (inclus)",col:"#1B5E20",bg:"#F1F8E9"})
-  if(iv.exter) items.push({icon:"🌧️",text:"Extérieur",col:"#0277BD",bg:"#E1F5FE"})
-  if(iv.form) items.push({icon:"📚",text:"Formation",col:"#6A1B9A",bg:"#F3E5F5"})
+
+  // Installation : mentionner batterie + pad pak inclus SEULEMENT si pas déjà signalés
+  if(inst&&!iv.padPak) items.push({icon:"⚡",text:"Pad Pak neuf (fourni)",col:"#2E7D32",bg:"#E8F5E9"})
+  if(inst&&!iv.batChange) items.push({icon:"🔋",text:"Batterie neuve (fournie)",col:"#2E7D32",bg:"#E8F5E9"})
+
+  // Extérieur / Formation
+  if(iv.exter) items.push({icon:"🌧️",text:"Site extérieur",col:"#0277BD",bg:"#E1F5FE"})
+  if(iv.form)  items.push({icon:"📚",text:"Formation",col:"#6A1B9A",bg:"#F3E5F5"})
   return items
 }
 function equipHTML(iv){
@@ -1666,7 +1711,7 @@ function renderPlanning(){
           </div>
           <a href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(iv.addr)}" target="_blank" style="text-decoration:none;font-size:22px;padding:4px">🗺️</a>
         </div>
-        ${iv.padPak?`<div class="dc-tags"><span class="tag tag-warn">⚡ Pad Pak</span></div>`:""}
+        ${equipHTML(iv)}
         ${iv.notes?`<div style="padding:2px 10px 5px;font-size:11px;color:var(--orange)">📝 ${iv.notes}</div>`:""}
         <div class="dc-btns">
           <button class="vbtn vbtn-v ${done?"active":""}" onclick="validated[${iv.id}]=!validated[${iv.id}];if(validated[${iv.id}]){failed[${iv.id}]=false;updIvStatus(${iv.id},'completed');autoNextMaintenance(${iv.id});pushToKizeo(${iv.id},'completed');pushStatusToNotion(${iv.id},'completed');toast('✅ Validé — sync Kizeo + Notion','#2E7D32')}else{updIvStatus(${iv.id},'pending');pushStatusToNotion(${iv.id},'pending')};saveVF();renderPlanning()">
@@ -1691,7 +1736,7 @@ function renderMateriel(){
   const allEquip=dayIvs.flatMap(i=>getEquip(i).map(e=>e.text.split(" ")[0]+" "+e.text.split(" ")[1]))
   const installs=dayIvs.filter(i=>i.type==="installation")
   const padpaks=dayIvs.filter(i=>i.padPak)
-  const bats=dayIvs.filter(i=>i.batChange||i.type==="installation")
+  const bats=dayIvs.filter(i=>i.batChange)
   const forms=dayIvs.filter(i=>i.form)
   const al=document.getElementById("mat-alert")
   if(padpaks.length){
@@ -1702,7 +1747,8 @@ function renderMateriel(){
     installs.length?{i:"🫀",n:installs.length,l:"DAE neufs",s:installs.map(i=>(i.dea&&i.dea!=="0"?i.dea:"standard")).join(", "),c:"var(--green)"}:null,
     installs.length?{i:"🗄️",n:installs.length,l:"Armoires / Supports",s:installs.map(i=>(i.arm&&i.arm!=="0"?i.arm:"standard")).join(", "),c:"var(--blue)"}:null,
     padpaks.length?{i:"⚡",n:padpaks.length,l:"Pad Pak à changer",s:padpaks.map(i=>i.client.split(" ")[0]).join(", "),c:"var(--orange)"}:null,
-    bats.length?{i:"🔋",n:bats.length,l:"Batteries",s:"Pour "+(installs.length?"installations + ":"")+(bats.length-installs.length>0?bats.length-installs.length+" changements":""),c:"var(--blue)"}:null,
+    bats.length?{i:"🔋",n:bats.length,l:"Batteries à changer",s:bats.map(i=>i.client.split(" ")[0]).join(", "),c:"var(--blue)"}:null,
+    installs.length?{i:"🔋",n:installs.length,l:"Batteries neuves (install.)",s:"Fournies avec le DAE",c:"var(--green)"}:null,
     forms.length?{i:"📚",n:forms.length,l:"Formations",s:forms.map(i=>i.client.split(" ")[0]).join(", "),c:"#6A1B9A"}:null,
     dayIvs.length?{i:"📋",n:dayIvs.length,l:"Fiches Kizeo",s:"À remplir après intervention",c:"var(--purple)"}:null,
   ].filter(Boolean)
