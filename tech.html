@@ -532,6 +532,8 @@ function saveIvs(){try{localStorage.setItem("optiq_ivs_data",JSON.stringify(ivs)
 // ════════════════════════════════════════════
 // STATE
 // ════════════════════════════════════════════
+// Nettoyer coords invalides (hors France) déjà stockées — exécuté après isFrance définie
+function _cleanBadCoords(){ivs.forEach(iv=>{if(iv.lat&&iv.lng&&!isFrance(iv.lat,iv.lng)){delete iv.lat;delete iv.lng}})}
 let curTech=1, curTab="depart", planSel=TODAY(), gCache={}, mapObj=null, mapRoute=null
 let mapMarkers={}, building=false, cmEditId=null, techRouteOrder={}, _dragId=null
 let validated={}, failed={}
@@ -545,6 +547,7 @@ function syncVFFromIvs(){
   ivs.forEach(i=>{if(i.status==="completed")validated[i.id]=true;else if(i.status==="not_responded")failed[i.id]=true})
 }
 syncVFFromIvs()
+_cleanBadCoords() // vider les coords hors France stockées depuis une session précédente
 let techCfg={token:"",formId:"",userId:""}
 try{const s=localStorage.getItem("techCfg2");if(s)Object.assign(techCfg,JSON.parse(s))}catch(e){}
 
@@ -1285,6 +1288,11 @@ function mkIcon(label,col){
     className:"",iconSize:[34,34],iconAnchor:[17,17],popupAnchor:[0,-20]
   })
 }
+// ── Validation géographique : s'assurer que les coords sont en France (mainland + Corse) ──
+function isFrance(lat,lng){
+  return lat>=41.33&&lat<=51.09&&lng>=-5.15&&lng<=9.57
+}
+
 // ── Moteur 1 : API Adresse gouv.fr (meilleur pour adresses postales FR) ──────
 async function _geocodeAddok(q){
   try{
@@ -1299,9 +1307,14 @@ async function _geocodeAddok(q){
 async function _geocodePhoton(q){
   try{
     await new Promise(r=>setTimeout(r,250))
-    const r=await fetch('https://photon.komoot.io/api/?q='+encodeURIComponent(q)+'&limit=1&lang=fr&bbox=-5.1,41.3,9.6,51.1')
+    // bbox France stricte + filtre countrycodes pour éviter résultats hors France
+    const r=await fetch('https://photon.komoot.io/api/?q='+encodeURIComponent(q)+'&limit=5&lang=fr&bbox=-5.15,41.33,9.57,51.09')
     const d=await r.json()
-    if(d.features?.[0]){const[lng,lat]=d.features[0].geometry.coordinates;return{lat,lng}}
+    // Prendre le premier résultat DANS les limites de la France
+    for(const f of d.features||[]){
+      const[lng,lat]=f.geometry.coordinates
+      if(isFrance(lat,lng)) return{lat,lng}
+    }
   }catch(e){}
   return null
 }
@@ -1310,9 +1323,12 @@ async function _geocodePhoton(q){
 async function _geocodeNominatim(q){
   try{
     await new Promise(r=>setTimeout(r,1100))
-    const r=await fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(q)+'&format=json&limit=1&countrycodes=fr')
+    const r=await fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(q)+'&format=json&limit=3&countrycodes=fr')
     const d=await r.json()
-    if(d[0]) return{lat:parseFloat(d[0].lat),lng:parseFloat(d[0].lon)}
+    for(const item of d||[]){
+      const lat=parseFloat(item.lat),lng=parseFloat(item.lon)
+      if(isFrance(lat,lng)) return{lat,lng}
+    }
   }catch(e){}
   return null
 }
@@ -1393,7 +1409,9 @@ async function calcMap(){
     const iv=dayIvs[i]
     // Utiliser coords Kizeo si dispo, sinon géocoder
     const cached=gCache[iv.addr]
-    const c=cached||(iv.lat&&iv.lng?{lat:iv.lat,lng:iv.lng}:null)||
+    // Valider coords Kizeo : rejet si hors France (évite Portugal, 0,0, etc.)
+    const kizeoCoords=(iv.lat&&iv.lng&&isFrance(iv.lat,iv.lng))?{lat:iv.lat,lng:iv.lng}:null
+    const c=cached||kizeoCoords||
             await geocodeWithFallback(iv.addr, iv.client, iv.siege||'')
     if(c){
       if(c!==cached) gCache[iv.addr]=c
@@ -2040,8 +2058,8 @@ function enrichIvWithKizeo(iv,site){
     urgenceElectrodes: site.urgenceElectrodes||'',
     urgenceAnnuelle:  site.urgenceAnnuelle||'',
     pma:         site.pma||'',
-    // Coordonnées GPS pré-géocodées depuis Kizeo → skip geocoding
-    ...(site.lat&&site.lng&&!iv.lat ? {lat:parseFloat(site.lat),lng:parseFloat(site.lng)} : {}),
+    // Coordonnées GPS Kizeo → utilisées seulement si dans les limites France
+    ...((()=>{const la=parseFloat(site.lat),lo=parseFloat(site.lng);return la&&lo&&!iv.lat&&isFrance(la,lo)?{lat:la,lng:lo}:{}})()),
     // Technicien depuis Kizeo si pas déjà défini
     techId:      iv.techId||getTechIdFromName(site.technicien||site.commercial)||0,
     kizeoSiteId: site.id,
@@ -2214,7 +2232,7 @@ async function pullFromNotion(dateFrom, dateTo){
     syncVFFromIvs()
     saveIvs()
     // Injecter les coordonnées Kizeo dans le cache de geocoding
-    ivs.forEach(iv=>{if(iv.lat&&iv.lng&&iv.addr)gCache[iv.addr]={lat:iv.lat,lng:iv.lng}})
+    ivs.forEach(iv=>{if(iv.lat&&iv.lng&&iv.addr&&isFrance(iv.lat,iv.lng))gCache[iv.addr]={lat:iv.lat,lng:iv.lng}})
     const msg=`✅ Notion : +${added} ajouts, ${updated} mises à jour`
     setStatus(msg)
     toast(msg,'#2E7D32')
@@ -2343,7 +2361,7 @@ async function silentPollNotion(){
 
     if(changed>0){
       ivs=await enrichIvsWithKizeo(ivs)
-      ivs.forEach(iv=>{if(iv.lat&&iv.lng&&iv.addr)gCache[iv.addr]={lat:iv.lat,lng:iv.lng}})
+      ivs.forEach(iv=>{if(iv.lat&&iv.lng&&iv.addr&&isFrance(iv.lat,iv.lng))gCache[iv.addr]={lat:iv.lat,lng:iv.lng}})
       syncVFFromIvs()
       saveIvs()
       renderDepart();renderPlanning();updateBadges()

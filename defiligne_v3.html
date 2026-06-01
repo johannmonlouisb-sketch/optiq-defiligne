@@ -4217,11 +4217,13 @@ function editDepot(){document.getElementById("depot-disp").style.display="none";
 function saveDepot(){depot=document.getElementById("depot-in").value.trim()||depot;cancelDepot()}
 function cancelDepot(){document.getElementById("depot-disp").style.display="flex";document.getElementById("depot-ed").style.display="none";document.getElementById("depot-txt").textContent=depot}
 // ── Moteur 1 : API Adresse gouv.fr (meilleur pour adresses postales FR) ──────
+function isFrance(lat,lng){return lat>=41.33&&lat<=51.09&&lng>=-5.15&&lng<=9.57}
+
 async function _geocodeAddok(q){
   try{
     const r=await fetch('https://api-adresse.data.gouv.fr/search/?q='+encodeURIComponent(q)+'&limit=1')
     const d=await r.json()
-    if(d.features?.[0]){const[lng,lat]=d.features[0].geometry.coordinates;return{lat,lng}}
+    if(d.features?.[0]){const[lng,lat]=d.features[0].geometry.coordinates;if(isFrance(lat,lng))return{lat,lng}}
   }catch(e){}
   return null
 }
@@ -4230,9 +4232,12 @@ async function _geocodeAddok(q){
 async function _geocodePhoton(q){
   try{
     await new Promise(r=>setTimeout(r,250))
-    const r=await fetch('https://photon.komoot.io/api/?q='+encodeURIComponent(q)+'&limit=1&lang=fr&bbox=-5.1,41.3,9.6,51.1')
+    const r=await fetch('https://photon.komoot.io/api/?q='+encodeURIComponent(q)+'&limit=5&lang=fr&bbox=-5.15,41.33,9.57,51.09')
     const d=await r.json()
-    if(d.features?.[0]){const[lng,lat]=d.features[0].geometry.coordinates;return{lat,lng}}
+    for(const f of d.features||[]){
+      const[lng,lat]=f.geometry.coordinates
+      if(isFrance(lat,lng)) return{lat,lng}
+    }
   }catch(e){}
   return null
 }
@@ -4241,9 +4246,9 @@ async function _geocodePhoton(q){
 async function _geocodeNominatim(q){
   try{
     await new Promise(r=>setTimeout(r,1100))
-    const r=await fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(q)+'&format=json&limit=1&countrycodes=fr')
+    const r=await fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(q)+'&format=json&limit=3&countrycodes=fr')
     const d=await r.json()
-    if(d[0]) return{lat:parseFloat(d[0].lat),lng:parseFloat(d[0].lon)}
+    for(const item of d||[]){const lat=parseFloat(item.lat),lng=parseFloat(item.lon);if(isFrance(lat,lng))return{lat,lng}}
   }catch(e){}
   return null
 }
@@ -6725,7 +6730,7 @@ function enrichIvWithKizeo(iv,site){
     pma:         site.pma||'',
     techId:      iv.techId||getTechIdFromName(site.technicien||site.commercial)||iv.techId,
     kizeoSiteId: site.id,
-    ...(site.lat&&site.lng&&!iv.lat ? {lat:parseFloat(site.lat),lng:parseFloat(site.lng)} : {}),
+    ...((()=>{const la=parseFloat(site.lat),lo=parseFloat(site.lng);return la&&lo&&!iv.lat&&isFrance(la,lo)?{lat:la,lng:lo}:{}})()),
   }
 }
 
