@@ -1756,7 +1756,12 @@ let ivs=[
 {id:1095,client:"COMMUNE DE NAVEIL",addr:"nan",siege:"nan",date:"2025-12-19",type:"maintenance_simple",status:"completed",techId:4,form:false,arm:0,dea:0,bat:0,padPak:false,padPakDate:"2031-02-09",notes:"scellé : B001727",contact:"BEUZELIN",cphone:"",cemail:"Place Louis Leygue",contact_siege:"",email_siege:"",phone_siege:"",unplanned:false,kizeoId:"253513065"}
 ]
 const TZ='Europe/Paris'
-function nowMinParis(){const[h,m]=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:TZ,hour12:false}).split(':').map(Number);return h*60+(m||0)}
+function nowMinParis(){
+  const raw=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:TZ,hour12:false})
+  const mt=raw.match(/(\d{1,2})\D*(\d{2})/)
+  if(mt) return parseInt(mt[1])*60+parseInt(mt[2])
+  const d=new Date(); return d.getHours()*60+d.getMinutes()
+}
 let nextId=1096
 let curView=(()=>{try{return sessionStorage.getItem('optiq_active_view')||'dashboard'}catch(e){return'dashboard'}})()
 let selDate=new Date().toLocaleDateString('fr-CA',{timeZone:TZ})
@@ -1834,8 +1839,15 @@ function equipHTMLAdmin(iv){
   return `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:5px">${chips}</div>`
 }
 function fmtMin(m){if(m<60)return m+"min";const h=Math.floor(m/60),mn=m%60;return mn>0?h+"h"+String(mn).padStart(2,"0"):h+"h00"}
-function addMinToTime(hhmm,mins){const[h,m]=hhmm.split(':').map(Number);const t=h*60+m+mins;return`${String(Math.floor(t/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`}
-function toHHMM(m){return`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`}
+function addMinToTime(hhmm,mins){
+  const[h,m]=(hhmm||'00:00').split(':').map(Number)
+  const t=Math.max(0,h*60+(m||0)+mins)%(24*60)
+  return`${String(Math.floor(t/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`
+}
+function toHHMM(m){
+  const safe=Math.max(0,m)%(24*60)
+  return`${String(Math.floor(safe/60)).padStart(2,'0')}:${String(safe%60).padStart(2,'0')}`
+}
 function refreshDepETAs(){
   if(!Object.keys(depRouteLegsByTechId).length) return
   const depStartTimeStr=document.getElementById('dep-time')?.value||'08:00'
@@ -6812,9 +6824,14 @@ function normalizeHHMM(s){
   if(!s) return ''
   if((s+'').includes('T')){
     const d=new Date(s)
-    if(!isNaN(d)) return d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:TZ,hour12:false})
+    if(!isNaN(d)){
+      const raw=d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:TZ,hour12:false})
+      const mt=raw.match(/(\d{1,2})\D+(\d{2})/)
+      if(mt) return mt[1].padStart(2,'0')+':'+mt[2]
+    }
   }
-  const m=(s+'').trim().match(/^(\d{1,2})[h:H](\d{2})$/)
+  // Regex souple : "9h30", "09:30", "9H30", "09 h 30"
+  const m=(s+'').trim().match(/^(\d{1,2})\s*[hH:]\s*(\d{2})$/)
   if(m) return m[1].padStart(2,'0')+':'+m[2]
   if(/^\d{2}:\d{2}$/.test(s)) return s
   return ''

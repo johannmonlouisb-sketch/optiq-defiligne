@@ -552,7 +552,12 @@ try{const s=localStorage.getItem("techCfg2");if(s)Object.assign(techCfg,JSON.par
 // HELPERS
 // ════════════════════════════════════════════
 function TODAY(){return new Date().toLocaleDateString('fr-CA',{timeZone:TZ})}
-function nowMinParis(){const[h,m]=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:TZ,hour12:false}).split(':').map(Number);return h*60+(m||0)}
+function nowMinParis(){
+  const raw=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:TZ,hour12:false})
+  const mt=raw.match(/(\d{1,2})\D*(\d{2})/)
+  if(mt) return parseInt(mt[1])*60+parseInt(mt[2])
+  const d=new Date(); return d.getHours()*60+d.getMinutes() // fallback
+}
 function addDays(d,n){const dt=new Date(d+"T12:00:00");dt.setDate(dt.getDate()+n);return dt.toISOString().split("T")[0]}
 function addYears(d,n){const dt=new Date(d+"T12:00:00");dt.setFullYear(dt.getFullYear()+n);return dt.toISOString().split("T")[0]}
 const MS=["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"]
@@ -562,8 +567,15 @@ function fdl(d){if(!d)return "";const dt=new Date(d+"T12:00:00");return DS[dt.ge
 function fmin(m){if(m<60)return m+"min";return Math.floor(m/60)+"h"+(m%60>0?String(m%60).padStart(2,"0"):"")}
 function dur(t,f){return TYPES[t].dur+(f?10:0)}
 function TB(id){return TECHS.find(t=>t.id===id)||TECHS[0]}
-function addMinToTime(hhmm,mins){const[h,m]=hhmm.split(':').map(Number);const t=h*60+m+mins;return`${String(Math.floor(t/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`}
-function toHHMM(m){return`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`}
+function addMinToTime(hhmm,mins){
+  const[h,m]=(hhmm||'00:00').split(':').map(Number)
+  const t=Math.max(0,h*60+(m||0)+mins)%(24*60)
+  return`${String(Math.floor(t/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`
+}
+function toHHMM(m){
+  const safe=Math.max(0,m)%(24*60)
+  return`${String(Math.floor(safe/60)).padStart(2,'0')}:${String(safe%60).padStart(2,'0')}`
+}
 function refreshLiveETAs(){
   if(!techRouteLegDurations.length||!_routeOrderedPts.length) return
   const startHHMM=depStartTime()
@@ -922,11 +934,16 @@ function renderDepart(){
         const totalGap=Math.max(0,etaThis-prevLeave)
         const prevCoord=idx===0?null:gCache[prevIv?.addr]
         const curCoord=gCache[iv.addr]
-        if(iv.timeStart&&prevCoord&&curCoord){
+        if(prevCoord&&curCoord){
+          // Haversine × facteur route → temps trajet estimé
           const dLat=(curCoord.lat-prevCoord.lat)*Math.PI/180,dLng=(curCoord.lng-prevCoord.lng)*Math.PI/180
           const a=Math.sin(dLat/2)**2+Math.cos(prevCoord.lat*Math.PI/180)*Math.cos(curCoord.lat*Math.PI/180)*Math.sin(dLng/2)**2
           travelMin=Math.round(6371*2*Math.asin(Math.sqrt(a))*1.3/50*60)
           waitMin=Math.max(0,totalGap-travelMin)
+        } else if(iv.timeStart){
+          // Pas de coords mais créneau connu → tout le gap = attente + trajet inconnu
+          waitMin=totalGap
+          travelMin=null // trajet inconnu, ne pas afficher
         } else {
           travelMin=totalGap
         }
@@ -2085,9 +2102,15 @@ function normalizeHHMM(s){
   // ISO datetime Notion (ex: "2025-06-01T07:00:00.000+00:00") → convertir en heure Paris
   if((s+'').includes('T')){
     const d=new Date(s)
-    if(!isNaN(d)) return d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:TZ,hour12:false})
+    if(!isNaN(d)){
+      // toLocaleTimeString peut retourner "09 h 30" sur certains Windows → parser avec regex souple
+      const raw=d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:TZ,hour12:false})
+      const mt=raw.match(/(\d{1,2})\D+(\d{2})/)
+      if(mt) return mt[1].padStart(2,'0')+':'+mt[2]
+    }
   }
-  const m=(s+'').trim().match(/^(\d{1,2})[h:H](\d{2})$/)
+  // Regex souple : "9h30", "09:30", "9H30", "09 h 30", "9 h 30"
+  const m=(s+'').trim().match(/^(\d{1,2})\s*[hH:]\s*(\d{2})$/)
   if(m) return m[1].padStart(2,'0')+':'+m[2]
   if(/^\d{2}:\d{2}$/.test(s)) return s
   return ''
