@@ -7638,6 +7638,9 @@ async function initSupabaseRealtimeAdmin() {
       console.log('🔄 Intervention mise à jour:', data)
       const idx = ivs.findIndex(i => i.id === data.id)
       if (idx >= 0) {
+        // Sync depValidated / depFailed en temps réel depuis le tech
+        if (data.status === 'completed')      { depValidated[data.id]=true;  depFailed[data.id]=false }
+        else if (data.status === 'not_responded') { depFailed[data.id]=true; depValidated[data.id]=false }
         ivs[idx] = {
           ...ivs[idx],
           client: data.client || ivs[idx].client,

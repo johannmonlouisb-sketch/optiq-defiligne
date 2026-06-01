@@ -312,6 +312,7 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
               </div>
               <button onclick="endTournee()" style="padding:10px 16px;background:#2E7D32;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;flex-shrink:0">✓ Fin tournée</button>
             </div>
+            <div id="dep-eta-banner" style="display:none"></div>
             <div id="dep-list-empty" style="padding:32px 12px;text-align:center;color:var(--gray);font-size:14px">
               Aucune intervention ce jour
             </div>
@@ -567,13 +568,16 @@ function refreshLiveETAs(){
   const[sh,sm]=startHHMM.split(':').map(Number)
   const nowMin=new Date().getHours()*60+new Date().getMinutes()
   let curMin=sh*60+sm
+  let lastLeaveMin=sh*60+sm
   _routeOrderedPts.forEach((p,idx)=>{
     curMin+=techRouteLegDurations[idx]?.trafficDurationMin||0
     if(p.iv.timeStart){const[th,tm]=p.iv.timeStart.split(':').map(Number);if(curMin<th*60+tm)curMin=th*60+tm}
     if(curMin<nowMin&&!validated[p.iv.id]&&!failed[p.iv.id]) curMin=nowMin
     techETAs[p.iv.id]={eta:toHHMM(curMin),leave:toHHMM(curMin+dur(p.iv.type,p.iv.form))}
     curMin+=dur(p.iv.type,p.iv.form)
+    if(!validated[p.iv.id]&&!failed[p.iv.id]) lastLeaveMin=curMin
   })
+  window._tourEndETA=toHHMM(lastLeaveMin)
   renderDepart()
 }
 function startLiveETAs(){
@@ -581,6 +585,15 @@ function startLiveETAs(){
   etaRefreshTimer=setInterval(refreshLiveETAs,60000)
 }
 function fmtDuration(mins){const h=Math.floor(mins/60);const m=mins%60;return h>0?`${h}h${String(m).padStart(2,'0')}`:`${m}min`}
+async function _acquireWakeLock(){
+  if('wakeLock' in navigator){
+    try{window._wakeLock=await navigator.wakeLock.request('screen')}catch(e){}
+  }
+}
+function _releaseWakeLock(){
+  if(window._wakeLock){try{window._wakeLock.release()}catch(e){}; window._wakeLock=null}
+}
+
 function startTournee(){
   if(tourRunning) return
   tourStartTime=new Date()
@@ -591,11 +604,15 @@ function startTournee(){
     if(el) el.textContent=fmtDuration(elapsed)
     renderDepart()
   },1000)
+  refreshLiveETAs()
+  startLiveETAs()
+  _acquireWakeLock()
   renderDepart()
 }
 function endTournee(){
   if(!tourRunning) return
   clearInterval(tourTimer)
+  _releaseWakeLock()
   const date=depDate()
   const endTime=new Date()
   const durationMin=Math.floor((endTime-tourStartTime)/60000)
@@ -679,6 +696,7 @@ function dropCard(targetId){
   saveRouteOrder(date)
   _dragId=null
   renderDepart()
+  refreshLiveETAs()
   // Mettre à jour les numéros sur la carte
   order.forEach((id,idx)=>{
     if(mapMarkers[id]){
@@ -790,6 +808,22 @@ function renderDepart(){
   if(empty)empty.style.display="none"
   if(timer)timer.style.display=tourRunning?"flex":"none"
   if(btnStart)btnStart.style.display=tourRunning?"none":"block"
+
+  // ── Barre résumé ETA ────────────────────────────────────────
+  const etaBanner=document.getElementById("dep-eta-banner")
+  if(etaBanner){
+    const pending=dayIvs.filter(i=>!validated[i.id]&&!failed[i.id])
+    const next3=pending.slice(0,3).filter(i=>techETAs[i.id])
+    if(next3.length||window._tourEndETA){
+      const chips=next3.map(i=>`<span style="background:#E8F5E9;color:#2E7D32;border-radius:20px;padding:3px 10px;font-weight:700;font-size:13px">🕐 ${techETAs[i.id].eta}</span>`).join("")
+      const endChip=window._tourEndETA&&pending.length?`<span style="background:#FFF3E0;color:#E65100;border-radius:20px;padding:3px 10px;font-weight:700;font-size:13px">🏁 Fin ~${window._tourEndETA}</span>`:""
+      const remaining=pending.length?`<span style="color:#757575;font-size:12px">${pending.length} restante${pending.length>1?"s":""}</span>`:""
+      etaBanner.innerHTML=`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;background:#F8F9FA;border-bottom:1px solid #E0E0E0">${remaining}${chips}${endChip}</div>`
+      etaBanner.style.display="block"
+    } else {
+      etaBanner.style.display="none"
+    }
+  }
 
   const tToMin=hhmm=>{if(!hhmm)return null;const[h,m]=hhmm.split(':').map(Number);return h*60+m}
   list.innerHTML=dayIvs.map((iv,idx)=>{
@@ -1986,7 +2020,10 @@ function startNotionPolling(){
   _pollTimer=setInterval(()=>{ if(!document.hidden) silentPollNotion() }, 60000)
   // Sync immédiate si on revient sur l'onglet après > 60s d'absence
   document.addEventListener('visibilitychange',()=>{
-    if(!document.hidden && Date.now()-_lastPollTs>60000) silentPollNotion()
+    if(!document.hidden){
+      if(Date.now()-_lastPollTs>60000) silentPollNotion()
+      if(tourRunning){ refreshLiveETAs(); if(!window._wakeLock) _acquireWakeLock() }
+    }
   })
 }
 
