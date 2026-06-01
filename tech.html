@@ -679,7 +679,10 @@ function navigateToNextClient(provider){
   closeNextClientPopup()
 }
 function depStartTime(){return document.getElementById('dep-time')?.value||techCfg.startTime||'08:00'}
-function myIvs(date){return ivs.filter(i=>i.date===date&&i.techId===curTech)}
+function myIvs(date){
+  // techId===curTech → propre au tech | !techId (0/null/undefined) → non assigné → visible aussi
+  return ivs.filter(i=>i.date===date&&(i.techId===curTech||!i.techId))
+}
 function saveCfg(){try{localStorage.setItem("techCfg2",JSON.stringify(techCfg))}catch(e){}}
 function saveVF(){saveIvs()} // état dérivé de iv.status, persisté via saveIvs
 
@@ -883,7 +886,12 @@ function renderDepart(){
   if(!techRouteOrder[date]) loadRouteOrder(date)
   const allIvs=myIvs(date)
   const order=techRouteOrder[date]
-  const dayIvs=order?order.map(id=>allIvs.find(i=>i.id===id)).filter(Boolean):[...allIvs]
+  // Stops dans l'ordre optimisé
+  const orderedIvs=order?order.map(id=>allIvs.find(i=>i.id===id)).filter(Boolean):[...allIvs]
+  // Stops sans géocode exclus de l'optimisation → ajoutés à la fin avec warning
+  const orderedIds=new Set(orderedIvs.map(i=>i.id))
+  const unroutedIvs=allIvs.filter(i=>!orderedIds.has(i.id))
+  const dayIvs=[...orderedIvs,...unroutedIvs]
   const doneN=dayIvs.filter(i=>validated[i.id]).length
   const failN=dayIvs.filter(i=>failed[i.id]).length
   document.getElementById("dep-list-hd").textContent=`${dayIvs.length} client${dayIvs.length>1?"s":""}`
@@ -998,6 +1006,7 @@ function renderDepart(){
         <span class="tag tag-info">🔧 ${fmin(workMin)} · ${TYPES[iv.type].label}</span>
         ${techETAs[iv.id]?`<span class="tag" style="background:#E8F5E9;color:#2E7D32;font-weight:600">🕐 Arrivée ${techETAs[iv.id].eta} · fin ${techETAs[iv.id].leave}</span>`:""}
         ${iv.timeEnd&&!done?`<span class="tag" style="background:#F3F3F3;color:#757575;font-size:11px">⏰ Au plus tard ${iv.timeEnd}</span>`:""}
+        ${unroutedIvs.includes(iv)?`<span class="tag" style="background:#FFF3E0;color:#E65100;font-weight:700">⚠️ Adresse non géolocalisée — hors itinéraire</span>`:""}
         ${done?`<span class="tag tag-ok">✅ Kizeo sync</span>`:""}
         ${fail?`<span class="tag tag-err">✗ Échec</span>`:""}
       </div>
@@ -1378,11 +1387,28 @@ async function calcMap(){
     .bindPopup(`<strong>🏠 Dépôt ${tc.name||''}</strong><br><small>${depotAddr}</small>`)
 
   // Géocoder toutes les interventions
-  const pts=[]
+  const pts=[], noGeoIvs=[]
   for(let i=0;i<dayIvs.length;i++){
     setProgress(15+Math.round(i/dayIvs.length*50),"Client "+(i+1)+"/"+dayIvs.length)
-    const c=await geocodeWithFallback(dayIvs[i].addr, dayIvs[i].client, dayIvs[i].siege||'')
-    if(c) pts.push({iv:dayIvs[i],c})
+    const iv=dayIvs[i]
+    // Utiliser coords Kizeo si dispo, sinon géocoder
+    const cached=gCache[iv.addr]
+    const c=cached||(iv.lat&&iv.lng?{lat:iv.lat,lng:iv.lng}:null)||
+            await geocodeWithFallback(iv.addr, iv.client, iv.siege||'')
+    if(c){
+      if(c!==cached) gCache[iv.addr]=c
+      pts.push({iv,c})
+    } else {
+      noGeoIvs.push(iv) // adresse non trouvée → hors itinéraire
+    }
+  }
+  if(noGeoIvs.length){
+    toast(`⚠️ ${noGeoIvs.length} adresse${noGeoIvs.length>1?"s":""} non trouvée${noGeoIvs.length>1?"s":""} — ${noGeoIvs.map(i=>i.client.split(' ')[0]).join(', ')} ajoutée${noGeoIvs.length>1?"s":""} en fin de liste`,'#E65100',6000)
+    // Ajouter les stops sans coords à la fin de l'ordre pour qu'ils restent visibles
+    loadRouteOrder(date)
+    if(!techRouteOrder[date]) techRouteOrder[date]=[]
+    noGeoIvs.forEach(iv=>{if(!techRouteOrder[date].includes(iv.id))techRouteOrder[date].push(iv.id)})
+    saveRouteOrder(date)
   }
 
   // ── Ordre de tournée : priorité à l'ordre calculé par l'admin ──
@@ -1522,9 +1548,19 @@ async function calcMap(){
         if(data.legs?.length&&orderedPts.length){
           const[sh,sm]=startHHMM.split(':').map(Number)
           let curMin=sh*60+sm
+          const nowMin=nowMinParis()
           orderedPts.forEach((p,idx)=>{
-            curMin+=data.legs[idx]?.trafficDurationMin||0
+            // Sécurité : si moins de legs que de stops, utiliser Haversine pour les derniers
+            if(idx<data.legs.length){
+              curMin+=data.legs[idx]?.trafficDurationMin||0
+            } else {
+              const prev=idx>0?orderedPts[idx-1].c:dc
+              const dLat=(p.c.lat-prev.lat)*Math.PI/180,dLng=(p.c.lng-prev.lng)*Math.PI/180
+              const a=Math.sin(dLat/2)**2+Math.cos(prev.lat*Math.PI/180)*Math.cos(p.c.lat*Math.PI/180)*Math.sin(dLng/2)**2
+              curMin+=Math.round(6371*2*Math.asin(Math.sqrt(a))*1.3/50*60)
+            }
             if(p.iv.timeStart){const[th,tm]=p.iv.timeStart.split(':').map(Number);if(curMin<th*60+tm)curMin=th*60+tm}
+            if(curMin<nowMin&&!validated[p.iv.id]&&!failed[p.iv.id]) curMin=nowMin
             techETAs[p.iv.id]={eta:toHHMM(curMin),leave:toHHMM(curMin+dur(p.iv.type,p.iv.form))}
             curMin+=dur(p.iv.type,p.iv.form)
           })
