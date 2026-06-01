@@ -1756,9 +1756,9 @@ let ivs=[
 {id:1095,client:"COMMUNE DE NAVEIL",addr:"nan",siege:"nan",date:"2025-12-19",type:"maintenance_simple",status:"completed",techId:4,form:false,arm:0,dea:0,bat:0,padPak:false,padPakDate:"2031-02-09",notes:"scellé : B001727",contact:"BEUZELIN",cphone:"",cemail:"Place Louis Leygue",contact_siege:"",email_siege:"",phone_siege:"",unplanned:false,kizeoId:"253513065"}
 ]
 let nextId=1096
-let curView="dashboard"
-let selDate=new Date().toLocaleDateString('fr-CA')
-let mapDate=new Date().toLocaleDateString('fr-CA')
+let curView=(()=>{try{return sessionStorage.getItem('optiq_active_view')||'dashboard'}catch(e){return'dashboard'}})()
+let selDate=new Date().toLocaleDateString('fr-CA',{timeZone:TZ})
+let mapDate=new Date().toLocaleDateString('fr-CA',{timeZone:TZ})
 let depot="7 rue des entrepreneurs, 78540 Vernouillet"
 let fStatus="all",fTech=0,fClient=""
 let depValidated={}
@@ -1773,7 +1773,9 @@ let depRouteLegsByTechId={}, depRouteOrderedByTechId={}
 let _dragId=null,_dragTechId=null
 // Map state
 let mapObj=null,rGroup=null,gcache={},building=false
-const TODAY=new Date().toLocaleDateString('fr-CA')
+const TZ='Europe/Paris'
+const TODAY=new Date().toLocaleDateString('fr-CA',{timeZone:TZ})
+function nowMinParis(){const[h,m]=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:TZ,hour12:false}).split(':').map(Number);return h*60+(m||0)}
 const WEEK=(()=>{
   const d=new Date();d.setHours(12,0,0,0)
   const day=d.getDay();const mon=new Date(d)
@@ -1815,7 +1817,7 @@ function refreshDepETAs(){
   if(!Object.keys(depRouteLegsByTechId).length) return
   const depStartTimeStr=document.getElementById('dep-time')?.value||'08:00'
   const[sh,sm]=depStartTimeStr.split(':').map(Number)
-  const nowMin=new Date().getHours()*60+new Date().getMinutes()
+  const nowMin=nowMinParis()
   for(const techId in depRouteLegsByTechId){
     const legs=depRouteLegsByTechId[techId]
     const orderedIvs=depRouteOrderedByTechId[techId]||[]
@@ -6785,6 +6787,10 @@ function notionPageToIv(page, existingIds){
 
 function normalizeHHMM(s){
   if(!s) return ''
+  if((s+'').includes('T')){
+    const d=new Date(s)
+    if(!isNaN(d)) return d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:TZ,hour12:false})
+  }
   const m=(s+'').trim().match(/^(\d{1,2})[h:H](\d{2})$/)
   if(m) return m[1].padStart(2,'0')+':'+m[2]
   if(/^\d{2}:\d{2}$/.test(s)) return s

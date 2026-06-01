@@ -550,7 +550,9 @@ try{const s=localStorage.getItem("techCfg2");if(s)Object.assign(techCfg,JSON.par
 // ════════════════════════════════════════════
 // HELPERS
 // ════════════════════════════════════════════
-function TODAY(){return new Date().toLocaleDateString('fr-CA')}
+const TZ='Europe/Paris'
+function TODAY(){return new Date().toLocaleDateString('fr-CA',{timeZone:TZ})}
+function nowMinParis(){const[h,m]=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:TZ,hour12:false}).split(':').map(Number);return h*60+(m||0)}
 function addDays(d,n){const dt=new Date(d+"T12:00:00");dt.setDate(dt.getDate()+n);return dt.toISOString().split("T")[0]}
 function addYears(d,n){const dt=new Date(d+"T12:00:00");dt.setFullYear(dt.getFullYear()+n);return dt.toISOString().split("T")[0]}
 const MS=["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"]
@@ -566,7 +568,7 @@ function refreshLiveETAs(){
   if(!techRouteLegDurations.length||!_routeOrderedPts.length) return
   const startHHMM=depStartTime()
   const[sh,sm]=startHHMM.split(':').map(Number)
-  const nowMin=new Date().getHours()*60+new Date().getMinutes()
+  const nowMin=nowMinParis()
   let curMin=sh*60+sm
   let lastLeaveMin=sh*60+sm
   _routeOrderedPts.forEach((p,idx)=>{
@@ -720,6 +722,7 @@ function toast(msg,col="#212121",dur=2800){
 // ════════════════════════════════════════════
 function goTab(tab){
   curTab=tab
+  try{sessionStorage.setItem('optiq_tech_tab',tab)}catch(e){}
   document.querySelectorAll(".view").forEach(v=>v.classList.remove("on"))
   document.querySelectorAll(".tab").forEach(t=>t.classList.remove("on"))
   document.getElementById("v-"+tab).classList.add("on")
@@ -1375,7 +1378,7 @@ async function calcMap(){
         orderedPts=localOptimizeRoute(dc,pts,sh*60+sm)
         techETAs={}
         let curMin=sh*60+sm,prev=dc
-        const nowMin=new Date().getHours()*60+new Date().getMinutes()
+        const nowMin=nowMinParis()
         orderedPts.forEach(p=>{
           const dLat=(p.c.lat-prev.lat)*Math.PI/180,dLng=(p.c.lng-prev.lng)*Math.PI/180
           const a=Math.sin(dLat/2)**2+Math.cos(prev.lat*Math.PI/180)*Math.cos(p.c.lat*Math.PI/180)*Math.sin(dLng/2)**2
@@ -1533,8 +1536,7 @@ function reoptimizeFromGPS(){
 
   navigator.geolocation.getCurrentPosition(async pos=>{
     const gps={lat:pos.coords.latitude,lng:pos.coords.longitude}
-    const now=new Date()
-    const curMin=now.getHours()*60+now.getMinutes()
+    const curMin=nowMinParis()
 
     try{
       // Récupère les coordonnées des arrêts restants (depuis le cache Leaflet)
@@ -2024,21 +2026,45 @@ function notionPageToIvTech(page){
 
 function normalizeHHMM(s){
   if(!s) return ''
+  // ISO datetime Notion (ex: "2025-06-01T07:00:00.000+00:00") → convertir en heure Paris
+  if((s+'').includes('T')){
+    const d=new Date(s)
+    if(!isNaN(d)) return d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:TZ,hour12:false})
+  }
   const m=(s+'').trim().match(/^(\d{1,2})[h:H](\d{2})$/)
   if(m) return m[1].padStart(2,'0')+':'+m[2]
-  // Format "HH:MM" déjà correct
   if(/^\d{2}:\d{2}$/.test(s)) return s
   return ''
 }
 
-async function notionCall(action,extra={}){
-  const r=await fetch(NOTION_ENDPOINT,{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({action,...extra})
-  })
-  if(!r.ok) throw new Error(`Notion ${r.status}`)
-  return r.json()
+async function notionCall(action,extra={},attempt=1){
+  const MAX=3, DELAYS=[0,1500,4000]
+  try{
+    if(attempt>1) await new Promise(r=>setTimeout(r,DELAYS[attempt-1]))
+    const r=await fetch(NOTION_ENDPOINT,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action,...extra})
+    })
+    if(r.status===429||r.status>=500){
+      if(attempt<MAX){
+        setTopbarSync(`⏳ Notion — tentative ${attempt+1}/${MAX}…`)
+        return notionCall(action,extra,attempt+1)
+      }
+      throw new Error(`Notion ${r.status} après ${MAX} tentatives`)
+    }
+    if(!r.ok){
+      const txt=await r.text().catch(()=>'')
+      throw new Error(`Notion ${r.status}${txt?': '+txt.substring(0,80):''}`)
+    }
+    return r.json()
+  }catch(e){
+    if(attempt<MAX&&(e.name==='TypeError'||e.message.includes('fetch'))){
+      setTopbarSync(`⚠️ Notion hors ligne — tentative ${attempt+1}…`)
+      return notionCall(action,extra,attempt+1)
+    }
+    throw e
+  }
 }
 
 async function pullFromNotion(dateFrom, dateTo){
@@ -2234,8 +2260,10 @@ if(isDeployedApp){
   }).catch(()=>{})
 }
 
+// Restaurer l'onglet actif depuis la session précédente
+try{const t=sessionStorage.getItem('optiq_tech_tab');if(t)curTab=t}catch(e){}
 updateTopbar()
-renderDepart()
+goTab(curTab)
 updateBadges()
 
 // ── Auto-chargement Notion au démarrage (année passée + en cours) ─────────────
