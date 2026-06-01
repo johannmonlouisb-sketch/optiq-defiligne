@@ -2133,6 +2133,7 @@ function dropDepCard(targetId){
   saveRouteOrder(date)
   _dragId=null
   rDepart()
+  refreshDepETAs()
   if(depMapObj) orderedIvs.forEach((iv,idx)=>{
     if(depMarkers[iv.id]){depMarkers[iv.id]._num=idx+1;updateDepMarker(iv.id)}
   })
@@ -2836,12 +2837,36 @@ function rMat(){
   if(matFilter.tech > 0) day = day.filter(i => i.techId === matFilter.tech)
   if(matFilter.type !== 'all') day = day.filter(i => i.type === matFilter.type)
 
-  const mat = day.reduce((a,i)=>({
-    arm:    a.arm    + (i.arm ? 1 : 0),
-    dea:    a.dea    + (i.type==="installation" && i.dea ? 1 : 0),
-    bat:    a.bat    + (i.batChange ? 1 : 0),
-    padPak: a.padPak + (i.padPak?1:0)
-  }), {arm:0,dea:0,bat:0,padPak:0})
+  // Auto-détection péremption : padPak ou batterie périmés même si non cochés
+  const today=new Date(); today.setHours(12,0,0,0)
+  const daysPast=d=>{if(!d)return -999;const dt=new Date(d+"T12:00:00");return Math.round((today-dt)/86400000)}
+  const isExpired=d=>daysPast(d)>=0
+  const isSoon=d=>daysPast(d)>=-90  // périmé dans moins de 90 jours
+
+  // Enrichit chaque intervention avec alertes péremption automatiques
+  const enriched=day.map(iv=>{
+    const autoAlerts=[]
+    if(iv.padPakDate&&(isExpired(iv.padPakDate)||isSoon(iv.padPakDate))&&!iv.padPak)
+      autoAlerts.push({icon:"⚡",text:`Pad Pak ${isExpired(iv.padPakDate)?"PÉRIMÉ":"bientôt périmé"} (${fd(iv.padPakDate)})`,col:"#C62828",bg:"#FFEBEE"})
+    if(iv.batDate&&(isExpired(iv.batDate)||isSoon(iv.batDate))&&!iv.batChange)
+      autoAlerts.push({icon:"🔋",text:`Batterie ${isExpired(iv.batDate)?"PÉRIMÉE":"bientôt périmée"} (${fd(iv.batDate)})`,col:"#C62828",bg:"#FFEBEE"})
+    return {...iv,autoAlerts}
+  })
+
+  const installs=enriched.filter(i=>i.type==="installation")
+  const withPadPak=enriched.filter(i=>i.padPak||(i.padPakDate&&(isExpired(i.padPakDate)||isSoon(i.padPakDate))))
+  const withBat=enriched.filter(i=>i.batChange||(i.batDate&&(isExpired(i.batDate)||isSoon(i.batDate))))
+  const withArm=enriched.filter(i=>i.arm&&i.arm!=="0"&&i.arm!==0)
+  // Modèles DEA uniques pour installations
+  const deaModels=[...new Set(installs.map(i=>i.dea&&i.dea!=="0"?i.dea:"standard"))]
+  const armModels=[...new Set(withArm.map(i=>i.arm))]
+
+  const mat = {
+    arm:    withArm.length,
+    dea:    installs.length,
+    bat:    withBat.length,
+    padPak: withPadPak.length
+  }
 
   const allTypes = [
     ['all','Tous'],
@@ -2852,10 +2877,10 @@ function rMat(){
 
   const sh = matFilter.show
   const kpiCards = [
-    sh.dea    ? ["⚡","DAE neufs",mat.dea,"#6A1B9A","installations uniquement"] : null,
-    sh.padPak ? ["🔌","Pad Pak",mat.padPak,"#E65100","électrodes à changer"] : null,
-    sh.bat    ? ["🔋","Batteries",mat.bat,"#1B5E20","recharges/remplacement"] : null,
-    sh.arm    ? ["🗄️","Armoires",mat.arm,"#1565C0","supports muraux"] : null,
+    sh.dea    && mat.dea    ? ["🫀","DAE neufs",mat.dea,"#2E7D32",deaModels.join(", ")||"—"] : null,
+    sh.arm    && mat.arm    ? ["🗄️","Supports",mat.arm,"#1565C0",armModels.slice(0,3).join(", ")||"—"] : null,
+    sh.padPak && mat.padPak ? ["⚡","Pad Pak",mat.padPak,"#E65100",withPadPak.filter(i=>i.padPakDate&&isExpired(i.padPakDate)).length+" périmé(s)"] : null,
+    sh.bat    && mat.bat    ? ["🔋","Batteries",mat.bat,"#1B5E20",withBat.filter(i=>i.batDate&&isExpired(i.batDate)).length+" périmée(s)"] : null,
   ].filter(Boolean)
 
   document.getElementById("d-mat").innerHTML=`
@@ -2920,53 +2945,57 @@ function rMat(){
     </div>`).join('')}
   </div>`:''}
 
-  <!-- ─── ALERTE PAD PAK ──────────────────────────────────── -->
+  <!-- ─── ALERTES PÉREMPTION AUTO ───────────────────────── -->
+  ${enriched.some(i=>i.autoAlerts?.length)?`<div style="background:#FFEBEE;border-left:4px solid #C62828;border-radius:9px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:#C62828;font-weight:500">
+    ⚠️ <strong>Consommables périmés ou bientôt périmés détectés :</strong>
+    <ul style="margin:6px 0 0 0;padding-left:16px">
+      ${enriched.flatMap(i=>(i.autoAlerts||[]).map(a=>`<li><strong>${i.client}</strong> — ${a.text}</li>`)).join('')}
+    </ul>
+  </div>`:''}
   ${mat.padPak>0&&sh.padPak?`<div style="background:#FFF3E0;border-left:4px solid #E65100;border-radius:9px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:#E65100;font-weight:500">
-    ⚡ <strong>${mat.padPak} Pad Pak</strong> à changer ce jour — pensez à charger les électrodes dans le véhicule
+    ⚡ <strong>${mat.padPak} Pad Pak</strong> à prévoir ce jour
+    ${withPadPak.filter(i=>i.padPakDate).map(i=>`<br>• ${i.client} — exp. ${fd(i.padPakDate)}`).join('')}
   </div>`:''}
 
   <!-- ─── LISTE DES INTERVENTIONS ────────────────────────── -->
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <h3 style="font-size:13px;font-weight:600">Détail par intervention</h3>
-      <span style="font-size:12px;color:var(--gray)">${day.length} résultat${day.length>1?'s':''}</span>
+      <span style="font-size:12px;color:var(--gray)">${enriched.length} résultat${enriched.length>1?'s':''}</span>
     </div>
-    ${!day.length?`<div style="text-align:center;color:var(--gray);padding:24px">Aucune intervention avec ces filtres</div>`:''}
-    ${day.map(iv=>{
+    ${!enriched.length?`<div style="text-align:center;color:var(--gray);padding:24px">Aucune intervention avec ces filtres</div>`:''}
+    ${enriched.map(iv=>{
       const tc=TB(iv.techId)
+      const eq=getEquip(iv)
+      const allEq=[...eq,...(iv.autoAlerts||[])]
       return `<div class="ivc" style="border-left-color:${TYPES[iv.type].color}" onclick="editIv(${iv.id})">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
           <div style="flex:1;min-width:0">
             <div class="cn">${iv.client}</div>
-            <div class="ca">${iv.addr}</div>
-            <div style="display:flex;gap:6px;margin-top:4px;align-items:center">
+            <div class="ca">${iv.addr||iv.siege||'—'}</div>
+            <div style="display:flex;gap:6px;margin-top:4px;align-items:center;flex-wrap:wrap">
               ${tBdg(iv.type)}
-              ${ava(tc.init,20)}
+              ${ava(tc.init,20,tc.color)}
               <span style="font-size:11px;color:var(--gray)">${tc.name}</span>
             </div>
           </div>
-          <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;align-items:flex-end">
-            ${sh.dea&&iv.dea&&iv.type==="installation"?`<span class="bdg" style="background:#F3E5F5;color:#6A1B9A">⚡ ${iv.dea}</span>`:''}
-            ${sh.padPak&&iv.padPak?`<span class="bdg" style="background:#FFF3E0;color:#E65100">🔌 Pad Pak${iv.padPakDate?' exp.'+fd(iv.padPakDate):''}</span>`:''}
-            ${sh.bat&&iv.batChange?`<span class="bdg" style="background:#E8F5E9;color:#1B5E20">🔋 Batterie</span>`:''}
-            ${sh.arm&&iv.arm?`<span class="bdg" style="background:#E3F2FD;color:#1565C0">🗄️ ${iv.arm}</span>`:''}
-          </div>
         </div>
-        ${iv.notes?`<div style="font-size:11px;color:var(--orange);background:#FFF3E0;padding:4px 8px;border-radius:5px">📝 ${iv.notes}</div>`:''}
+        ${allEq.length?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">
+          ${allEq.map(e=>`<span style="background:${e.bg};color:${e.col};padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600">${e.icon} ${e.text}</span>`).join('')}
+        </div>`:'<div style="font-size:11px;color:var(--gray);margin-bottom:8px">Maintenance standard — aucun matériel spécifique</div>'}
+        ${iv.notes?`<div style="font-size:11px;color:var(--orange);background:#FFF3E0;padding:4px 8px;border-radius:5px;margin-bottom:8px">📝 ${iv.notes}</div>`:''}
         <!-- Modification inline -->
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px" onclick="event.stopPropagation()">
-          ${sh.arm&&iv.arm?`<div class="surf"><label class="lbl" style="margin-bottom:2px">🗄️ Support</label><div style="font-size:12px;padding:4px 0;font-weight:500">${iv.arm}</div></div>`:''}
-          ${sh.dea&&iv.dea&&iv.type==="installation"?`<div class="surf"><label class="lbl" style="margin-bottom:2px">⚡ DAE</label><div style="font-size:12px;padding:4px 0;font-weight:500">${iv.dea}</div></div>`:''}
-          ${sh.bat?`<div class="surf" style="display:flex;align-items:center;gap:6px;padding:7px 9px">
+        <div style="display:flex;gap:6px;flex-wrap:wrap" onclick="event.stopPropagation()">
+          <div style="display:flex;align-items:center;gap:5px;padding:5px 9px;background:var(--bg);border-radius:7px">
             <input type="checkbox" id="bc-${iv.id}" ${iv.batChange?'checked':''} style="width:auto"
               onchange="updMat(${iv.id},'batChange',this.checked);rMat()"/>
-            <label for="bc-${iv.id}" class="lbl" style="cursor:pointer;margin:0">🔋 Batterie</label>
-          </div>`:''}
-          ${sh.padPak?`<div class="surf" style="display:flex;align-items:center;gap:6px;padding:7px 9px">
+            <label for="bc-${iv.id}" style="font-size:12px;cursor:pointer;color:#1B5E20;font-weight:600">🔋 Batterie</label>
+          </div>
+          <div style="display:flex;align-items:center;gap:5px;padding:5px 9px;background:var(--bg);border-radius:7px">
             <input type="checkbox" id="pp-${iv.id}" ${iv.padPak?'checked':''} style="width:auto"
               onchange="updMat(${iv.id},'padPak',this.checked);rMat()"/>
-            <label for="pp-${iv.id}" class="lbl" style="cursor:pointer;margin:0">🔌 Pad Pak</label>
-          </div>`:''}
+            <label for="pp-${iv.id}" style="font-size:12px;cursor:pointer;color:#E65100;font-weight:600">⚡ Pad Pak</label>
+          </div>
         </div>
       </div>`
     }).join('')}

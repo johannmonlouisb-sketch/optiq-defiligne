@@ -863,28 +863,40 @@ function renderDepart(){
     const col=done?"#2E7D32":fail?"#C62828":TYPES[iv.type].color
     const lbl=done?"✓":fail?"✗":(idx+1)
     // Temps de trajet = ETA(ce stop) - leave(stop précédent ou départ)
-    let travelMin=null, waitMin=null
+    let travelMin=null, waitMin=null, travelStatus=null
     const etaThis=tToMin(techETAs[iv.id]?.eta)
     if(etaThis!==null){
+      const prevIv=idx>0?dayIvs[idx-1]:null
       const prevLeave=idx===0
         ? tToMin(depStartTime())
-        : tToMin(techETAs[dayIvs[idx-1]?.id]?.leave)
+        : tToMin(techETAs[prevIv?.id]?.leave)
       if(prevLeave!==null){
         const totalGap=Math.max(0,etaThis-prevLeave)
-        // Estimer le vrai trajet (Haversine) pour détecter une attente créneau
-        const prevCoord=idx===0?null:gCache[dayIvs[idx-1]?.addr]
+        const prevCoord=idx===0?null:gCache[prevIv?.addr]
         const curCoord=gCache[iv.addr]
         if(iv.timeStart&&prevCoord&&curCoord){
           const dLat=(curCoord.lat-prevCoord.lat)*Math.PI/180,dLng=(curCoord.lng-prevCoord.lng)*Math.PI/180
           const a=Math.sin(dLat/2)**2+Math.cos(prevCoord.lat*Math.PI/180)*Math.cos(curCoord.lat*Math.PI/180)*Math.sin(dLng/2)**2
-          const estTravel=Math.round(6371*2*Math.asin(Math.sqrt(a))*1.3/50*60)
-          travelMin=estTravel
-          waitMin=Math.max(0,totalGap-estTravel)
+          travelMin=Math.round(6371*2*Math.asin(Math.sqrt(a))*1.3/50*60)
+          waitMin=Math.max(0,totalGap-travelMin)
         } else {
           travelMin=totalGap
         }
       }
+      // Couleur trajet live : compare temps écoulé depuis départ du stop précédent
+      if(travelMin&&!done&&!fail&&prevIv&&validated[prevIv.id]){
+        const depTs=window._actualDepartures?.[prevIv.id]
+        if(depTs){
+          const elapsed=Math.round((Date.now()-depTs)/60000)
+          const pct=travelMin>0?elapsed/travelMin:0
+          if(pct<=0.82)       travelStatus={bg:"#E8F5E9",col:"#2E7D32",icon:"🟢",label:"En avance"}
+          else if(pct<=1.15)  travelStatus={bg:"#FFF3E0",col:"#E65100",icon:"🟠",label:"Dans les temps"}
+          else                travelStatus={bg:"#FFEBEE",col:"#C62828",icon:"🔴",label:"En retard ("+fmin(elapsed)+" / prévu "+fmin(travelMin)+")"}
+        }
+      }
     }
+    // Afficher avertissement dépassement créneau (buffer 30min)
+    const etaLate=techETAs[iv.id]?.late
     const workMin=dur(iv.type,iv.form)
     return `<div class="dc ${done?"vdone":fail?"vfail":""}" id="dc-${iv.id}"
       draggable="true"
@@ -912,10 +924,15 @@ function renderDepart(){
         </div>
       </div>
       <div class="dc-tags">
-        ${travelMin!==null?`<span class="tag" style="background:#E3F2FD;color:#1565C0;font-weight:600">🚗 ${fmin(travelMin)} de trajet</span>`:""}
-        ${waitMin?`<span class="tag" style="background:#FFF3E0;color:#E65100;font-weight:600">⏰ Attente ${fmin(waitMin)} (créneau ${iv.timeStart})</span>`:""}
+        ${travelMin!==null?travelStatus
+          ?`<span class="tag" style="background:${travelStatus.bg};color:${travelStatus.col};font-weight:700">${travelStatus.icon} ${travelStatus.label}</span>`
+          :`<span class="tag" style="background:#E3F2FD;color:#1565C0;font-weight:600">🚗 ${fmin(travelMin)} de trajet</span>`
+        :""}
+        ${waitMin?`<span class="tag" style="background:#FFF3E0;color:#E65100;font-weight:600">⏰ Attente ${fmin(waitMin)} — créneau ${iv.timeStart}</span>`:""}
+        ${etaLate?`<span class="tag" style="background:#FFEBEE;color:#C62828;font-weight:700">⚠️ Créneau serré (−30min)</span>`:""}
         <span class="tag tag-info">🔧 ${fmin(workMin)} · ${TYPES[iv.type].label}</span>
-        ${techETAs[iv.id]?`<span class="tag" style="background:#E8F5E9;color:#2E7D32;font-weight:600">🕐 ${techETAs[iv.id].eta} → ${techETAs[iv.id].leave}</span>`:""}
+        ${techETAs[iv.id]?`<span class="tag" style="background:#E8F5E9;color:#2E7D32;font-weight:600">🕐 Arrivée ${techETAs[iv.id].eta} · fin ${techETAs[iv.id].leave}</span>`:""}
+        ${iv.timeEnd&&!done?`<span class="tag" style="background:#F3F3F3;color:#757575;font-size:11px">⏰ Au plus tard ${iv.timeEnd}</span>`:""}
         ${done?`<span class="tag tag-ok">✅ Kizeo sync</span>`:""}
         ${fail?`<span class="tag tag-err">✗ Échec</span>`:""}
       </div>
@@ -977,6 +994,9 @@ async function validateIv(id){
   validated[id]=!wasValidated
   if(validated[id]){
     failed[id]=false
+    // Enregistre l'heure de départ effective (pour couleur trajet live du prochain stop)
+    if(!window._actualDepartures) window._actualDepartures={}
+    window._actualDepartures[id]=Date.now()
     updIvStatus(id,"completed")
     autoNextMaintenance(id)
     pushToKizeo(id,"completed")
@@ -1117,24 +1137,67 @@ function _localRouteDist(depot,route){
   for(let i=1;i<route.length;i++) d+=_localDist(route[i-1],route[i])
   return d+_localDist(route[route.length-1],depot)
 }
-function localOptimizeRoute(depot,pts){
+// Algorithme EDF + Cheapest-Insertion avec fenêtres horaires (buffer 30 min)
+// 1. Tris les stops avec deadline (timeEnd) par EDF
+// 2. Insère les stops libres par cheapest-insertion entre les stops contraints
+function localOptimizeRoute(depot,pts,startMin){
   if(pts.length<=1) return pts
-  const toStop=p=>({...p.c,_pt:p})
-  let best=null,bestD=Infinity
-  const starts=[-1,...pts.map((_,i)=>i)]
-  for(const si of starts){
-    const unvis=pts.map(toStop),route=[]
-    let cur=si===-1?depot:unvis[si]
-    if(si>=0){route.push(unvis[si]);unvis.splice(si,1)}
-    while(unvis.length){
-      let bi=0,bd=Infinity
-      for(let i=0;i<unvis.length;i++){const d=_localDist(cur,unvis[i]);if(d<bd){bd=d;bi=i}}
-      cur=unvis[bi];route.push(unvis[bi]);unvis.splice(bi,1)
-    }
-    const d=_localRouteDist(depot,route)
-    if(d<bestD){bestD=d;best=route}
+  const toMin=hhmm=>{if(!hhmm)return null;const[h,m]=hhmm.split(':').map(Number);return h*60+m}
+  const travelM=(a,b)=>{
+    const dLat=(b.lat-a.lat)*Math.PI/180,dLng=(b.lng-a.lng)*Math.PI/180
+    const h=Math.sin(dLat/2)**2+Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLng/2)**2
+    return Math.round(6371*2*Math.asin(Math.sqrt(h))*1.3/50*60)
   }
-  return best.map(s=>s._pt)
+  // Vérifie si une séquence respecte toutes les fenêtres avec buffer 30 min
+  function feasible(seq){
+    let t=startMin||480,pos=depot
+    for(const p of seq){
+      t+=travelM(pos,p.c)
+      const ts=toMin(p.iv.timeStart),te=toMin(p.iv.timeEnd)
+      if(ts&&t<ts) t=ts
+      if(te&&t>te-30) return false
+      t+=dur(p.iv.type,p.iv.form)
+      pos=p.c
+    }
+    return true
+  }
+  // Sépare: stops avec contrainte horaire vs libres
+  const constrained=pts.filter(p=>p.iv.timeEnd||p.iv.timeStart)
+    .sort((a,b)=>{
+      const ae=toMin(a.iv.timeEnd)||1440,be=toMin(b.iv.timeEnd)||1440
+      if(ae!==be) return ae-be
+      return (toMin(a.iv.timeStart)||0)-(toMin(b.iv.timeStart)||0)
+    })
+  const free=pts.filter(p=>!p.iv.timeEnd&&!p.iv.timeStart)
+  // Si pas de contraintes: nearest-neighbor classique
+  if(!constrained.length){
+    const toStop=p=>({...p.c,_pt:p})
+    let best=null,bestD=Infinity
+    for(const si of[-1,...pts.map((_,i)=>i)]){
+      const unvis=pts.map(toStop),route=[]
+      let cur=si===-1?depot:unvis[si]
+      if(si>=0){route.push(unvis[si]);unvis.splice(si,1)}
+      while(unvis.length){let bi=0,bd=Infinity;for(let i=0;i<unvis.length;i++){const d=_localDist(cur,unvis[i]);if(d<bd){bd=d;bi=i}};cur=unvis[bi];route.push(unvis[bi]);unvis.splice(bi,1)}
+      const d=_localRouteDist(depot,route);if(d<bestD){bestD=d;best=route}
+    }
+    return best.map(s=>s._pt)
+  }
+  // Base: stops triés EDF
+  const result=[...constrained]
+  // Insertion cheapest pour les stops libres
+  for(const fp of free){
+    let bestPos=result.length,bestCost=Infinity
+    for(let i=0;i<=result.length;i++){
+      const before=i===0?depot:result[i-1].c
+      const after=i===result.length?depot:result[i].c
+      const cost=travelM(before,fp.c)+travelM(fp.c,after)-travelM(before,after)
+      const candidate=[...result.slice(0,i),fp,...result.slice(i)]
+      if(cost<bestCost&&feasible(candidate)){bestCost=cost;bestPos=i}
+    }
+    // Si aucune position feasible, insère à la fin
+    result.splice(bestPos,0,fp)
+  }
+  return result
 }
 function setProgress(pct,msg){
   document.getElementById("dep-prog").style.display="block"
@@ -1309,16 +1372,20 @@ async function calcMap(){
         }
       }catch(e){}
       if(!apiOk){
-        orderedPts=localOptimizeRoute(dc,pts)
+        orderedPts=localOptimizeRoute(dc,pts,sh*60+sm)
         techETAs={}
         let curMin=sh*60+sm,prev=dc
+        const nowMin=new Date().getHours()*60+new Date().getMinutes()
         orderedPts.forEach(p=>{
           const dLat=(p.c.lat-prev.lat)*Math.PI/180,dLng=(p.c.lng-prev.lng)*Math.PI/180
           const a=Math.sin(dLat/2)**2+Math.cos(prev.lat*Math.PI/180)*Math.cos(p.c.lat*Math.PI/180)*Math.sin(dLng/2)**2
           curMin+=Math.round(6371*2*Math.asin(Math.sqrt(a))*1.3/50*60)
-          const eta=`${String(Math.floor(curMin/60)).padStart(2,'0')}:${String(curMin%60).padStart(2,'0')}`
+          if(p.iv.timeStart){const[th,tm]=p.iv.timeStart.split(':').map(Number);if(curMin<th*60+tm)curMin=th*60+tm}
+          if(curMin<nowMin&&!validated[p.iv.id]&&!failed[p.iv.id]) curMin=nowMin
+          const eta=toHHMM(curMin)
           const workMin=dur(p.iv.type,p.iv.form)
-          techETAs[p.iv.id]={eta,leave:addMinToTime(eta,workMin)}
+          const late=p.iv.timeEnd&&curMin>p.iv.timeEnd.split(':').map((v,i)=>parseInt(v)*(i?1:60)).reduce((a,b)=>a+b)-30
+          techETAs[p.iv.id]={eta,leave:addMinToTime(eta,workMin),late:!!late}
           curMin+=workMin;prev=p.c
         })
       }
