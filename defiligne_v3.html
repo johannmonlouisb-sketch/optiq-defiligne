@@ -1785,6 +1785,29 @@ const DAYS=["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"]
 // ═══════════════════════════════════════════════════════
 // HELPERS
 // ═══════════════════════════════════════════════════════
+function getEquip(iv){
+  const items=[]
+  const inst=iv.type==="installation"
+  const arm=iv.arm&&iv.arm!=="0"&&iv.arm!==0?iv.arm:inst?"Armoire":""
+  const dea=iv.dea&&iv.dea!=="0"&&iv.dea!==0?iv.dea:inst?"Neuf":""
+  if(dea) items.push({icon:"🫀",text:"DAE "+(inst&&dea==="Neuf"?"neuf":"· "+dea),col:"#1B5E20",bg:"#E8F5E9"})
+  if(arm) items.push({icon:"🗄️",text:arm,col:"#1565C0",bg:"#E3F2FD"})
+  if(iv.padPak){const exp=iv.padPakDate?` exp. ${fd(iv.padPakDate)}`:"";items.push({icon:"⚡",text:"Pad Pak"+exp,col:"#E65100",bg:"#FFF3E0"})}
+  if(iv.batChange){const exp=iv.batDate?` exp. ${fd(iv.batDate)}`:"";items.push({icon:"🔋",text:"Batterie"+exp,col:"#1B5E20",bg:"#F1F8E9"})}
+  if(inst&&!iv.padPak) items.push({icon:"⚡",text:"Pad Pak (inclus)",col:"#E65100",bg:"#FFF3E0"})
+  if(inst&&!iv.batChange) items.push({icon:"🔋",text:"Batterie (inclus)",col:"#1B5E20",bg:"#F1F8E9"})
+  if(iv.exter) items.push({icon:"🌧️",text:"Extérieur",col:"#0277BD",bg:"#E1F5FE"})
+  if(iv.form) items.push({icon:"📚",text:"Formation",col:"#6A1B9A",bg:"#F3E5F5"})
+  return items
+}
+function equipHTMLAdmin(iv){
+  const eq=getEquip(iv)
+  if(!eq.length) return ""
+  const isInstall=iv.type==="installation"
+  const chips=eq.map(e=>`<span style="background:${e.bg};color:${e.col};padding:2px 7px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap">${e.icon} ${e.text}</span>`).join("")
+  if(isInstall) return `<div style="background:#E8F5E9;border-left:3px solid #2E7D32;border-radius:0 6px 6px 0;padding:4px 8px;margin-bottom:5px;display:flex;gap:4px;flex-wrap:wrap;align-items:center"><span style="font-size:10px;font-weight:700;color:#1B5E20;text-transform:uppercase;letter-spacing:.4px;flex-shrink:0">📦 À prendre</span>${chips}</div>`
+  return `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:5px">${chips}</div>`
+}
 function fmtMin(m){if(m<60)return m+"min";const h=Math.floor(m/60),mn=m%60;return mn>0?h+"h"+String(mn).padStart(2,"0"):h+"h00"}
 function addMinToTime(hhmm,mins){const[h,m]=hhmm.split(':').map(Number);const t=h*60+m+mins;return`${String(Math.floor(t/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`}
 function toHHMM(m){return`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`}
@@ -2215,10 +2238,10 @@ function rDepart(){
             </div>`:""}
             <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:5px">
               ${tBdg(iv.type)}${sBdg(iv.status)}
-              ${iv.padPak?bdg("⚡ Pad Pak","#E65100","#FFF3E0"):""}
               <span style="font-size:11px;color:var(--gray)">⏱ ${fmtMin(dur(iv.type,iv.form))}</span>
               ${depETAs[iv.id]?`<span style="font-size:11px;font-weight:600;padding:2px 7px;border-radius:100px;background:#E8F5E9;color:#2E7D32">🕐 ${depETAs[iv.id].eta} → ${depETAs[iv.id].leave}</span>`:""}
             </div>
+            ${equipHTMLAdmin(iv)}
             ${iv.notes?`<div style="font-size:12px;color:var(--orange);background:#FFF3E0;padding:5px 9px;border-radius:6px;margin-bottom:5px">📝 ${iv.notes}</div>`:""}
             ${(iv.contact||iv.cphone||iv.cemail)?`<div style="font-size:12px;background:#F3E5F5;padding:5px 9px;border-radius:6px;margin-bottom:5px">
               ${iv.contact?`👤 <strong>${iv.contact}</strong> `:""}${iv.cphone?`📞 <a href="tel:${iv.cphone}" style="color:var(--blue)">${iv.cphone}</a>`:""}

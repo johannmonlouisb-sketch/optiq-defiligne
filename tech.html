@@ -786,6 +786,38 @@ function onDepDateChange(){renderDepart();updateBadges()}
 // ════════════════════════════════════════════
 // DÉPART DU JOUR
 // ════════════════════════════════════════════
+// ÉQUIPEMENT À PRENDRE — logique automatique par intervention
+// ════════════════════════════════════════════
+function getEquip(iv){
+  const items=[]
+  const inst=iv.type==="installation"
+  const arm=iv.arm&&iv.arm!=="0"&&iv.arm!==0?iv.arm:inst?"Armoire":""
+  const dea=iv.dea&&iv.dea!=="0"&&iv.dea!==0?iv.dea:inst?"Neuf":""
+  if(dea) items.push({icon:"🫀",text:"DAE "+(inst&&dea==="Neuf"?"neuf":"· "+dea),col:"#1B5E20",bg:"#E8F5E9"})
+  if(arm) items.push({icon:"🗄️",text:arm,col:"#1565C0",bg:"#E3F2FD"})
+  if(iv.padPak){
+    const exp=iv.padPakDate?` exp. ${fd(iv.padPakDate)}`:""
+    items.push({icon:"⚡",text:"Pad Pak"+exp,col:"#E65100",bg:"#FFF3E0"})
+  }
+  if(iv.batChange){
+    const exp=iv.batDate?` exp. ${fd(iv.batDate)}`:""
+    items.push({icon:"🔋",text:"Batterie"+exp,col:"#1B5E20",bg:"#F1F8E9"})
+  }
+  if(inst&&!iv.padPak) items.push({icon:"⚡",text:"Pad Pak (inclus)",col:"#E65100",bg:"#FFF3E0"})
+  if(inst&&!iv.batChange) items.push({icon:"🔋",text:"Batterie (inclus)",col:"#1B5E20",bg:"#F1F8E9"})
+  if(iv.exter) items.push({icon:"🌧️",text:"Extérieur",col:"#0277BD",bg:"#E1F5FE"})
+  if(iv.form) items.push({icon:"📚",text:"Formation",col:"#6A1B9A",bg:"#F3E5F5"})
+  return items
+}
+function equipHTML(iv){
+  const eq=getEquip(iv)
+  if(!eq.length) return ""
+  const isInstall=iv.type==="installation"
+  const chips=eq.map(e=>`<span style="background:${e.bg};color:${e.col};padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap">${e.icon} ${e.text}</span>`).join("")
+  if(isInstall) return `<div style="background:#E8F5E9;border-left:3px solid #2E7D32;border-radius:0 6px 6px 0;padding:5px 8px;margin:0 6px 6px;display:flex;gap:5px;flex-wrap:wrap;align-items:center"><span style="font-size:10px;font-weight:700;color:#1B5E20;text-transform:uppercase;letter-spacing:.5px;flex-shrink:0">📦 À prendre</span>${chips}</div>`
+  return `<div style="display:flex;gap:4px;flex-wrap:wrap;padding:0 10px 6px">${chips}</div>`
+}
+
 function renderDepart(){
   const date=depDate()
   if(!techRouteOrder[date]) loadRouteOrder(date)
@@ -884,11 +916,10 @@ function renderDepart(){
         ${waitMin?`<span class="tag" style="background:#FFF3E0;color:#E65100;font-weight:600">⏰ Attente ${fmin(waitMin)} (créneau ${iv.timeStart})</span>`:""}
         <span class="tag tag-info">🔧 ${fmin(workMin)} · ${TYPES[iv.type].label}</span>
         ${techETAs[iv.id]?`<span class="tag" style="background:#E8F5E9;color:#2E7D32;font-weight:600">🕐 ${techETAs[iv.id].eta} → ${techETAs[iv.id].leave}</span>`:""}
-        ${iv.padPak?`<span class="tag tag-warn">⚡ Pad Pak</span>`:""}
-        ${iv.form?`<span class="tag" style="background:#F3E5F5;color:#6A1B9A">+Formation</span>`:""}
         ${done?`<span class="tag tag-ok">✅ Kizeo sync</span>`:""}
         ${fail?`<span class="tag tag-err">✗ Échec</span>`:""}
       </div>
+      ${equipHTML(iv)}
       ${iv.notes?`<div style="padding:2px 10px 5px;font-size:11px;color:var(--orange);background:#FFF8E1;margin:0 6px;border-radius:6px">📝 ${iv.notes}</div>`:""}
       <!-- BOUTONS VALIDATION — toujours visibles -->
       <div class="dc-btns" onclick="event.stopPropagation()">
@@ -1587,41 +1618,45 @@ function renderMateriel(){
   const date=depDate()
   const dayIvs=myIvs(date)
   document.getElementById("mat-title").textContent=`Matériel — ${fdl(date)}`
-  const padpaks=dayIvs.filter(i=>i.padPak)
+  // Totaux à partir de getEquip()
+  const allEquip=dayIvs.flatMap(i=>getEquip(i).map(e=>e.text.split(" ")[0]+" "+e.text.split(" ")[1]))
   const installs=dayIvs.filter(i=>i.type==="installation")
-  const bats=dayIvs.filter(i=>i.padPak||i.type==="installation")
+  const padpaks=dayIvs.filter(i=>i.padPak)
+  const bats=dayIvs.filter(i=>i.batChange||i.type==="installation")
+  const forms=dayIvs.filter(i=>i.form)
   const al=document.getElementById("mat-alert")
   if(padpaks.length){
     al.style.display="block"
     al.innerHTML=`⚡ ${padpaks.length} Pad Pak à changer :<br>${padpaks.map(i=>"• "+i.client+(i.padPakDate?" (périmé "+fd(i.padPakDate)+")":"")).join("<br>")}`
   } else al.style.display="none"
   const rows=[
-    padpaks.length?{i:"⚡",n:padpaks.length,l:"Pad Pak",s:"Électrodes à remplacer",c:"var(--orange)"}:null,
-    bats.length?{i:"🔋",n:bats.length,l:"Batteries",s:"Piles de rechange",c:"var(--blue)"}:null,
-    installs.length?{i:"🏥",n:installs.length,l:"DEA complets",s:"Nouvelles installations",c:"var(--green)"}:null,
+    installs.length?{i:"🫀",n:installs.length,l:"DAE neufs",s:installs.map(i=>(i.dea&&i.dea!=="0"?i.dea:"standard")).join(", "),c:"var(--green)"}:null,
+    installs.length?{i:"🗄️",n:installs.length,l:"Armoires / Supports",s:installs.map(i=>(i.arm&&i.arm!=="0"?i.arm:"standard")).join(", "),c:"var(--blue)"}:null,
+    padpaks.length?{i:"⚡",n:padpaks.length,l:"Pad Pak à changer",s:padpaks.map(i=>i.client.split(" ")[0]).join(", "),c:"var(--orange)"}:null,
+    bats.length?{i:"🔋",n:bats.length,l:"Batteries",s:"Pour "+(installs.length?"installations + ":"")+(bats.length-installs.length>0?bats.length-installs.length+" changements":""),c:"var(--blue)"}:null,
+    forms.length?{i:"📚",n:forms.length,l:"Formations",s:forms.map(i=>i.client.split(" ")[0]).join(", "),c:"#6A1B9A"}:null,
     dayIvs.length?{i:"📋",n:dayIvs.length,l:"Fiches Kizeo",s:"À remplir après intervention",c:"var(--purple)"}:null,
   ].filter(Boolean)
   document.getElementById("mat-totaux").innerHTML=!rows.length
     ?`<div style="padding:24px;text-align:center;color:var(--gray)">Aucun matériel spécifique</div>`
     :rows.map(r=>`<div class="mat-row">
       <div class="mat-ico">${r.i}</div>
-      <div><div class="mat-n" style="color:${r.c}">${r.n}</div><div style="font-size:14px;font-weight:700">${r.l}</div><div style="font-size:12px;color:var(--gray)">${r.s}</div></div>
+      <div style="min-width:0"><div class="mat-n" style="color:${r.c}">${r.n}</div><div style="font-size:14px;font-weight:700">${r.l}</div><div style="font-size:11px;color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.s}</div></div>
     </div>`).join("")
-  document.getElementById("mat-detail").innerHTML=dayIvs.map(iv=>`
-    <div class="dc" style="margin:5px 12px;border-radius:10px">
+  document.getElementById("mat-detail").innerHTML=dayIvs.map(iv=>{
+    const eq=getEquip(iv)
+    return `<div class="dc" style="margin:5px 12px;border-radius:10px">
       <div class="dc-top">
         <div style="font-size:18px">${iv.type==="installation"?"🏥":iv.padPak?"⚡":"🔧"}</div>
         <div class="dc-info">
           <div class="dc-client">${iv.client}</div>
-          <div class="dc-addr" style="font-size:11px">${TYPES[iv.type].label} · ${fmin(dur(iv.type,iv.form))}</div>
+          <div class="dc-addr" style="font-size:11px">${TYPES[iv.type].label}${iv.addr?" · "+iv.addr.split(",")[0]:""}</div>
         </div>
       </div>
-      <div class="dc-tags" style="padding-bottom:8px">
-        ${iv.padPak?`<span class="tag tag-warn">⚡ Pad Pak${iv.padPakDate?" exp. "+fd(iv.padPakDate):""}</span>`:""}
-        ${iv.type==="installation"?`<span class="tag tag-ok">DEA neuf + batterie</span>`:`<span class="tag tag-info">DEA en place</span>`}
-        ${iv.contact?`<span class="tag" style="background:var(--bg);color:var(--gray)">👤 ${iv.contact}</span>`:""}
-      </div>
-    </div>`).join("")
+      ${eq.length?`<div style="padding:4px 10px 10px;display:flex;gap:5px;flex-wrap:wrap">
+        ${eq.map(e=>`<span style="background:${e.bg};color:${e.col};padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600">${e.icon} ${e.text}</span>`).join("")}
+      </div>`:`<div style="padding:2px 10px 8px;font-size:12px;color:var(--gray)">Maintenance standard</div>`}
+    </div>`}).join("")
 }
 
 // ════════════════════════════════════════════
