@@ -1652,6 +1652,14 @@ function reoptimizeFromGPS(){
 
   navigator.geolocation.getCurrentPosition(async pos=>{
     const gps={lat:pos.coords.latitude,lng:pos.coords.longitude}
+
+    // Validation : rejet si position hors France (GPS incorrect, VPN, IP approximative)
+    if(!isFrance(gps.lat,gps.lng)){
+      building=false
+      toast(`❌ Position GPS hors France (${gps.lat.toFixed(2)}, ${gps.lng.toFixed(2)}) — géolocalisation incorrecte. Utiliser l'optimisation normale.`,"#C62828",7000)
+      return
+    }
+
     const curMin=nowMinParis()
 
     try{
