@@ -1755,6 +1755,8 @@ let ivs=[
 {id:1094,client:"ANIMALIS",addr:"6 rue henri barbuss 92300 Levallois Perret",siege:"nan",date:"2025-12-19",type:"maintenance_simple",status:"completed",techId:4,form:false,arm:0,dea:0,bat:0,padPak:false,padPakDate:"2030-01-01",notes:"",contact:"ANIMALIS LEVALLOIS",cphone:"",cemail:"7 Allée Du Brévent",contact_siege:"",email_siege:"",phone_siege:"",unplanned:false,kizeoId:"253498183"},
 {id:1095,client:"COMMUNE DE NAVEIL",addr:"nan",siege:"nan",date:"2025-12-19",type:"maintenance_simple",status:"completed",techId:4,form:false,arm:0,dea:0,bat:0,padPak:false,padPakDate:"2031-02-09",notes:"scellé : B001727",contact:"BEUZELIN",cphone:"",cemail:"Place Louis Leygue",contact_siege:"",email_siege:"",phone_siege:"",unplanned:false,kizeoId:"253513065"}
 ]
+const TZ='Europe/Paris'
+function nowMinParis(){const[h,m]=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:TZ,hour12:false}).split(':').map(Number);return h*60+(m||0)}
 let nextId=1096
 let curView=(()=>{try{return sessionStorage.getItem('optiq_active_view')||'dashboard'}catch(e){return'dashboard'}})()
 let selDate=new Date().toLocaleDateString('fr-CA',{timeZone:TZ})
@@ -1773,9 +1775,7 @@ let depRouteLegsByTechId={}, depRouteOrderedByTechId={}
 let _dragId=null,_dragTechId=null
 // Map state
 let mapObj=null,rGroup=null,gcache={},building=false
-const TZ='Europe/Paris'
 const TODAY=new Date().toLocaleDateString('fr-CA',{timeZone:TZ})
-function nowMinParis(){const[h,m]=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:TZ,hour12:false}).split(':').map(Number);return h*60+(m||0)}
 const WEEK=(()=>{
   const d=new Date();d.setHours(12,0,0,0)
   const day=d.getDay();const mon=new Date(d)
