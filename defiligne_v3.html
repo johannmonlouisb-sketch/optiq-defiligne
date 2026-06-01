@@ -6902,7 +6902,10 @@ async function pullFromNotion(dateFrom, dateTo, mode='merge'){
         )
       }
       if(existIdx>=0){
-        ivs[existIdx] = {...ivs[existIdx], ...iv, id:ivs[existIdx].id}
+        const old = ivs[existIdx]
+        // Conserver le statut local si un push est encore en attente de confirmation
+        const status = old._pendingSync ? old.status : iv.status
+        ivs[existIdx] = {...old, ...iv, id:old.id, status, _pendingSync:old._pendingSync||false}
         updated++
       } else {
         nextId = Math.max(nextId, iv.id+1)
@@ -6979,12 +6982,20 @@ async function pushStatusToNotion(ivId, newStatus){
   const iv = ivs.find(i=>i.id===ivId)
   if(!iv) return
 
+  // Marquer en attente avant l'envoi pour protéger au prochain pull
+  iv._pendingSync = true
+  cloudSave()
+
   // Sync hybride avec Notion + Supabase
+  try{
   if(newStatus==='completed'){
     await validateIvHybrid(ivId)
   } else {
     await updateIvHybrid(ivId, {status: newStatus})
   }
+  iv._pendingSync = false
+  cloudSave()
+  }catch(e){ console.warn('[Notion] pushStatus failed:', e.message) }
 
   // Si terminée → synchroniser aussi la base Kizeo (suivi des sites)
   if(newStatus === 'completed') syncCompletionToKizeo(iv)

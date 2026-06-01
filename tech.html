@@ -2141,8 +2141,14 @@ async function pullFromNotion(dateFrom, dateTo){
       const iv=notionPageToIvTech(page)
       if(!iv) return
       const existIdx=ivs.findIndex(i=>i.notionId===page.id)
-      if(existIdx>=0){ivs[existIdx]={...ivs[existIdx],...iv,id:ivs[existIdx].id};updated++}
-      else{ivs.push(iv);added++}
+      if(existIdx>=0){
+        const old=ivs[existIdx]
+        // Si un push local est encore en attente de confirmation Notion,
+        // conserver le statut local pour ne pas perdre la validation/échec
+        const status=old._pendingSync ? old.status : iv.status
+        ivs[existIdx]={...old,...iv,id:old.id,status,_pendingSync:old._pendingSync||false}
+        updated++
+      } else{ivs.push(iv);added++}
     })
     // Enrichissement depuis la base Kizeo (DAE, PAD PAK, GPS…)
     ivs=await enrichIvsWithKizeo(ivs)
@@ -2209,6 +2215,9 @@ async function pushStatusToNotion(ivId,newStatus){
     console.warn('[Notion] Intervention sans notionId — sync impossible:',iv.client)
     return
   }
+  // Marquer comme "en attente de confirmation Notion" pour ne pas être écrasé au prochain pull
+  iv._pendingSync=true
+  saveIvs()
   try{
     await notionCall('update_page',{
       pageId:iv.notionId,
@@ -2217,6 +2226,9 @@ async function pushStatusToNotion(ivId,newStatus){
         'Echec':{checkbox:newStatus==='not_responded'}
       }
     })
+    // Push confirmé — Notion est maintenant source de vérité
+    iv._pendingSync=false
+    saveIvs()
     // Si terminé → mettre à jour la base Kizeo (Dernière intervention + Prochaine maintenance)
     if(newStatus==='completed'){
       const tc=TB(curTech)
@@ -2225,7 +2237,8 @@ async function pushStatusToNotion(ivId,newStatus){
       }).catch(e=>console.warn('Kizeo sync:',e.message))
     }
   }catch(e){
-    console.warn('[Notion] push statut échoué:',e.message)
+    // _pendingSync reste true → le prochain pull Notion ne réécrasera pas le statut local
+    console.warn('[Notion] push statut échoué (statut local conservé):',e.message)
   }
 }
 
@@ -2255,12 +2268,14 @@ async function silentPollNotion(){
       const idx=ivs.findIndex(i=>i.notionId===page.id)
       if(idx>=0){
         const old=ivs[idx]
+        // Conserver le statut local si un push est encore en attente
+        const status=old._pendingSync ? old.status : fresh.status
         // Détecter tout changement pertinent depuis Notion
-        if(old.status!==fresh.status||old.notes!==fresh.notes||old.techId!==fresh.techId||
-           old.timeStart!==fresh.timeStart||old.timeEnd!==fresh.timeEnd||
-           old.contact!==fresh.contact||old.addr!==fresh.addr||
-           old.urgent!==fresh.urgent||old.exter!==fresh.exter||old.motif!==fresh.motif) changed++
-        ivs[idx]={...ivs[idx],...fresh,id:ivs[idx].id}
+        if(status!==old.status||fresh.notes!==old.notes||fresh.techId!==old.techId||
+           fresh.timeStart!==old.timeStart||fresh.timeEnd!==old.timeEnd||
+           fresh.contact!==old.contact||fresh.addr!==old.addr||
+           fresh.urgent!==old.urgent||fresh.exter!==old.exter||fresh.motif!==old.motif) changed++
+        ivs[idx]={...old,...fresh,id:old.id,status,_pendingSync:old._pendingSync||false}
       } else {
         ivs.push(fresh)
         changed++
