@@ -44,6 +44,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);display:flex;h
 /* PANELS */
 .vp{display:none;flex:1;overflow-y:auto;flex-direction:column;padding-bottom:54px}
 .vp.on{display:flex}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.3)}}
 /* ── CARDS ── */
 .card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px 18px}
 .surf{background:var(--bg);border-radius:8px;padding:12px 14px}
@@ -190,6 +191,10 @@ tr:hover td{background:var(--bg)}
       <input id="gsearch" type="search" placeholder="🔍 Rechercher client, adresse..." oninput="doSearch(this.value)" onfocus="doSearch(this.value)" onblur="setTimeout(()=>closeSearch(),200)"/>
       <div id="gsearch-res"></div>
     </div>
+    <span id="topbar-tour-badge" style="display:none;align-items:center;gap:5px;font-size:11px;font-weight:700;color:#16a34a;background:#f0fdf4;border:1px solid #86efac;border-radius:20px;padding:3px 10px;white-space:nowrap;cursor:pointer" onclick="SV('dashboard')">
+      <span style="width:7px;height:7px;background:#16a34a;border-radius:50%;animation:pulse 1.5s infinite;display:inline-block"></span>
+      <span id="topbar-tour-badge-txt"></span>
+    </span>
     <span id="cloud-status" style="font-size:11px;color:var(--gray);white-space:nowrap">☁️ ...</span>
     <button class="bb bsm" onclick="showNotionPanel()" style="background:#000;gap:6px" title="Sync Notion">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="flex-shrink:0">
@@ -206,7 +211,10 @@ tr:hover td{background:var(--bg)}
   </div>
 
   <!-- DASHBOARD -->
-  <div id="p-dashboard" class="vp on" style="padding:18px;gap:16px"><div id="d-dash"></div></div>
+  <div id="p-dashboard" class="vp on" style="padding:18px;gap:14px">
+    <div id="tour-tracker" style="display:none;flex-direction:column;gap:8px"></div>
+    <div id="d-dash"></div>
+  </div>
 
   <!-- DÉPART & CARTE (vue fusionnée) -->
   <div id="p-depart" class="vp" style="flex-direction:column">
@@ -1916,6 +1924,61 @@ function doSearch(q){
 function closeSearch(){document.getElementById("gsearch-res").classList.remove("open")}
 
 // ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+// TRACKER TOURNÉES EN DIRECT
+// ═══════════════════════════════════════════════════════
+function renderTourTracker(){
+  const el=document.getElementById('tour-tracker')
+  if(!el) return
+  try{
+    const stored=JSON.parse(localStorage.getItem('optiq_tour_progress')||'{}')
+    const today=selDate
+    const active=Object.values(stored).filter(t=>t.date===today&&(t.status==='running'||t.status==='done'))
+    // Badge topbar
+    const running=active.filter(t=>t.status==='running')
+    const badge=document.getElementById('topbar-tour-badge')
+    const badgeTxt=document.getElementById('topbar-tour-badge-txt')
+    if(badge&&badgeTxt){
+      if(running.length){badgeTxt.textContent=running.map(t=>t.techName).join(', ')+' en cours';badge.style.display='inline-flex'}
+      else badge.style.display='none'
+    }
+    if(!active.length){el.style.display='none';return}
+    el.style.display='flex'
+    el.innerHTML=active.map(t=>{
+      const tc=TECHS.find(x=>x.id===t.techId)||{color:'#1565C0'}
+      const col=tc.color||'#1565C0'
+      const done=t.done+t.failed
+      const pct=t.total>0?Math.round(done/t.total*100):0
+      const isRunning=t.status==='running'
+      const barCol=isRunning?col:'#9ca3af'
+      const elapsed=t.updatedAt?Math.floor((Date.now()-t.updatedAt)/60000):0
+      return `<div style="background:#fff;border:1px solid ${col}33;border-left:4px solid ${isRunning?col:'#9ca3af'};border-radius:10px;padding:12px 16px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+          ${isRunning?`<span style="width:9px;height:9px;background:#16a34a;border-radius:50%;display:inline-block;animation:pulse 1.5s infinite;flex-shrink:0"></span>`:'<span style="width:9px;height:9px;background:#9ca3af;border-radius:50%;display:inline-block;flex-shrink:0"></span>'}
+          <span style="font-weight:700;font-size:14px;color:${isRunning?col:'#6b7280'}">${t.techName}</span>
+          <span style="font-size:12px;color:var(--gray)">${isRunning?'· En cours':'· Terminée'} · Départ ${t.startTime}</span>
+          <span style="margin-left:auto;font-size:18px;font-weight:800;color:${isRunning?col:'#6b7280'}">${pct}%</span>
+        </div>
+        <div style="height:10px;background:var(--bg);border-radius:5px;overflow:hidden;margin-bottom:8px">
+          <div style="height:100%;width:${pct}%;background:${barCol};border-radius:5px;transition:width .6s ease"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--gray)">
+          <span style="display:flex;gap:10px">
+            <span style="color:#16a34a;font-weight:600">✅ ${t.done} validée${t.done>1?'s':''}</span>
+            ${t.failed?`<span style="color:#C62828;font-weight:600">❌ ${t.failed} échec${t.failed>1?'s':''}</span>`:''}
+          </span>
+          <span style="font-weight:600;color:var(--dark)">${done} / ${t.total} interventions</span>
+        </div>
+      </div>`
+    }).join('')
+  }catch(e){el.style.display='none'}
+}
+let _trackerInterval=null
+function startTrackerPolling(){
+  if(_trackerInterval) return
+  _trackerInterval=setInterval(()=>{if(curView==='dashboard')renderTourTracker()},15000)
+}
+
 // DASHBOARD
 // ═══════════════════════════════════════════════════════
 function rDash(){
@@ -1935,6 +1998,7 @@ function rDash(){
   const totalWithTravel=totMin+travelEstMin
   const lp=capMin>0?Math.min(Math.round(totalWithTravel/capMin*100),100):0
   const lc=lp>85?"#C62828":lp>65?"#E65100":"#1B5E20"
+  renderTourTracker()
   document.getElementById("d-dash").innerHTML=`
   <div class="kpig" style="margin-bottom:16px">
     <div class="kpi" style="border-left-color:#1565C0" onclick="fStatus='all';SV('interventions')" title="Toutes les interventions"><p>Interventions du jour</p><p style="color:#1565C0">${day.length}</p></div>
@@ -2269,8 +2333,13 @@ function rDepart(){
                 ${tBdg(iv.type)}${sBdg(iv.status)}
                 ${iv.padPak?bdg("⚡ Pad Pak","#E65100","#FFF3E0"):""}
                 <span style="font-size:11px;color:var(--gray)">⏱ ${fmtMin(dur(iv.type,iv.form))}</span>
-                ${depETAs[iv.id]?`<span style="font-size:11px;font-weight:600;padding:2px 7px;border-radius:100px;background:#E8F5E9;color:#2E7D32">🕐 ${depETAs[iv.id].eta} → ${depETAs[iv.id].leave}</span>`:""}
               </div>
+              ${(depETAs[iv.id]||iv.timeStart||iv.timeEnd)?`<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:5px">
+                ${depETAs[iv.id]?.travelMin?`<span style="font-size:11px;padding:2px 7px;border-radius:100px;background:#E3F2FD;color:#1565C0">🚗 ${fmtMin(depETAs[iv.id].travelMin)}</span>`:''}
+                ${depETAs[iv.id]?`<span style="font-size:11px;font-weight:600;padding:2px 7px;border-radius:100px;background:#E8F5E9;color:#2E7D32">🕐 ${depETAs[iv.id].eta} → ${depETAs[iv.id].leave}</span>`:''}
+                ${iv.timeStart?`<span style="font-size:11px;padding:2px 7px;border-radius:100px;background:#FFF3E0;color:#E65100">Dès ${iv.timeStart}</span>`:''}
+                ${iv.timeEnd?`<span style="font-size:11px;padding:2px 7px;border-radius:100px;background:#FFEBEE;color:#C62828">⏰ Limite ${iv.timeEnd}</span>`:''}
+              </div>`:''}
               ${iv.notes?`<div style="font-size:12px;color:var(--orange);background:#FFF3E0;padding:5px 9px;border-radius:6px;margin-bottom:5px">📝 ${iv.notes}</div>`:""}
               ${(iv.contact||iv.cphone||iv.cemail)?`<div style="font-size:12px;background:#F3E5F5;padding:5px 9px;border-radius:6px;margin-bottom:5px">
                 ${iv.contact?`👤 <strong>${iv.contact}</strong> `:""}${iv.cphone?`📞 <a href="tel:${iv.cphone}" style="color:var(--blue)">${iv.cphone}</a>`:""}
@@ -2436,9 +2505,17 @@ async function initDepMap(){
             const byId=Object.fromEntries(ivcFiltered.map(x=>[x.iv.id,x]))
             ivc=orderedIds.map(id=>byId[id]).filter(Boolean)
             const arrs=r.estimatedArrivals||{}
+            let prevLeaveMin=depSH*60+depSM
             ivc.forEach(({iv})=>{
               const eta=arrs[iv.id]
-              if(eta) depETAs[iv.id]={eta,leave:addMinToTime(eta,dur(iv.type,iv.form))}
+              if(eta){
+                const [eh,em]=eta.split(':').map(Number)
+                const etaMin=eh*60+em
+                const travelMin=Math.max(0,etaMin-prevLeaveMin)
+                const wm=dur(iv.type,iv.form)
+                depETAs[iv.id]={eta,leave:addMinToTime(eta,wm),travelMin}
+                prevLeaveMin=etaMin+wm
+              }
             })
             const conflicts=r.conflicts||[]
             conflicts.forEach(c=>{
@@ -6915,7 +6992,11 @@ function initCloud(){
         if(cv==='depart') rDepart()
       }catch{}
     }
+    if(e.key==='optiq_tour_progress'){
+      renderTourTracker()
+    }
   })
+  startTrackerPolling()
 }
 
 

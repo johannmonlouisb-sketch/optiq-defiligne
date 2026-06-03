@@ -598,10 +598,34 @@ function _releaseWakeLock(){
   if(window._wakeLock){try{window._wakeLock.release()}catch(e){}; window._wakeLock=null}
 }
 
+function saveTourProgress(status){
+  const date=depDate()
+  const dayIvs=myIvs(date)
+  const tc=TB(curTech)
+  const startTimeStr=tourStartTime?tourStartTime.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}):''
+  try{
+    const stored=JSON.parse(localStorage.getItem('optiq_tour_progress')||'{}')
+    const key=`${curTech}_${date}`
+    if(status==='idle'){ delete stored[key] }
+    else{
+      stored[key]={
+        techId:curTech, techName:tc.name, date, status,
+        startTime:startTimeStr,
+        total:dayIvs.length,
+        done:dayIvs.filter(i=>validated[i.id]).length,
+        failed:dayIvs.filter(i=>failed[i.id]).length,
+        updatedAt:Date.now()
+      }
+    }
+    localStorage.setItem('optiq_tour_progress',JSON.stringify(stored))
+  }catch(e){}
+}
+
 function startTournee(){
   if(tourRunning) return
   tourStartTime=new Date()
   tourRunning=true
+  saveTourProgress('running')
   tourTimer=setInterval(()=>{
     const elapsed=Math.floor((new Date()-tourStartTime)/60000)
     const el=document.getElementById('tour-timer')
@@ -629,6 +653,7 @@ function endTournee(){
   try{localStorage.setItem("techTourneesData",JSON.stringify(tourneesData))}catch(e){}
   tourRunning=false
   tourStartTime=null
+  saveTourProgress('done')
   toast("✅ Tournée terminée — "+fmtDuration(durationMin),"#2E7D32")
   renderDepart()
 }
@@ -1133,6 +1158,7 @@ async function validateIv(id){
     updIvStatus(id,"pending")
   }
   saveVF();updateMarkerCol(id);renderDepart()
+  if(tourRunning) saveTourProgress('running')
 }
 
 async function failIv(id){
@@ -1149,6 +1175,7 @@ async function failIv(id){
     updIvStatus(id,"pending")
   }
   saveVF();updateMarkerCol(id);renderDepart()
+  if(tourRunning) saveTourProgress('running')
 }
 
 function updIvStatus(id,status){
