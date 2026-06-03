@@ -2093,6 +2093,7 @@ function dropDepCard(targetId){
   const orderedIvs=order.map(id=>byId[id]).filter(Boolean)
   const other=(depRouteOrder[techId]||[]).filter(iv=>iv.date!==date)
   depRouteOrder[techId]=[...orderedIvs,...other]
+  setRouteLock(techId,date,true)
   saveRouteOrder(date)
   _dragId=null
   rDepart()

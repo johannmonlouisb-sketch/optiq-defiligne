@@ -700,6 +700,7 @@ function dropCard(targetId){
   if(fi===-1||ti===-1){_dragId=null;return}
   order.splice(fi,1);order.splice(ti,0,_dragId)
   techRouteOrder[date]=order
+  setTechRouteLock(date,true)
   saveRouteOrder(date)
   _dragId=null
   renderDepart()
@@ -713,6 +714,51 @@ function dropCard(targetId){
       mapMarkers[id].setIcon(mkIcon(done?"✓":fail?"✗":(idx+1),col))
     }
   })
+}
+
+// ── Verrou d'ordre tournée (technicien) ──────────────────────────
+function isTechRouteLocked(date){
+  try{return JSON.parse(localStorage.getItem("optiq_route_lock")||"{}")[`lock_${curTech}_${date}`]===true}catch{return false}
+}
+function setTechRouteLock(date,val){
+  try{
+    const s=JSON.parse(localStorage.getItem("optiq_route_lock")||"{}")
+    if(val) s[`lock_${curTech}_${date}`]=true
+    else delete s[`lock_${curTech}_${date}`]
+    localStorage.setItem("optiq_route_lock",JSON.stringify(s))
+  }catch(e){}
+}
+function toggleTechRouteLock(){
+  const date=depDate()
+  const was=isTechRouteLocked(date)
+  setTechRouteLock(date,!was)
+  if(!was) saveRouteOrder(date)
+  renderDepart()
+}
+function reverseTechRoute(){
+  const date=depDate()
+  const base=myIvs(date).map(i=>i.id)
+  const order=[...(techRouteOrder[date]||base)]
+  order.reverse()
+  techRouteOrder[date]=order
+  setTechRouteLock(date,true)
+  saveRouteOrder(date)
+  renderDepart()
+  refreshLiveETAs()
+}
+function setFirstTechIv(ivId){
+  const date=depDate()
+  const base=myIvs(date).map(i=>i.id)
+  const order=[...(techRouteOrder[date]||base)]
+  const idx=order.indexOf(ivId)
+  if(idx<=0) return
+  order.splice(idx,1)
+  order.unshift(ivId)
+  techRouteOrder[date]=order
+  setTechRouteLock(date,true)
+  saveRouteOrder(date)
+  renderDepart()
+  refreshLiveETAs()
 }
 
 let toastTimer
@@ -915,7 +961,13 @@ function renderDepart(){
   }
 
   const tToMin=hhmm=>{if(!hhmm)return null;const[h,m]=hhmm.split(':').map(Number);return h*60+m}
-  list.innerHTML=dayIvs.map((iv,idx)=>{
+  const locked=isTechRouteLocked(date)
+  const toolbarHtml=dayIvs.length?`<div style="display:flex;align-items:center;gap:8px;padding:6px 2px 8px;flex-shrink:0">
+    <span style="font-size:12px;color:var(--gray);flex:1">${locked?"🔒 Ordre verrouillé":"Glisser pour réordonner"}</span>
+    <button onclick="reverseTechRoute()" style="padding:5px 12px;font-size:12px;border-radius:8px;border:1.5px solid var(--blue);background:#fff;color:var(--blue);cursor:pointer;font-family:inherit;font-weight:600">⇅ Inverser</button>
+    <button onclick="toggleTechRouteLock()" style="padding:5px 12px;font-size:12px;border-radius:8px;border:1.5px solid ${locked?"#16a34a":"var(--border)"};background:${locked?"#f0fdf4":"#fff"};color:${locked?"#16a34a":"var(--gray)"};cursor:pointer;font-family:inherit;font-weight:600">${locked?"🔒 Verr.":"🔓 Libre"}</button>
+  </div>`:""
+  list.innerHTML=toolbarHtml+dayIvs.map((iv,idx)=>{
     const done=validated[iv.id], fail=failed[iv.id]
     const col=done?"#2E7D32":fail?"#C62828":TYPES[iv.type].color
     const lbl=done?"✓":fail?"✗":(idx+1)
@@ -971,7 +1023,11 @@ function renderDepart(){
         <div class="dc-drag" onclick="event.stopPropagation()" title="Déplacer l'ordre">☰</div>
         <div class="dc-num" style="background:${col}">${lbl}</div>
         <div class="dc-info">
-          <div class="dc-client">${iv.client}</div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <div class="dc-client" style="flex:1">${iv.client}</div>
+            ${idx===0&&!done&&!fail?`<span style="font-size:11px;font-weight:700;color:#f59e0b">⭐</span>`
+              :!done&&!fail?`<button onclick="event.stopPropagation();setFirstTechIv(${iv.id})" style="background:none;border:1.5px solid #f59e0b;border-radius:6px;padding:1px 6px;font-size:10px;cursor:pointer;color:#f59e0b;font-family:inherit;white-space:nowrap">☆ 1er</button>`:""}
+          </div>
           <div class="dc-addr">📍 ${iv.addr}</div>
           ${iv.contact?`<div style="font-size:11px;color:var(--blue);margin-top:2px">👤 ${iv.contact}${iv.cphone?` <a href="tel:${iv.cphone}" onclick="event.stopPropagation()" style="color:var(--blue)">📞</a>`:""}</div>`:""}
         </div>
