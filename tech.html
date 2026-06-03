@@ -774,6 +774,7 @@ function toast(msg,col="#212121",dur=2800){
 function goTab(tab){
   curTab=tab
   try{sessionStorage.setItem('optiq_tech_tab',tab)}catch(e){}
+  try{localStorage.setItem('optiq_tech_tab',tab)}catch(e){}
   document.querySelectorAll(".view").forEach(v=>v.classList.remove("on"))
   document.querySelectorAll(".tab").forEach(t=>t.classList.remove("on"))
   document.getElementById("v-"+tab).classList.add("on")
@@ -834,7 +835,10 @@ function updateBadges(){
   if(bm){bm.textContent="⚡";bm.style.display=pp.length?"block":"none"}
 }
 function depDate(){return document.getElementById("dep-date")?.value||TODAY()}
-function onDepDateChange(){renderDepart();updateBadges()}
+function onDepDateChange(){
+  try{localStorage.setItem('optiq_tech_date',document.getElementById('dep-date').value)}catch(e){}
+  renderDepart();updateBadges()
+}
 
 // ════════════════════════════════════════════
 // DÉPART DU JOUR
@@ -2436,7 +2440,12 @@ function startNotionPolling(){
 // INIT
 // ════════════════════════════════════════════
 try{const s=localStorage.getItem("tech_id");if(s)curTech=parseInt(s)}catch(e){}
-document.getElementById("dep-date").value=TODAY()
+// Restaurer la date précédente (sinon aujourd'hui)
+;(()=>{
+  let d=TODAY()
+  try{const s=localStorage.getItem('optiq_tech_date');if(s)d=s}catch(e){}
+  document.getElementById("dep-date").value=d
+})()
 if(techCfg.startTime){const te=document.getElementById("dep-time");if(te)te.value=techCfg.startTime}
 
 // Charger les paramètres depuis Netlify (noms techs, véhicules, dépôts)
@@ -2464,8 +2473,11 @@ if(isDeployedApp){
   }).catch(()=>{})
 }
 
-// Restaurer l'onglet actif depuis la session précédente
-try{const t=sessionStorage.getItem('optiq_tech_tab');if(t)curTab=t}catch(e){}
+// Restaurer l'onglet actif (sessionStorage prioritaire, sinon localStorage)
+try{
+  const t=sessionStorage.getItem('optiq_tech_tab')||localStorage.getItem('optiq_tech_tab')
+  if(t)curTab=t
+}catch(e){}
 updateTopbar()
 goTab(curTab)
 updateBadges()

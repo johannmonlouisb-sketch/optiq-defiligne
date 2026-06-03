@@ -1850,6 +1850,7 @@ const VT={dashboard:"Tableau de bord",depart:"Départ du jour & Itinéraire",pla
 let _depSubTab="depart"
 function switchDepSub(tab){
   _depSubTab=tab
+  _saveUIState()
   const sd=document.getElementById("depsub-depart")
   const sc=document.getElementById("depsub-carte")
   const bd=document.getElementById("depsub-depart-btn")
@@ -1871,6 +1872,9 @@ function switchDepSub(tab){
     if(mapObj)setTimeout(()=>mapObj.invalidateSize(),200)
   }
 }
+function _saveUIState(){
+  try{localStorage.setItem('optiq_ui_state',JSON.stringify({view:curView,subTab:_depSubTab,selDate}))}catch(e){}
+}
 function SV(v){
   if(v==="carte"){SV("depart");switchDepSub("carte");return}
   curView=v
@@ -1880,6 +1884,7 @@ function SV(v){
   document.querySelectorAll(".vp").forEach(p=>p.classList.remove("on"))
   const p=document.getElementById("p-"+v);if(p)p.classList.add("on")
   document.getElementById("sb-count").textContent=ivs.length+" interventions"
+  _saveUIState()
   if(v==="dashboard")rDash()
   else if(v==="depart"){rDepart();if(_depSubTab==="depart"&&depMapObj)setTimeout(()=>depMapObj.invalidateSize(),200);else if(_depSubTab==="carte"&&mapObj)setTimeout(()=>mapObj.invalidateSize(),200)}
   else if(v==="planning")rPlan()
@@ -1940,7 +1945,7 @@ function rDash(){
     <div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <h2 style="font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap">Interventions du
-          <input type="date" value="${selDate}" onchange="selDate=this.value;rDash()" style="width:auto;padding:4px 8px;font-size:13px"/>
+          <input type="date" value="${selDate}" onchange="selDate=this.value;_saveUIState();rDash()" style="width:auto;padding:4px 8px;font-size:13px"/>
           ${selDate!==TODAY?`<button onclick="selDate=TODAY;rDash()" class="bg bsm" style="font-size:11px">Aujourd'hui</button>`:""}
         </h2>
       </div>
@@ -2108,7 +2113,7 @@ function dropDepCard(targetId){
 function rDepart(){
   const di=document.getElementById("dep-date")
   di.value=selDate
-  di.onchange=()=>{selDate=di.value;depRouteOrder={};loadRouteOrder(selDate);rDepart()}
+  di.onchange=()=>{selDate=di.value;depRouteOrder={};loadRouteOrder(selDate);_saveUIState();rDepart()}
   const date=selDate
   // ─── Dropdown label ──────────────────────────────────
   const lbl=document.getElementById("dep-tech-label")
@@ -6762,8 +6767,14 @@ function initCloud(){
     }
   } catch(e){}
 
-  // Mettre à jour selDate sur la date du jour
-  selDate = new Date().toISOString().split("T")[0]
+  // Restaurer la dernière vue + date + sous-onglet
+  try{
+    const ui = JSON.parse(localStorage.getItem('optiq_ui_state')||'{}')
+    if(ui.selDate) selDate = ui.selDate
+    if(ui.view && VT[ui.view]) curView = ui.view
+    if(ui.subTab) _depSubTab = ui.subTab
+  }catch(e){}
+
   loadRouteOrder(selDate)
 
   // Mettre à jour analyseMonth sur le dernier mois avec des données
@@ -6785,7 +6796,7 @@ function initCloud(){
 
   const el = document.getElementById('cloud-status')
   if(el) el.innerHTML = `💾 <span style="color:#1B5E20">${ivs.length} interventions</span>`
-  rDash()
+  SV(curView)
 
   // Sync temps réel quand l'app tech modifie les données dans un autre onglet
   window.addEventListener('storage',e=>{
