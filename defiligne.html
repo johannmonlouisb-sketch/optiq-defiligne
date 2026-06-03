@@ -301,7 +301,7 @@ tr:hover td{background:var(--bg)}
       </div>
       <div id="rte-stats" style="display:none;grid-template-columns:repeat(5,1fr);gap:10px">
         <div class="surf" style="border-left:3px solid var(--blue);display:flex;align-items:center;gap:8px"><span style="font-size:18px">🛣️</span><div><div class="lbl">Distance</div><div id="sk" style="font-size:18px;font-weight:700;color:var(--blue)">—</div></div></div>
-        <div class="surf" style="border-left:3px solid var(--purple);display:flex;align-items:center;gap:8px"><span style="font-size:18px">🚗</span><div><div class="lbl">Trajet</div><div id="st" style="font-size:18px;font-weight:700;color:var(--purple)">—</div></div></div>
+        <div class="surf" style="border-left:3px solid var(--purple);display:flex;align-items:center;gap:8px"><span style="font-size:18px">🚗</span><div><div class="lbl">Trajet</div><div id="st" style="font-size:18px;font-weight:700;color:var(--purple)">—</div><div id="st-sub" style="font-size:10px;color:var(--gray);margin-top:1px"></div></div></div>
         <div class="surf" style="border-left:3px solid var(--orange);display:flex;align-items:center;gap:8px"><span style="font-size:18px">🔧</span><div><div class="lbl">Travail</div><div id="sw" style="font-size:18px;font-weight:700;color:var(--orange)">—</div></div></div>
         <div class="surf" style="border-left:3px solid #C62828;display:flex;align-items:center;gap:8px"><span style="font-size:18px">⏰</span><div><div class="lbl">Journée totale</div><div id="stot" style="font-size:18px;font-weight:700;color:#C62828">—</div></div></div>
         <div class="surf" style="border-left:3px solid var(--green);display:flex;align-items:center;gap:8px"><span style="font-size:18px">📍</span><div><div class="lbl">Arrêts</div><div id="ss" style="font-size:18px;font-weight:700;color:var(--green)">—</div></div></div>
@@ -5225,36 +5225,85 @@ async function _calcRouteInner(){
       .bindPopup(`<strong>🏁 Retour dépôt</strong><br><small>${depot}</small>`)
   }
 
-  // OSRM routing
-  sp(75,"Calcul de l'itinéraire routier...")
+  // Route avec trafic réel (/api/route-traffic, même API que l'app technicien)
+  sp(75,"Calcul de l'itinéraire avec trafic réel...")
+  const startHHMM=document.getElementById('map-time')?.value||'08:00'
   const allPts=[dc,...ivc.map(x=>x.coords),...(doReturn?[dc]:[])]
   let travelMin=0
   if(allPts.length>=2){
+    let routeOk=false
     try{
-      const cs=allPts.map(c=>c.lng+","+c.lat).join(";")
-      const res=await fetch("https://router.project-osrm.org/route/v1/driving/"+cs+"?overview=full&geometries=geojson")
-      const data=await res.json()
-      if(data.routes?.[0]){
-        const rt=data.routes[0]
-        const km=Math.round(rt.distance/1000)
-        travelMin=Math.round(rt.duration/60)
+      const res=await fetch('/api/route-traffic',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({waypoints:allPts,departureHHMM:startHHMM})
+      })
+      if(res.ok){
+        const data=await res.json()
+        const km=Math.round(data.totalDistanceKm||0)
+        travelMin=data.trafficDurationMin||0
+        const delayMin=data.delayMin||0
         const totalMin=travelMin+workMin
+        const trafficCol=delayMin>15?"#C62828":delayMin>5?"#E65100":"#2E7D32"
+        const stEl=document.getElementById("st"),stSubEl=document.getElementById("st-sub")
+        if(stEl){stEl.textContent=fmtMin(travelMin);stEl.style.color=delayMin>5?trafficCol:"var(--purple)"}
+        if(stSubEl) stSubEl.textContent=delayMin>2?`+${delayMin}min trafic`:''
         document.getElementById("sk").textContent=km+" km"
-        document.getElementById("st").textContent=fmtMin(travelMin)
         document.getElementById("sw").textContent=fmtMin(workMin)
         document.getElementById("stot").textContent=fmtMin(totalMin)
         document.getElementById("ss").textContent=ivc.length
         document.getElementById("rte-stats").style.display="grid"
-        // Rouge > 12h légal, orange > 10h heures sup, vert sinon
         const totEl=document.getElementById("stot")
         if(totEl) totEl.style.color=totalMin>720?"#C62828":totalMin>600?"#E65100":"#1B5E20"
         const skEl=document.getElementById("sk")
         if(skEl) skEl.style.color=km>400?"#C62828":km>250?"#E65100":"#1565C0"
-        L.geoJSON(rt.geometry,{style:{color:"#1565C0",weight:4,opacity:.85}}).addTo(rGroup)
-        mapObj.fitBounds(L.geoJSON(rt.geometry).getBounds(),{padding:[50,50]})
+        if(data.polylineGeoJson){
+          L.geoJSON(data.polylineGeoJson,{style:{color:"#1565C0",weight:4,opacity:.85}}).addTo(rGroup)
+          mapObj.fitBounds(L.geoJSON(data.polylineGeoJson).getBounds(),{padding:[50,50]})
+        }
+        // ETAs par arrêt depuis les durées de leg réelles
+        if(data.legs?.length&&ivc.length){
+          const[sh,sm]=startHHMM.split(':').map(Number)
+          let curMin=sh*60+sm
+          ivc.forEach((x,idx)=>{
+            const legMin=data.legs[idx]?.trafficDurationMin??data.legs[idx]?.durationMin??0
+            curMin+=legMin
+            if(x.iv.timeStart){const[th,tm]=x.iv.timeStart.split(':').map(Number);if(curMin<th*60+tm)curMin=th*60+tm}
+            const eta=`${String(Math.floor(curMin/60)).padStart(2,'0')}:${String(curMin%60).padStart(2,'0')}`
+            const wm=dur(x.iv.type,x.iv.form)
+            depETAs[x.iv.id]={eta,leave:addMinToTime(eta,wm),travelMin:legMin,delayed:delayMin>2}
+            curMin+=wm
+          })
+        }
+        routeOk=true
       }
-    }catch(e){
-      if(allPts.length) mapObj.fitBounds(L.latLngBounds(allPts.map(c=>[c.lat,c.lng])),{padding:[60,60]})
+    }catch(e){}
+    // Fallback OSRM si route-traffic indisponible (mode local / erreur)
+    if(!routeOk){
+      try{
+        const cs=allPts.map(c=>c.lng+","+c.lat).join(";")
+        const res=await fetch("https://router.project-osrm.org/route/v1/driving/"+cs+"?overview=full&geometries=geojson")
+        const data=await res.json()
+        if(data.routes?.[0]){
+          const rt=data.routes[0]
+          const km=Math.round(rt.distance/1000)
+          travelMin=Math.round(rt.duration/60)
+          const totalMin=travelMin+workMin
+          document.getElementById("sk").textContent=km+" km"
+          document.getElementById("st").textContent=fmtMin(travelMin)
+          document.getElementById("sw").textContent=fmtMin(workMin)
+          document.getElementById("stot").textContent=fmtMin(totalMin)
+          document.getElementById("ss").textContent=ivc.length
+          document.getElementById("rte-stats").style.display="grid"
+          const totEl=document.getElementById("stot")
+          if(totEl) totEl.style.color=totalMin>720?"#C62828":totalMin>600?"#E65100":"#1B5E20"
+          const skEl=document.getElementById("sk")
+          if(skEl) skEl.style.color=km>400?"#C62828":km>250?"#E65100":"#1565C0"
+          L.geoJSON(rt.geometry,{style:{color:"#1565C0",weight:4,opacity:.85}}).addTo(rGroup)
+          mapObj.fitBounds(L.geoJSON(rt.geometry).getBounds(),{padding:[50,50]})
+        }
+      }catch(e2){
+        if(allPts.length) mapObj.fitBounds(L.latLngBounds(allPts.map(c=>[c.lat,c.lng])),{padding:[60,60]})
+      }
     }
   }
 
@@ -5296,6 +5345,9 @@ async function _calcRouteInner(){
     ${ivc.map(({iv,coords},i)=>{
       const tc=TB(iv.techId)
       const distFromPrev=i===0?haversine(dc,coords):haversine(ivc[i-1].coords,coords)
+      const eta=depETAs[iv.id]
+      const trafMin=eta?.travelMin
+      const delayed=eta?.delayed
       return `<div style="display:flex;gap:8px;padding:7px 10px;background:var(--bg);border-radius:7px;margin-bottom:4px;align-items:flex-start">
         <div style="width:24px;height:24px;background:var(--blue);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;margin-top:2px">${i+1}</div>
         <div style="flex:1;min-width:0">
@@ -5303,10 +5355,15 @@ async function _calcRouteInner(){
           <div style="font-size:11px;color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📍 ${iv.addr}</div>
           ${iv.notes?`<div style="font-size:11px;color:var(--orange)">📝 ${iv.notes}</div>`:""}
           ${iv.contact?`<div style="font-size:11px;color:#6A1B9A">👤 ${iv.contact}${iv.cphone?" · "+iv.cphone:""}</div>`:""}
-          <div style="font-size:11px;color:var(--gray);margin-top:2px">~${distFromPrev.toFixed(1)} km · ${fmtMin(dur(iv.type,iv.form))}</div>
+          <div style="display:flex;gap:6px;margin-top:3px;flex-wrap:wrap;align-items:center">
+            ${trafMin!=null
+              ?`<span style="font-size:11px;padding:1px 7px;border-radius:100px;background:${delayed?"#FFF3E0":"#E3F2FD"};color:${delayed?"#E65100":"#1565C0"}">🚗 ${fmtMin(trafMin)}</span>`
+              :`<span style="font-size:11px;color:var(--gray)">~${distFromPrev.toFixed(1)} km</span>`}
+            <span style="font-size:11px;color:var(--gray)">🔧 ${fmtMin(dur(iv.type,iv.form))}</span>
+          </div>
         </div>
         <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0">
-          ${depETAs[iv.id]?`<span style="font-size:11px;font-weight:700;padding:2px 7px;border-radius:100px;background:#E8F5E9;color:#2E7D32;white-space:nowrap">🕐 ${depETAs[iv.id].eta}</span>`:""}
+          ${eta?`<span style="font-size:11px;font-weight:700;padding:2px 7px;border-radius:100px;background:#E8F5E9;color:#2E7D32;white-space:nowrap">🕐 ${eta.eta} → ${eta.leave}</span>`:""}
           ${tBdg(iv.type)}${sBdg(iv.status)}
           ${ava(tc.init,20)}
         </div>
