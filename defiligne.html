@@ -476,7 +476,12 @@ tr:hover td{background:var(--bg)}
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div><label class="lbl">Date <span style="font-size:10px;color:var(--blue);font-weight:normal">(auto-suggérée)</span></label><input type="date" id="m-date" onchange="onDateChange()"/></div>
-        <div><label class="lbl">Technicien</label><select id="m-tech"></select></div>
+        <div>
+          <label class="lbl">Technicien</label><select id="m-tech"></select>
+          <div id="m-commercial-row" style="display:none;margin-top:5px;padding:4px 8px;background:#f0f4ff;border-radius:6px;font-size:11px;color:#1d4ed8">
+            💼 Commercial : <span id="m-commercial-name" style="font-weight:600"></span>
+          </div>
+        </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div><label class="lbl">🕐 Créneau souhaité (début)</label><input type="time" id="m-timestart" style="font-size:13px"/></div>
@@ -3940,6 +3945,7 @@ function openAdd(){
   document.getElementById("m-cphone").value=""
   document.getElementById("m-cemail").value=""
   document.getElementById("m-siege").value=""
+  const _cr=document.getElementById("m-commercial-row");if(_cr)_cr.style.display="none"
   document.getElementById("m-edit").classList.add("open")
 }
 function editIv(id){
@@ -3977,6 +3983,13 @@ function editIv(id){
   const mcs=document.getElementById("m-cscontact");if(mcs)mcs.value=iv.contact_siege||""
   const mce=document.getElementById("m-csemail");if(mce)mce.value=iv.email_siege||""
   const mcp=document.getElementById("m-csphone");if(mcp)mcp.value=iv.phone_siege||""
+  // Afficher le commercial si renseigné dans Notion
+  const mcommRow=document.getElementById("m-commercial-row")
+  const mcommName=document.getElementById("m-commercial-name")
+  if(mcommRow&&mcommName){
+    if(iv.commercial){mcommName.textContent=iv.commercial;mcommRow.style.display="block"}
+    else mcommRow.style.display="none"
+  }
   document.getElementById("m-edit").classList.add("open")
 }
 function closeEdit(){document.getElementById("m-edit").classList.remove("open")}
@@ -7085,9 +7098,11 @@ function notionPageToIv(page, existingIds){
 
   if(!client || !dateStr) return null
 
-  // Technicien → id (Commercial  = select Notion)
-  const techName = nProp(p, 'Commercial ')
-  const techId   = getTechIdFromName(techName)
+  // Technicien — priorité au champ 'Technicien', fallback sur 'Commercial '
+  const techFieldName = nProp(p, 'Technicien') || nProp(p, 'Commercial ')
+  const techId   = getTechIdFromName(techFieldName)
+  // Commercial : champ dédié, stocké séparément pour affichage dans la fiche
+  const commercial = nProp(p, 'Commercial ') || nProp(p, 'Commercial') || ''
 
   // Statut (checkboxes)
   const terminer = nProp(p, 'Terminer')
@@ -7135,19 +7150,31 @@ function notionPageToIv(page, existingIds){
     urgent:         !!(nProp(p, 'Urgent')),
     exter:          nProp(p, 'EXTER') === true,
     validePar:      nProp(p, 'valider par'),
+    commercial,
     unplanned:      false,
     notionId
   }
 }
 
 function getTechIdFromName(name){
-  const n=(name||'').toLowerCase()
-  if(n.includes('cindy')||n.includes('herbet'))        return 1
-  if(n.includes('priscill')||n.includes('beuzelin'))   return 2
-  if(n.includes('yaniss')||n.includes('bouvet'))       return 3
-  if(n.includes('nathan')||n.includes('salah'))        return 4
-  if(n.includes('johann')||n.includes('monlouis'))     return 5
-  return 1
+  if(!name) return 0
+  const n = name.toLowerCase().trim()
+  // Matching dynamique sur le tableau TECHS (prénom)
+  for(const t of TECHS){
+    if(n.includes(t.name.toLowerCase())) return t.id
+  }
+  // Aliases noms de famille / variantes orthographiques
+  const aliases = [
+    [1, ['herbet','cindy']],
+    [2, ['beuzelin','priscill']],
+    [3, ['bouvet','yaniss']],
+    [4, ['salah','nathan']],
+    [5, ['monlouis','monlouisb','johann']],
+  ]
+  for(const [id, words] of aliases){
+    if(words.some(w => n.includes(w))) return id
+  }
+  return 0
 }
 
 function getTypeFromStr(s){
