@@ -17,14 +17,9 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);display:flex;h
 #logo-z img{height:30px;object-fit:contain;background:#fff;border-radius:4px;padding:2px}
 #logo-z p{font-size:11px;color:rgba(255,255,255,0.5);margin-top:6px}
 .ni{display:flex;align-items:center;gap:10px;padding:10px 14px;margin:1px 8px;border-radius:8px;cursor:pointer;font-size:14px;color:rgba(255,255,255,0.7);transition:all 0.12s;user-select:none;white-space:nowrap}
-.agent-msg{padding:10px 13px;border-radius:12px;font-size:13px;line-height:1.5;max-width:92%}
-.agent-msg-user{background:#0071e3;color:white;align-self:flex-end;border-bottom-right-radius:3px}
-.agent-msg-assistant{background:#f1f5f9;color:#1e293b;align-self:flex-start;border-bottom-left-radius:3px}
-.agent-msg-assistant ul{margin:4px 0 0 14px}
-.agent-plan-day{background:#fff;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:10px;overflow:hidden}
-.agent-plan-day-header{background:#1e40af;color:white;padding:8px 12px;font-weight:600;font-size:12px;display:flex;justify-content:space-between}
-.agent-plan-site{padding:7px 12px;border-bottom:1px solid #f1f5f9;font-size:12px;display:flex;gap:8px;align-items:flex-start}
-.agent-plan-site:last-child{border-bottom:none}
+.chat-msg{padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.5;max-width:88%}
+.chat-msg-user{background:#0071e3;color:white;align-self:flex-end;border-bottom-right-radius:3px}
+.chat-msg-assistant{background:#f1f5f9;color:#1e293b;align-self:flex-start;border-bottom-left-radius:3px}
 .ni:hover{background:rgba(255,255,255,0.1);color:#fff}
 .ni.on{background:rgba(255,255,255,0.18);color:#fff;font-weight:500}
 .ni .ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
@@ -47,7 +42,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);display:flex;h
 .sr-item .sr-name{font-weight:500;color:var(--dark)}
 .sr-item .sr-addr{color:var(--gray);font-size:11px}
 /* PANELS */
-.vp{display:none;flex:1;overflow-y:auto;flex-direction:column}
+.vp{display:none;flex:1;overflow-y:auto;flex-direction:column;padding-bottom:54px}
 .vp.on{display:flex}
 /* ── CARDS ── */
 .card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px 18px}
@@ -178,7 +173,6 @@ tr:hover td{background:var(--bg)}
   <div class="ni" onclick="SV('notifications')" id="n-notifications"><span class="ic">🔔</span><span>Notifications</span></div>
   <div class="ni" onclick="SV('parametres')" id="n-parametres"><span class="ic">⚙️</span><span>Paramètres</span></div>
   <div class="ni" onclick="SV('import')" id="n-import"><span class="ic">📥</span><span>Import</span></div>
-  <div class="ni" onclick="toggleAgentPanel()" id="n-agent"><span class="ic">🤖</span><span>Agent IA</span></div>
   <div class="ni" onclick="window.open('/report/index.html','_blank')" id="n-rapport-planning" title="Rapport Planning multi-agents" style="margin-top:4px;border-top:1px solid rgba(255,255,255,.1);padding-top:10px"><span class="ic">📊</span><span>Rapport Planning</span></div>
   <div id="sb-foot">
     <p>OptiQ · v1.0</p>
@@ -326,7 +320,10 @@ tr:hover td{background:var(--bg)}
   <div id="p-previsions" class="vp" style="padding:18px;gap:14px"><div id="d-prev"></div></div>
 
   <!-- PARAMÈTRES -->
-  <div id="p-analyse" class="vp" style="padding:0;overflow:hidden;flex-direction:column"><div id="d-analyse" style="flex:1;overflow-y:auto;padding:18px"></div></div>
+  <div id="p-analyse" class="vp" style="padding:0;overflow:hidden;flex-direction:row">
+    <div id="d-analyse" style="flex:1;overflow-y:auto;padding:18px;min-width:0"></div>
+    <div id="d-live" style="width:320px;flex-shrink:0;border-left:1px solid var(--border);overflow-y:auto;display:flex;flex-direction:column;background:#fafbfc"></div>
+  </div>
   <div id="p-notifications" class="vp" style="padding:18px;gap:14px;overflow-y:auto"><div id="d-notif"></div></div>
   <div id="p-parametres" class="vp" style="padding:18px;overflow-y:auto"><div id="d-param" style="max-width:700px"></div></div>
   <div id="p-import" class="vp" style="padding:18px;overflow-y:auto">
@@ -393,57 +390,36 @@ tr:hover td{background:var(--bg)}
       </div>
     </div>
   </div>
-</div>
 
-<!-- AGENT IA PANEL -->
-<div id="agent-panel" style="position:fixed;top:0;right:0;width:440px;height:100vh;background:#fff;box-shadow:-4px 0 24px rgba(0,0,0,0.18);z-index:2000;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1)">
-  <!-- Header -->
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid #eee;background:#0071e3;color:white;flex-shrink:0">
-    <div>
-      <div style="font-weight:700;font-size:15px">🤖 Agent Planning IA</div>
-      <div style="font-size:11px;opacity:.85">Claude · Défi Ligne</div>
+  <!-- BARRE CHAT IA -->
+  <div id="chat-bar" style="flex-shrink:0;border-top:1px solid var(--border);background:#fff;z-index:100">
+    <!-- Historique (masqué par défaut) -->
+    <div id="chat-history" style="display:none;height:240px;overflow-y:auto;padding:10px 16px;flex-direction:column;gap:8px;border-bottom:1px solid var(--border)">
+      <div class="chat-msg chat-msg-assistant">Bonjour ! Posez-moi une question sur la planification, les techniciens ou les interventions.</div>
     </div>
-    <button onclick="toggleAgentPanel()" style="background:rgba(255,255,255,.2);border:none;color:white;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:14px">✕</button>
-  </div>
-
-  <!-- Messages -->
-  <div id="agent-messages" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px">
-    <div class="agent-msg agent-msg-assistant">
-      <p>Bonjour ! Je suis votre agent de planification.</p>
-      <p style="margin-top:6px">Exemples de directives :</p>
-      <ul style="margin:6px 0 0 16px;font-size:13px;color:#555">
-        <li>« Planifie les sites PAD PAK expirés de HERBET sur 3 jours »</li>
-        <li>« Quels sites en Normandie ont une maintenance annuelle en retard ? »</li>
-        <li>« Découpe les urgences du 20 au 24 mai pour Beuzelin en tenant compte de la proximité »</li>
-      </ul>
+    <!-- Plan preview -->
+    <div id="chat-plan" style="display:none;background:#eff6ff;border-top:1px solid #dbeafe;padding:8px 16px">
+      <div style="font-weight:600;color:#1d4ed8;font-size:12px;margin-bottom:6px">📋 Plan proposé — en attente de confirmation</div>
+      <div id="chat-plan-content" style="font-size:12px;max-height:100px;overflow-y:auto"></div>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button onclick="confirmChatPlan()" style="background:#16a34a;color:white;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;font-weight:600">✅ Confirmer & Écrire dans Notion</button>
+        <button onclick="cancelChatPlan()" style="background:#f3f4f6;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer">Annuler</button>
+      </div>
     </div>
-  </div>
-
-  <!-- Plan preview -->
-  <div id="agent-plan-preview" style="display:none;border-top:1px solid #eee;background:#f8fafc;flex-shrink:0;max-height:45vh;overflow-y:auto">
-    <div style="padding:12px 16px;background:#eff6ff;border-bottom:1px solid #dbeafe">
-      <span style="font-weight:600;color:#1d4ed8;font-size:13px">📋 Plan proposé — En attente de confirmation</span>
+    <!-- Ligne d'input -->
+    <div style="display:flex;align-items:center;gap:8px;padding:7px 14px">
+      <button onclick="toggleChatHistory()" id="chat-toggle-btn" title="Afficher/masquer l'historique"
+        style="background:none;border:1px solid var(--border);border-radius:8px;padding:5px 9px;cursor:pointer;font-size:13px;color:var(--gray);flex-shrink:0">💬</button>
+      <input id="chat-input" type="text" placeholder="Posez une question à l'assistant IA planning… (Entrée pour envoyer)"
+        style="flex:1;border:1px solid var(--border);border-radius:20px;padding:6px 16px;font-size:13px;outline:none;font-family:inherit"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"/>
+      <button onclick="sendChat()" id="chat-send-btn"
+        style="background:var(--blue);color:white;border:none;border-radius:20px;padding:6px 16px;cursor:pointer;font-size:13px;flex-shrink:0;font-weight:500">Envoyer</button>
     </div>
-    <div id="agent-plan-content" style="padding:12px 16px;font-size:13px"></div>
-    <div style="padding:12px 16px;display:flex;gap:10px;border-top:1px solid #eee">
-      <button onclick="confirmAgentPlan()" style="flex:1;background:#16a34a;color:white;border:none;border-radius:8px;padding:10px;font-weight:600;cursor:pointer;font-size:13px">✅ Confirmer & Écrire dans Notion</button>
-      <button onclick="cancelAgentPlan()" style="background:#eee;border:none;border-radius:8px;padding:10px 14px;cursor:pointer;font-size:13px">Annuler</button>
-    </div>
-  </div>
-
-  <!-- Input -->
-  <div style="padding:12px 14px;border-top:1px solid #eee;background:#fafafa;flex-shrink:0">
-    <div style="display:flex;gap:8px;align-items:flex-end">
-      <textarea id="agent-input" placeholder="Donnez une directive en français..." rows="2"
-        style="flex:1;border:1px solid #ddd;border-radius:10px;padding:9px 12px;font-size:13px;resize:none;font-family:inherit;outline:none"
-        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAgentMessage()}"></textarea>
-      <button onclick="sendAgentMessage()" id="agent-send-btn"
-        style="background:#0071e3;color:white;border:none;border-radius:10px;padding:9px 14px;cursor:pointer;font-size:18px;flex-shrink:0">➤</button>
-    </div>
-    <div style="font-size:11px;color:#aaa;margin-top:5px;text-align:right">Entrée pour envoyer · Maj+Entrée pour sauter une ligne</div>
   </div>
 </div>
-<div id="agent-backdrop" onclick="toggleAgentPanel()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:1999"></div>
+
+<!-- BARRE CHAT IA (bas de #main) -->
 
 <!-- MODAL EDIT / ADD -->
 <div id="m-edit" class="mo">
@@ -5486,6 +5462,94 @@ function rAnalyse(){
   if(!el) return
   if(analyseView==="mois") renderAnalyseMois(el)
   else renderAnalyseAnnee(el)
+  renderLiveFeed()
+}
+
+// ── Panneau droit : interventions terminées en direct + tournées techs ──
+let _liveInterval = null
+
+function renderLiveFeed(){
+  const el = document.getElementById("d-live")
+  if(!el) return
+
+  // Interventions terminées aujourd'hui (triées par date desc)
+  const completed = ivs.filter(i=>i.status==="completed").sort((a,b)=>b.date.localeCompare(a.date))
+  const today = TODAY
+  const todayDone = completed.filter(i=>i.date===today)
+
+  // Tournées stockées par tech.html dans localStorage
+  let techTournees = {}
+  try { techTournees = JSON.parse(localStorage.getItem("techTourneesData")||"{}") } catch(e){}
+  const tourDates = Object.keys(techTournees).sort().reverse().slice(0,5)
+
+  el.innerHTML = `
+  <div style="padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;background:#fff">
+    <span style="font-weight:700;font-size:13px">🟢 En direct</span>
+    <span id="live-ts" style="font-size:11px;color:var(--gray)">${new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}</span>
+  </div>
+
+  <!-- Terminées aujourd'hui -->
+  <div style="padding:10px 14px 6px;font-size:12px;font-weight:600;color:var(--gray);text-transform:uppercase;letter-spacing:.5px">
+    Terminées aujourd'hui (${todayDone.length})
+  </div>
+  <div style="padding:0 14px 10px;display:flex;flex-direction:column;gap:6px">
+    ${todayDone.length ? todayDone.map(i=>{
+      const tc = TB(i.techId)
+      return `<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px 10px;border-left:3px solid #16a34a">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-weight:600;font-size:13px">${i.client}</span>
+          <span style="font-size:10px;color:#16a34a;font-weight:600">✓ OK</span>
+        </div>
+        <div style="font-size:11px;color:var(--gray);margin-top:2px">${tc.name} · ${i.addr||"—"}</div>
+      </div>`
+    }).join("") : `<div style="color:var(--gray);font-size:12px;text-align:center;padding:12px">Aucune intervention terminée aujourd'hui</div>`}
+  </div>
+
+  <!-- Dernières 20 terminées (toutes dates) -->
+  <div style="padding:10px 14px 6px;font-size:12px;font-weight:600;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;border-top:1px solid var(--border)">
+    Récentes (${Math.min(completed.length,20)}/${completed.length})
+  </div>
+  <div style="padding:0 14px 10px;display:flex;flex-direction:column;gap:4px">
+    ${completed.slice(0,20).map(i=>{
+      const tc = TB(i.techId)
+      const dateStr = new Date(i.date+"T12:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"short"})
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--bg)">
+        <div>
+          <span style="font-size:12px;font-weight:500">${i.client}</span>
+          <span style="font-size:10px;color:var(--gray);margin-left:4px">${tc.init}</span>
+        </div>
+        <span style="font-size:11px;color:var(--gray);flex-shrink:0">${dateStr}</span>
+      </div>`
+    }).join("")}
+  </div>
+
+  <!-- Tournées techniciens (depuis tech.html localStorage) -->
+  ${tourDates.length ? `
+  <div style="padding:10px 14px 6px;font-size:12px;font-weight:600;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;border-top:1px solid var(--border)">
+    Tournées techniciens
+  </div>
+  <div style="padding:0 14px 10px;display:flex;flex-direction:column;gap:6px">
+    ${tourDates.map(date=>{
+      const t = techTournees[date]
+      const dateStr = new Date(date+"T12:00:00").toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"})
+      const rate = (t.validated+t.failed)>0 ? Math.round(t.validated/(t.validated+t.failed)*100) : 0
+      return `<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px 10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <span style="font-weight:600;font-size:12px">${dateStr}</span>
+          <span style="font-size:12px;font-weight:700;color:${rate>=80?"#16a34a":rate>=60?"#E65100":"#C62828"}">${rate}%</span>
+        </div>
+        <div style="font-size:11px;color:var(--gray)">${t.startTime||""} → ${t.endTime||""} · ✓${t.validated} ✗${t.failed} / ${t.totalClients} clients</div>
+      </div>`
+    }).join("")}
+  </div>` : ""}
+  `
+
+  // Auto-refresh toutes les 60s si le panel est visible
+  if(!_liveInterval){
+    _liveInterval = setInterval(()=>{
+      if(document.getElementById("p-analyse").classList.contains("on")) renderLiveFeed()
+    }, 60000)
+  }
 }
 
 // ── Barre CSS simple ──────────────────────────────────
@@ -7223,158 +7287,100 @@ function startAdminNotionPolling(){
   startAdminNotionPolling()
 })()
 
-// ── Agent IA ──────────────────────────────────────────────────
-let _agentOpen = false;
-let _agentHistory = [];
-let _agentPendingPlan = null;
+// ── Chat IA (barre persistante) ───────────────────────────────
+let _chatHistory = [];
+let _chatPendingPlan = null;
+let _chatHistoryOpen = false;
 
-function toggleAgentPanel() {
-  _agentOpen = !_agentOpen;
-  const panel = document.getElementById('agent-panel');
-  const backdrop = document.getElementById('agent-backdrop');
-  panel.style.transform = _agentOpen ? 'translateX(0)' : 'translateX(100%)';
-  backdrop.style.display = _agentOpen ? 'block' : 'none';
-  if (_agentOpen) {
-    document.getElementById('agent-input').focus();
-    document.getElementById('n-agent').classList.add('on');
-  } else {
-    document.getElementById('n-agent').classList.remove('on');
-  }
+function toggleChatHistory() {
+  _chatHistoryOpen = !_chatHistoryOpen;
+  const h = document.getElementById('chat-history');
+  h.style.display = _chatHistoryOpen ? 'flex' : 'none';
+  document.getElementById('chat-toggle-btn').style.background = _chatHistoryOpen ? 'var(--blueLight)' : 'none';
+  if (_chatHistoryOpen) h.scrollTop = h.scrollHeight;
 }
 
-function agentAddMessage(role, text) {
-  const container = document.getElementById('agent-messages');
+function chatAddMessage(role, text) {
+  if (!_chatHistoryOpen) { _chatHistoryOpen = true; document.getElementById('chat-history').style.display='flex'; document.getElementById('chat-toggle-btn').style.background='var(--blueLight)'; }
+  const h = document.getElementById('chat-history');
   const div = document.createElement('div');
-  div.className = `agent-msg agent-msg-${role}`;
+  div.className = `chat-msg chat-msg-${role}`;
   div.innerHTML = text.replace(/\n/g, '<br>');
-  container.appendChild(div);
-  container.scrollTop = container.scrollHeight;
+  h.appendChild(div);
+  h.scrollTop = h.scrollHeight;
   return div;
 }
 
-function agentSetTyping(show) {
-  const id = 'agent-typing';
+function chatSetTyping(show) {
+  const id = 'chat-typing';
   let el = document.getElementById(id);
-  if (show && !el) {
-    el = agentAddMessage('assistant', '⏳ <em>Réflexion en cours…</em>');
-    el.id = id;
-  } else if (!show && el) {
-    el.remove();
-  }
-  document.getElementById('agent-send-btn').disabled = show;
-  document.getElementById('agent-input').disabled = show;
+  if (show && !el) { el = chatAddMessage('assistant', '⏳ <em>Réflexion…</em>'); el.id = id; }
+  else if (!show && el) el.remove();
+  document.getElementById('chat-send-btn').disabled = show;
+  document.getElementById('chat-input').disabled = show;
 }
 
-async function sendAgentMessage() {
-  const input = document.getElementById('agent-input');
+async function sendChat() {
+  const input = document.getElementById('chat-input');
   const text = input.value.trim();
   if (!text) return;
   input.value = '';
-
-  agentAddMessage('user', text);
-  _agentHistory.push({ role: 'user', content: text });
-  agentSetTyping(true);
-
+  chatAddMessage('user', text);
+  _chatHistory.push({ role: 'user', content: text });
+  chatSetTyping(true);
   try {
     const res = await fetch('/api/agent-directif', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: _agentHistory }),
+      body: JSON.stringify({ messages: _chatHistory }),
     });
     const data = await res.json();
-    agentSetTyping(false);
-
-    if (data.error) {
-      agentAddMessage('assistant', `❌ Erreur : ${data.error}`);
-      return;
-    }
-    if (data.text) {
-      agentAddMessage('assistant', data.text);
-      _agentHistory.push({ role: 'assistant', content: data.text });
-    }
-    if (data.plan) {
-      _agentPendingPlan = data.plan;
-      renderAgentPlan(data.plan);
-    }
+    chatSetTyping(false);
+    if (data.error) { chatAddMessage('assistant', `❌ ${data.error}`); return; }
+    if (data.text) { chatAddMessage('assistant', data.text); _chatHistory.push({ role: 'assistant', content: data.text }); }
+    if (data.plan) { _chatPendingPlan = data.plan; renderChatPlan(data.plan); }
   } catch(e) {
-    agentSetTyping(false);
-    agentAddMessage('assistant', `❌ Erreur réseau : ${e.message}`);
+    chatSetTyping(false);
+    chatAddMessage('assistant', `❌ Erreur réseau : ${e.message}`);
   }
 }
 
-function renderAgentPlan(plan) {
-  const preview = document.getElementById('agent-plan-preview');
-  const content = document.getElementById('agent-plan-content');
+function renderChatPlan(plan) {
+  const preview = document.getElementById('chat-plan');
+  const content = document.getElementById('chat-plan-content');
   preview.style.display = 'block';
-
-  const urgColor = { expired:'#dc2626',critical:'#ea580c',urgent:'#d97706',soon:'#2563eb',ok:'#16a34a',overdue:'#dc2626',unknown:'#9ca3af' };
-  const urgEmoji = { expired:'⚠️',critical:'🔴',urgent:'🟠',soon:'🟡',ok:'✅',overdue:'🔴',unknown:'—' };
-
-  let html = `<p style="color:#374151;margin-bottom:10px">${plan.resume || ''}</p>`;
+  let html = `<p style="color:#374151;margin-bottom:6px">${plan.resume || ''}</p>`;
   for (const jour of plan.jours || []) {
-    const dateStr = new Date(jour.date + 'T12:00:00').toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'long' });
-    html += `<div class="agent-plan-day">
-      <div class="agent-plan-day-header">
-        <span>📅 ${dateStr} — ${jour.technicien}</span>
-        <span>${jour.zone || ''} · ${jour.sites?.length || 0} sites</span>
-      </div>`;
-    for (const site of jour.sites || []) {
-      const pu = site.urgence_padpak || 'unknown';
-      const au = site.urgence_annuelle || 'unknown';
-      html += `<div class="agent-plan-site">
-        <div style="flex:1">
-          <strong>${site.nom || '—'}</strong>
-          <span style="color:#6b7280;margin-left:6px">${site.ville || ''} ${site.code_postal ? '('+site.code_postal+')' : ''}</span><br>
-          <span style="color:#9ca3af;font-size:11px">${site.adresse || ''}</span><br>
-          <span style="font-size:11px;color:#374151">${site.motif || ''}</span>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:3px;flex-shrink:0">
-          <span style="color:${urgColor[pu]};font-size:11px">${urgEmoji[pu]} PAD PAK</span>
-          <span style="color:${urgColor[au]};font-size:11px">${urgEmoji[au]} Annuel</span>
-        </div>
-      </div>`;
-    }
-    if (jour.note) html += `<div style="padding:6px 12px;font-size:11px;color:#6b7280;background:#f8fafc">💬 ${jour.note}</div>`;
-    html += '</div>';
+    const dateStr = new Date(jour.date + 'T12:00:00').toLocaleDateString('fr-FR', { weekday:'short', day:'numeric', month:'short' });
+    html += `<strong style="color:#1d4ed8">${dateStr} — ${jour.technicien}</strong> · ${jour.sites?.length || 0} sites<br>`;
+    for (const site of jour.sites || []) html += `<span style="color:#374151;margin-left:10px">• ${site.nom || '—'} (${site.ville || ''})</span><br>`;
   }
   content.innerHTML = html;
-  document.getElementById('agent-messages').scrollTop = document.getElementById('agent-messages').scrollHeight;
 }
 
-async function confirmAgentPlan() {
-  if (!_agentPendingPlan) return;
-  const btn = document.querySelector('#agent-plan-preview button');
-  btn.disabled = true;
-  btn.textContent = '⏳ Écriture dans Notion…';
-
+async function confirmChatPlan() {
+  if (!_chatPendingPlan) return;
+  const btn = document.querySelector('#chat-plan button');
+  btn.disabled = true; btn.textContent = '⏳ Écriture…';
   try {
     const res = await fetch('/api/agent-directif', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ confirmPlan: true, plan: _agentPendingPlan }),
+      body: JSON.stringify({ confirmPlan: true, plan: _chatPendingPlan }),
     });
     const data = await res.json();
-    document.getElementById('agent-plan-preview').style.display = 'none';
-    _agentPendingPlan = null;
-    if (data.error) {
-      agentAddMessage('assistant', `❌ Erreur : ${data.error}`);
-    } else {
-      const errInfo = data.errors?.length ? ` (${data.errors.length} erreur${data.errors.length>1?'s':''})` : '';
-      agentAddMessage('assistant', `✅ **${data.created} interventions créées dans Notion**${errInfo}.\n\nVous pouvez les retrouver dans l'onglet Interventions ou dans votre base Notion.`);
-      _agentHistory.push({ role: 'assistant', content: `Plan confirmé : ${data.created} interventions créées dans Notion.` });
-    }
-  } catch(e) {
-    agentAddMessage('assistant', `❌ Erreur réseau : ${e.message}`);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '✅ Confirmer & Écrire dans Notion';
-  }
+    document.getElementById('chat-plan').style.display = 'none';
+    _chatPendingPlan = null;
+    if (data.error) chatAddMessage('assistant', `❌ ${data.error}`);
+    else { chatAddMessage('assistant', `✅ ${data.created} interventions créées dans Notion.`); _chatHistory.push({ role:'assistant', content:`Plan confirmé.` }); }
+  } catch(e) { chatAddMessage('assistant', `❌ ${e.message}`); }
+  finally { btn.disabled=false; btn.textContent='✅ Confirmer & Écrire dans Notion'; }
 }
 
-function cancelAgentPlan() {
-  document.getElementById('agent-plan-preview').style.display = 'none';
-  _agentPendingPlan = null;
-  agentAddMessage('assistant', 'Plan annulé. Dites-moi comment vous souhaitez modifier la planification.');
+function cancelChatPlan() {
+  document.getElementById('chat-plan').style.display = 'none';
+  _chatPendingPlan = null;
+  chatAddMessage('assistant', 'Plan annulé.');
 }
 
 // ── Import Kizeo ──────────────────────────────────────────────
