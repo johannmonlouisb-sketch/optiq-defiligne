@@ -2023,6 +2023,61 @@ function loadRouteOrder(date){
     })
   }catch(e){}
 }
+
+// ── Verrou d'ordre : empêche l'optimiseur de recalculer ───────────
+function _routeLockKey(techId,date){return `lock_${techId}_${date}`}
+function isRouteLocked(techId,date){
+  try{return JSON.parse(localStorage.getItem("optiq_route_lock")||"{}")[_routeLockKey(techId,date)]===true}catch{return false}
+}
+function setRouteLock(techId,date,val){
+  try{
+    const s=JSON.parse(localStorage.getItem("optiq_route_lock")||"{}")
+    if(val) s[_routeLockKey(techId,date)]=true
+    else delete s[_routeLockKey(techId,date)]
+    localStorage.setItem("optiq_route_lock",JSON.stringify(s))
+  }catch(e){}
+}
+function toggleRouteLock(techId){
+  const date=selDate
+  const was=isRouteLocked(techId,date)
+  setRouteLock(techId,date,!was)
+  // S'assurer que l'ordre actuel est bien sauvegardé avant de verrouiller
+  if(!was) saveRouteOrder(date)
+  rDepart()
+}
+
+// ── Inverser l'ordre d'une tournée technicien ─────────────────────
+function reverseDepRoute(techId){
+  const date=selDate
+  let ord=(depRouteOrder[techId]||[]).filter(iv=>iv.date===date)
+  if(!ord.length) ord=ivs.filter(i=>i.date===date&&i.techId===techId)
+  depRouteOrder[techId]=[...ord.reverse(),...(depRouteOrder[techId]||[]).filter(iv=>iv.date!==date)]
+  setRouteLock(techId,date,true)
+  saveRouteOrder(date)
+  rDepart()
+  // Mettre à jour les numéros sur la carte
+  if(depMapObj)(depRouteOrder[techId]||[]).filter(iv=>iv.date===date).forEach((iv,idx)=>{
+    if(depMarkers[iv.id]){depMarkers[iv.id]._num=idx+1;updateDepMarker(iv.id)}
+  })
+}
+
+// ── Déplacer une intervention en première position ────────────────
+function setFirstDepIv(ivId,techId){
+  const date=selDate
+  let ord=(depRouteOrder[techId]||[]).filter(iv=>iv.date===date)
+  if(!ord.length) ord=ivs.filter(i=>i.date===date&&i.techId===techId)
+  const idx=ord.findIndex(iv=>iv.id===ivId)
+  if(idx<=0) return  // déjà premier ou introuvable
+  const [item]=ord.splice(idx,1)
+  ord.unshift(item)
+  depRouteOrder[techId]=[...ord,...(depRouteOrder[techId]||[]).filter(iv=>iv.date!==date)]
+  setRouteLock(techId,date,true)
+  saveRouteOrder(date)
+  rDepart()
+  if(depMapObj) ord.forEach((iv,i)=>{
+    if(depMarkers[iv.id]){depMarkers[iv.id]._num=i+1;updateDepMarker(iv.id)}
+  })
+}
 function dropDepCard(targetId){
   if(_dragId===null||_dragId===targetId){_dragId=null;return}
   const date=selDate
@@ -2114,62 +2169,92 @@ function rDepart(){
     const seen=new Set(displayIvs.map(iv=>iv.id))
     dayIvs.filter(iv=>!seen.has(iv.id)).forEach(iv=>displayIvs.push(iv))
   }
-  document.getElementById("dep-list").innerHTML=!dayIvs.length?
-    `<div class="card" style="text-align:center;color:var(--gray);padding:36px">Aucune intervention pour cette date/technicien</div>`:
-    displayIvs.map((iv,idx)=>{
-      const done=depValidated[iv.id],fail=depFailed[iv.id]
-      const tc=TB(iv.techId);const techCol=tc.color||"#1565C0"
-      const hasTime=iv.timeStart||iv.timeEnd
-      const now=new Date();const nowMin=now.getHours()*60+now.getMinutes()
-      const endMin=iv.timeEnd?parseInt(iv.timeEnd.split(":")[0])*60+parseInt(iv.timeEnd.split(":")[1]):null
-      const late=endMin&&!done&&!fail&&iv.date===date&&nowMin>endMin
-      return `<div class="dep-card ${done||fail?"done":""}" id="dc-${iv.id}"
-        style="border-left-color:${done?"#4CAF50":fail?"#C62828":techCol}"
-        draggable="true"
-        ondragstart="_dragId=${iv.id};_dragTechId=${iv.techId};event.dataTransfer.effectAllowed='move'"
-        ondragover="event.preventDefault();if(${iv.techId}===_dragTechId)this.classList.add('drag-over')"
-        ondragleave="this.classList.remove('drag-over')"
-        ondrop="event.preventDefault();this.classList.remove('drag-over');dropDepCard(${iv.id})">
-        <div style="display:flex;gap:10px;align-items:flex-start">
-          <div class="dep-drag" onclick="event.stopPropagation()" title="Déplacer">☰</div>
-          <div class="dep-num" style="background:${done?"#4CAF50":fail?"#C62828":techCol}">${done?"✓":fail?"✗":idx+1}</div>
-          <div style="flex:1;min-width:0">
-            <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
-              <span style="font-weight:600;font-size:14px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${iv.client}</span>
-              ${ava(tc.init,18,techCol)}
-            </div>
-            <div style="font-size:12px;color:var(--gray);margin-bottom:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📍 ${iv.addr}</div>
-            ${hasTime?`<div style="font-size:12px;padding:3px 8px;border-radius:6px;margin-bottom:5px;display:inline-flex;gap:8px;align-items:center;background:${late?"#FFEBEE":"#E3F2FD"};color:${late?"#C62828":"#1565C0"}">
-              ${late?"⚠️ Dépassé":"🕐"}
-              ${iv.timeStart?`<span>Dès ${iv.timeStart}</span>`:""}
-              ${iv.timeEnd?`<span>Au plus tard ${iv.timeEnd}</span>`:""}
-            </div>`:""}
-            <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:5px">
-              ${tBdg(iv.type)}${sBdg(iv.status)}
-              ${iv.padPak?bdg("⚡ Pad Pak","#E65100","#FFF3E0"):""}
-              <span style="font-size:11px;color:var(--gray)">⏱ ${fmtMin(dur(iv.type,iv.form))}</span>
-              ${depETAs[iv.id]?`<span style="font-size:11px;font-weight:600;padding:2px 7px;border-radius:100px;background:#E8F5E9;color:#2E7D32">🕐 ${depETAs[iv.id].eta} → ${depETAs[iv.id].leave}</span>`:""}
-            </div>
-            ${iv.notes?`<div style="font-size:12px;color:var(--orange);background:#FFF3E0;padding:5px 9px;border-radius:6px;margin-bottom:5px">📝 ${iv.notes}</div>`:""}
-            ${(iv.contact||iv.cphone||iv.cemail)?`<div style="font-size:12px;background:#F3E5F5;padding:5px 9px;border-radius:6px;margin-bottom:5px">
-              ${iv.contact?`👤 <strong>${iv.contact}</strong> `:""}${iv.cphone?`📞 <a href="tel:${iv.cphone}" style="color:var(--blue)">${iv.cphone}</a>`:""}
-              ${iv.cemail?`<br>✉️ <a href="mailto:${iv.cemail}" style="color:var(--blue)">${iv.cemail}</a>`:""}
-            </div>`:""}
-            <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap" onclick="event.stopPropagation()">
-              <button onclick="valDep(${iv.id})" style="flex:1;min-width:90px;padding:9px;border-radius:8px;border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:500;background:${done?"#4CAF50":"var(--bg)"};color:${done?"#fff":"var(--dark)"}">
-                ${done?"✅ Validé":"☐ Valider"}
-              </button>
-              <button onclick="failDep(${iv.id})" style="flex:1;min-width:80px;padding:9px;border-radius:8px;border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:500;background:${fail?"#C62828":"var(--bg)"};color:${fail?"#fff":"var(--dark)"}">
-                ${fail?"❌ Échec":"✕ Échec"}
-              </button>
-              <a href="https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(depot)}&destination=${encodeURIComponent(iv.addr)}" target="_blank" class="bg" style="display:inline-flex;align-items:center;gap:4px;text-decoration:none;padding:9px 12px;font-size:13px;border-radius:8px" title="Google Maps">🗺️</a>
-              <a href="https://waze.com/ul?q=${encodeURIComponent(iv.addr)}&navigate=yes" target="_blank" class="bg" style="display:inline-flex;align-items:center;gap:4px;text-decoration:none;padding:9px 12px;font-size:13px;border-radius:8px;background:#05C8F7;color:#fff;border:none" title="Waze"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M20.54 6.63C19.26 3.1 15.97 1 12.25 1 7.32 1 3.28 4.81 3.28 9.65c0 2.17.8 4.24 2.25 5.85l.12 3.55 3.36-1.49c1 .29 2.01.44 3.02.44.11 0 .22 0 .33-.01l.03.01c.67 0 1.33-.07 1.97-.2l3.62 1.61-.13-3.74c1.44-1.35 2.34-3.11 2.5-5.02.03-.35.05-.69.05-1.02 0-.67-.08-1.35-.22-2h-.02l-.64 2.5z"/></svg> Waze</a>
-              <button class="bicon" onclick="editIv(${iv.id})" style="padding:9px">✏️</button>
-            </div>
-          </div>
+  if(!dayIvs.length){
+    document.getElementById("dep-list").innerHTML=`<div class="card" style="text-align:center;color:var(--gray);padding:36px">Aucune intervention pour cette date/technicien</div>`
+  } else {
+    const techOrder=depSelectedTechs.length?depSelectedTechs:TECHS.map(t=>t.id)
+    let html=""
+    techOrder.forEach(tid=>{
+      const techIvs=displayIvs.filter(iv=>iv.techId===tid)
+      if(!techIvs.length) return
+      const tc=TB(tid);const techCol=tc.color||"#1565C0"
+      const locked=isRouteLocked(tid,date)
+      // ── En-tête du groupe technicien ──
+      html+=`<div style="display:flex;align-items:center;gap:8px;padding:8px 4px 4px;flex-shrink:0">
+        ${ava(tc.init,26,techCol)}
+        <span style="font-weight:700;font-size:13px;color:${techCol}">${tc.name}</span>
+        <span style="font-size:11px;color:var(--gray)">${techIvs.length} intervention${techIvs.length>1?'s':''}</span>
+        <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
+          <button onclick="reverseDepRoute(${tid})" title="Inverser le sens de la tournée"
+            style="padding:4px 10px;font-size:12px;border-radius:7px;border:1.5px solid ${techCol};background:#fff;color:${techCol};cursor:pointer;font-family:inherit;font-weight:600">
+            ⇅ Inverser
+          </button>
+          <button onclick="toggleRouteLock(${tid})" title="${locked?'Déverrouiller l\'ordre':'Verrouiller l\'ordre'}"
+            style="padding:4px 10px;font-size:12px;border-radius:7px;border:1.5px solid ${locked?"#16a34a":"var(--border)"};background:${locked?"#f0fdf4":"#fff"};color:${locked?"#16a34a":"var(--gray)"};cursor:pointer;font-family:inherit;font-weight:600">
+            ${locked?"🔒 Verrouillé":"🔓 Libre"}
+          </button>
         </div>
       </div>`
-    }).join("")
+      // ── Cartes interventions du technicien ──
+      techIvs.forEach((iv,techIdx)=>{
+        const done=depValidated[iv.id],fail=depFailed[iv.id]
+        const hasTime=iv.timeStart||iv.timeEnd
+        const now=new Date();const nowMin=now.getHours()*60+now.getMinutes()
+        const endMin=iv.timeEnd?parseInt(iv.timeEnd.split(":")[0])*60+parseInt(iv.timeEnd.split(":")[1]):null
+        const late=endMin&&!done&&!fail&&iv.date===date&&nowMin>endMin
+        const isFirst=techIdx===0
+        html+=`<div class="dep-card ${done||fail?"done":""}" id="dc-${iv.id}"
+          style="border-left-color:${done?"#4CAF50":fail?"#C62828":techCol}"
+          draggable="true"
+          ondragstart="_dragId=${iv.id};_dragTechId=${iv.techId};event.dataTransfer.effectAllowed='move'"
+          ondragover="event.preventDefault();if(${iv.techId}===_dragTechId)this.classList.add('drag-over')"
+          ondragleave="this.classList.remove('drag-over')"
+          ondrop="event.preventDefault();this.classList.remove('drag-over');dropDepCard(${iv.id})">
+          <div style="display:flex;gap:10px;align-items:flex-start">
+            <div class="dep-drag" onclick="event.stopPropagation()" title="Déplacer">☰</div>
+            <div class="dep-num" style="background:${done?"#4CAF50":fail?"#C62828":techCol}">${done?"✓":fail?"✗":techIdx+1}</div>
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
+                <span style="font-weight:600;font-size:14px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${iv.client}</span>
+                ${!isFirst&&!done&&!fail?`<button onclick="event.stopPropagation();setFirstDepIv(${iv.id},${iv.techId})" title="Commencer par cette intervention"
+                  style="background:none;border:1.5px solid #f59e0b;border-radius:6px;padding:2px 7px;font-size:11px;cursor:pointer;color:#f59e0b;flex-shrink:0;font-family:inherit;white-space:nowrap">☆ 1er</button>`
+                  :isFirst&&!done&&!fail?`<span style="font-size:11px;font-weight:700;color:#f59e0b;flex-shrink:0">⭐ 1er</span>`:''}
+              </div>
+              <div style="font-size:12px;color:var(--gray);margin-bottom:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📍 ${iv.addr}</div>
+              ${hasTime?`<div style="font-size:12px;padding:3px 8px;border-radius:6px;margin-bottom:5px;display:inline-flex;gap:8px;align-items:center;background:${late?"#FFEBEE":"#E3F2FD"};color:${late?"#C62828":"#1565C0"}">
+                ${late?"⚠️ Dépassé":"🕐"}
+                ${iv.timeStart?`<span>Dès ${iv.timeStart}</span>`:""}
+                ${iv.timeEnd?`<span>Au plus tard ${iv.timeEnd}</span>`:""}
+              </div>`:""}
+              <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:5px">
+                ${tBdg(iv.type)}${sBdg(iv.status)}
+                ${iv.padPak?bdg("⚡ Pad Pak","#E65100","#FFF3E0"):""}
+                <span style="font-size:11px;color:var(--gray)">⏱ ${fmtMin(dur(iv.type,iv.form))}</span>
+                ${depETAs[iv.id]?`<span style="font-size:11px;font-weight:600;padding:2px 7px;border-radius:100px;background:#E8F5E9;color:#2E7D32">🕐 ${depETAs[iv.id].eta} → ${depETAs[iv.id].leave}</span>`:""}
+              </div>
+              ${iv.notes?`<div style="font-size:12px;color:var(--orange);background:#FFF3E0;padding:5px 9px;border-radius:6px;margin-bottom:5px">📝 ${iv.notes}</div>`:""}
+              ${(iv.contact||iv.cphone||iv.cemail)?`<div style="font-size:12px;background:#F3E5F5;padding:5px 9px;border-radius:6px;margin-bottom:5px">
+                ${iv.contact?`👤 <strong>${iv.contact}</strong> `:""}${iv.cphone?`📞 <a href="tel:${iv.cphone}" style="color:var(--blue)">${iv.cphone}</a>`:""}
+                ${iv.cemail?`<br>✉️ <a href="mailto:${iv.cemail}" style="color:var(--blue)">${iv.cemail}</a>`:""}
+              </div>`:""}
+              <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap" onclick="event.stopPropagation()">
+                <button onclick="valDep(${iv.id})" style="flex:1;min-width:90px;padding:9px;border-radius:8px;border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:500;background:${done?"#4CAF50":"var(--bg)"};color:${done?"#fff":"var(--dark)"}">
+                  ${done?"✅ Validé":"☐ Valider"}
+                </button>
+                <button onclick="failDep(${iv.id})" style="flex:1;min-width:80px;padding:9px;border-radius:8px;border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:500;background:${fail?"#C62828":"var(--bg)"};color:${fail?"#fff":"var(--dark)"}">
+                  ${fail?"❌ Échec":"✕ Échec"}
+                </button>
+                <a href="https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(depot)}&destination=${encodeURIComponent(iv.addr)}" target="_blank" class="bg" style="display:inline-flex;align-items:center;gap:4px;text-decoration:none;padding:9px 12px;font-size:13px;border-radius:8px" title="Google Maps">🗺️</a>
+                <a href="https://waze.com/ul?q=${encodeURIComponent(iv.addr)}&navigate=yes" target="_blank" class="bg" style="display:inline-flex;align-items:center;gap:4px;text-decoration:none;padding:9px 12px;font-size:13px;border-radius:8px;background:#05C8F7;color:#fff;border:none" title="Waze"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M20.54 6.63C19.26 3.1 15.97 1 12.25 1 7.32 1 3.28 4.81 3.28 9.65c0 2.17.8 4.24 2.25 5.85l.12 3.55 3.36-1.49c1 .29 2.01.44 3.02.44.11 0 .22 0 .33-.01l.03.01c.67 0 1.33-.07 1.97-.2l3.62 1.61-.13-3.74c1.44-1.35 2.34-3.11 2.5-5.02.03-.35.05-.69.05-1.02 0-.67-.08-1.35-.22-2h-.02l-.64 2.5z"/></svg> Waze</a>
+                <button class="bicon" onclick="editIv(${iv.id})" style="padding:9px">✏️</button>
+              </div>
+            </div>
+          </div>
+        </div>`
+      })
+    })
+    document.getElementById("dep-list").innerHTML=html
+  }
 }
 
 function valDep(id){
@@ -2281,39 +2366,52 @@ async function initDepMap(){
     // ── Filtre et tri horaire (EDF — Earliest Deadline First) ──
     const withTime=ivcFiltered.filter(x=>x.iv.timeStart||x.iv.timeEnd)
     const free=ivcFiltered.filter(x=>!x.iv.timeStart&&!x.iv.timeEnd)
-    // Appel Netlify Function optimize-route (2-opt contraint sur créneaux)
+    // ── Si l'ordre est verrouillé, utiliser l'ordre sauvegardé ──
     let ivc
-    try{
-      const payload={techs:[{id:tech.id,depot:dc,startH:depSH,startMin:depSM,stops:ivcFiltered.map(x=>({
-        id:x.iv.id, lat:x.coords.lat, lng:x.coords.lng, label:x.iv.client,
-        duration:dur(x.iv.type,x.iv.form),
-        timeWindow:(x.iv.timeStart||x.iv.timeEnd)?{start:x.iv.timeStart||"00:00",end:x.iv.timeEnd||"23:59"}:null
-      }))}]}
-      const res=await fetch('/api/optimize-route',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
-      if(res.ok){
-        const data=await res.json()
-        const r=data.results?.[tech.id]
-        const orderedIds=r?.orderedIds
-        if(orderedIds?.length){
-          const byId=Object.fromEntries(ivcFiltered.map(x=>[x.iv.id,x]))
-          ivc=orderedIds.map(id=>byId[id]).filter(Boolean)
-          // Stocker les ETAs pour l'affichage dans la liste
-          const arrs=r.estimatedArrivals||{}
-          ivc.forEach(({iv})=>{
-            const eta=arrs[iv.id]
-            if(eta) depETAs[iv.id]={eta,leave:addMinToTime(eta,dur(iv.type,iv.form))}
-          })
-          const conflicts=r.conflicts||[]
-          conflicts.forEach(c=>{
-            if(warnEl){warnEl.style.display="block";warnEl.innerHTML+='<div style="background:#FFEBEE;border:1px solid #C62828;border-radius:8px;padding:8px 12px;font-size:12px;color:#C62828;margin-bottom:4px">⏰ <strong>'+c.label+'</strong> — créneau '+c.créneau+', arrivée estimée '+c.arrivée_est+'</div>'}
-          })
-        }
+    if(isRouteLocked(tech.id,date)){
+      const savedOrd=(depRouteOrder[tech.id]||[]).filter(iv=>iv.date===date)
+      if(savedOrd.length){
+        const byId=Object.fromEntries(ivcFiltered.map(x=>[x.iv.id,x]))
+        const locked_ivc=savedOrd.map(iv=>byId[iv.id]).filter(Boolean)
+        const lockedIds=new Set(locked_ivc.map(x=>x.iv.id))
+        const newIvcs=ivcFiltered.filter(x=>!lockedIds.has(x.iv.id))
+        ivc=[...locked_ivc,...newIvcs]
+        if(warnEl&&!warnEl.innerHTML){warnEl.style.display="block";warnEl.innerHTML+=`<div style="background:#f0fdf4;border:1px solid #16a34a;border-radius:8px;padding:8px 12px;font-size:12px;color:#16a34a;margin-bottom:4px">🔒 <strong>${tech.name}</strong> — Ordre verrouillé, tournée inchangée</div>`}
       }
-    }catch(e){}
-    // Fallback navigateur si la Function échoue
+    }
+    // ── Appel Netlify Function optimize-route (si non verrouillé) ──
     if(!ivc){
-      withTime.sort((a,b)=>(a.iv.timeEnd||a.iv.timeStart||"23:59").localeCompare(b.iv.timeEnd||b.iv.timeStart||"23:59"))
-      ivc=[...withTime,...(free.length>1?optimizeNN(dc,free):free)]
+      try{
+        const payload={techs:[{id:tech.id,depot:dc,startH:depSH,startMin:depSM,stops:ivcFiltered.map(x=>({
+          id:x.iv.id, lat:x.coords.lat, lng:x.coords.lng, label:x.iv.client,
+          duration:dur(x.iv.type,x.iv.form),
+          timeWindow:(x.iv.timeStart||x.iv.timeEnd)?{start:x.iv.timeStart||"00:00",end:x.iv.timeEnd||"23:59"}:null
+        }))}]}
+        const res=await fetch('/api/optimize-route',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+        if(res.ok){
+          const data=await res.json()
+          const r=data.results?.[tech.id]
+          const orderedIds=r?.orderedIds
+          if(orderedIds?.length){
+            const byId=Object.fromEntries(ivcFiltered.map(x=>[x.iv.id,x]))
+            ivc=orderedIds.map(id=>byId[id]).filter(Boolean)
+            const arrs=r.estimatedArrivals||{}
+            ivc.forEach(({iv})=>{
+              const eta=arrs[iv.id]
+              if(eta) depETAs[iv.id]={eta,leave:addMinToTime(eta,dur(iv.type,iv.form))}
+            })
+            const conflicts=r.conflicts||[]
+            conflicts.forEach(c=>{
+              if(warnEl){warnEl.style.display="block";warnEl.innerHTML+='<div style="background:#FFEBEE;border:1px solid #C62828;border-radius:8px;padding:8px 12px;font-size:12px;color:#C62828;margin-bottom:4px">⏰ <strong>'+c.label+'</strong> — créneau '+c.créneau+', arrivée estimée '+c.arrivée_est+'</div>'}
+            })
+          }
+        }
+      }catch(e){}
+      // Fallback navigateur si la Function échoue
+      if(!ivc){
+        withTime.sort((a,b)=>(a.iv.timeEnd||a.iv.timeStart||"23:59").localeCompare(b.iv.timeEnd||b.iv.timeStart||"23:59"))
+        ivc=[...withTime,...(free.length>1?optimizeNN(dc,free):free)]
+      }
     }
     depRouteOrder[tech.id]=ivc.map(x=>x.iv)
     saveRouteOrder(selDate)
