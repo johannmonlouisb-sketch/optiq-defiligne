@@ -2140,6 +2140,17 @@ function getTypeFromStr(s){
   return 'maintenance_simple'
 }
 
+function getDaeFromStr(s){
+  const v=(s||'').toUpperCase().replace(/\s+/g,'')
+  if(v.includes('HS500')||v.includes('500P')) return 'HS500P'
+  if(v.includes('HS360')||v.includes('360P')) return 'HS360P'
+  if(v.includes('HS350')||v.includes('350P')) return 'HS350P'
+  if(v.includes('HS300')||v.includes('300P')) return 'HS300P'
+  if(v.includes('CR2'))    return 'CR2'
+  if(v.includes('ROTAID')) return 'Rotaid'
+  return ''
+}
+
 function notionPageToIvTech(page){
   const p=page.properties||{}
   const client   = nProp(p,'Société')
@@ -2161,7 +2172,7 @@ function notionPageToIvTech(page){
     id:ivId, client:client.trim(), addr:addr.trim(), siege:(addrSiege||'').trim(),
     date:dateStr.substring(0,10), type:getTypeFromStr(nProp(p,'INTERVENTION')),
     status, techId, form:nProp(p,'Fichier')===true,
-    arm:0, dea:0, bat:0, padPak:false, padPakDate:'',
+    arm:0, dea:getDaeFromStr(nProp(p,'INTERVENTION')), bat:0, padPak:false, padPakDate:'',
     notes:   nProp(p,'INFO','INFO '),
     motif:   nProp(p,'Motif'),
     contact: nProp(p,'Contact site'),

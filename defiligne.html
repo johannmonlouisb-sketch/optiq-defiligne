@@ -7210,9 +7210,10 @@ function notionPageToIv(page, existingIds){
   if(terminer === true)  status = 'completed'
   else if(echec === true) status = 'not_responded'
 
-  // Type d'intervention (multi_select → chaîne CSV)
+  // Type d'intervention + modèle DAE (multi_select INTERVENTION)
   const typeStr = nProp(p, 'INTERVENTION')
   const type    = getTypeFromStr(typeStr)
+  const deaNotion = getDaeFromStr(typeStr)
 
   // Formulaire rempli = fichier attaché dans Notion
   const form = nProp(p, 'Fichier') === true
@@ -7230,8 +7231,8 @@ function notionPageToIv(page, existingIds){
     date: dateStr.substring(0, 10),
     type, status, techId,
     form,
-    // Matériel : valeurs neutres — enrichIvsWithKizeo() les remplira
-    arm: 0, dea: '', bat: 0,
+    // Matériel : dea extrait du champ INTERVENTION Notion, enrichIvsWithKizeo() complètera
+    arm: 0, dea: deaNotion, bat: 0,
     padPak: false, padPakDate: '', batChange: false,
     nSerie: '', batDate: '', electrodeDate: '',
     urgencePadPak: '', urgenceElectrodes: '', urgenceAnnuelle: '', pma: '',
@@ -7285,6 +7286,17 @@ function getTypeFromStr(s){
   if(v.includes('pad pak') || v.includes('remplac') || v.includes('armoir') ||
      v.includes('électrode')) return 'maintenance_complex'
   return 'maintenance_simple'
+}
+
+function getDaeFromStr(s){
+  const v = (s||'').toUpperCase().replace(/\s+/g,'')
+  if(v.includes('HS500')||v.includes('500P')) return 'HS500P'
+  if(v.includes('HS360')||v.includes('360P')) return 'HS360P'
+  if(v.includes('HS350')||v.includes('350P')) return 'HS350P'
+  if(v.includes('HS300')||v.includes('300P')) return 'HS300P'
+  if(v.includes('CR2'))    return 'CR2'
+  if(v.includes('ROTAID')) return 'Rotaid'
+  return ''
 }
 
 // ── Appel proxy Notion ─────────────────────────────────────────
