@@ -1753,6 +1753,7 @@ let depSelectedTechs=[]
 let depTechDropdownOpen=false
 let depRouteOrder={}  // {techId:[iv,...]} ordre optimisé de la dernière carte calculée
 let depETAs={}        // {ivId:{eta:"08:32",leave:"08:47"}} calculé lors du dernier initDepMap
+let depRouteLines={}  // {techId: L.GeoJSON layer} pour mise à jour sans recalcul complet
 let _dragId=null,_dragTechId=null
 // Map state
 let mapObj=null,rGroup=null,gcache={},building=false
@@ -2051,6 +2052,30 @@ function toggleRouteLock(techId){
   rDepart()
 }
 
+// ── Redessiner la ligne de route OSRM après réordonnancement ─────
+async function redrawDepRoute(techId){
+  if(!depMapObj||!depRGroup) return
+  const date=selDate
+  const ord=(depRouteOrder[techId]||[]).filter(iv=>iv.date===date)
+  if(!ord.length) return
+  const tc=TB(techId)
+  const techCol=tc.color||'#1565C0'
+  const dc=gcache[tc.depotAddr||depot]||{lat:48.96,lng:1.97}
+  // Coords disponibles depuis le cache géocode
+  const pts=ord.map(iv=>({iv,coords:gcache[iv.addr]})).filter(x=>x.coords)
+  if(!pts.length) return
+  try{
+    const allP=[dc,...pts.map(x=>x.coords),dc]
+    const cs=allP.map(c=>c.lng+','+c.lat).join(';')
+    const res=await fetch('https://router.project-osrm.org/route/v1/driving/'+cs+'?overview=full&geometries=geojson')
+    const data=await res.json()
+    if(data.routes?.[0]){
+      if(depRouteLines[techId]) depRGroup.removeLayer(depRouteLines[techId])
+      depRouteLines[techId]=L.geoJSON(data.routes[0].geometry,{style:{color:techCol,weight:5,opacity:.85}}).addTo(depRGroup)
+    }
+  }catch(e){}
+}
+
 // ── Inverser l'ordre d'une tournée technicien ─────────────────────
 function reverseDepRoute(techId){
   const date=selDate
@@ -2060,10 +2085,12 @@ function reverseDepRoute(techId){
   setRouteLock(techId,date,true)
   saveRouteOrder(date)
   rDepart()
-  // Mettre à jour les numéros sur la carte
-  if(depMapObj)(depRouteOrder[techId]||[]).filter(iv=>iv.date===date).forEach((iv,idx)=>{
-    if(depMarkers[iv.id]){depMarkers[iv.id]._num=idx+1;updateDepMarker(iv.id)}
-  })
+  if(depMapObj){
+    ;(depRouteOrder[techId]||[]).filter(iv=>iv.date===date).forEach((iv,idx)=>{
+      if(depMarkers[iv.id]){depMarkers[iv.id]._num=idx+1;updateDepMarker(iv.id)}
+    })
+    redrawDepRoute(techId)
+  }
 }
 
 // ── Déplacer une intervention en première position ────────────────
@@ -2079,9 +2106,12 @@ function setFirstDepIv(ivId,techId){
   setRouteLock(techId,date,true)
   saveRouteOrder(date)
   rDepart()
-  if(depMapObj) ord.forEach((iv,i)=>{
-    if(depMarkers[iv.id]){depMarkers[iv.id]._num=i+1;updateDepMarker(iv.id)}
-  })
+  if(depMapObj){
+    ord.forEach((iv,i)=>{
+      if(depMarkers[iv.id]){depMarkers[iv.id]._num=i+1;updateDepMarker(iv.id)}
+    })
+    redrawDepRoute(techId)
+  }
 }
 function dropDepCard(targetId){
   if(_dragId===null||_dragId===targetId){_dragId=null;return}
@@ -2102,9 +2132,12 @@ function dropDepCard(targetId){
   saveRouteOrder(date)
   _dragId=null
   rDepart()
-  if(depMapObj) orderedIvs.forEach((iv,idx)=>{
-    if(depMarkers[iv.id]){depMarkers[iv.id]._num=idx+1;updateDepMarker(iv.id)}
-  })
+  if(depMapObj){
+    orderedIvs.forEach((iv,idx)=>{
+      if(depMarkers[iv.id]){depMarkers[iv.id]._num=idx+1;updateDepMarker(iv.id)}
+    })
+    redrawDepRoute(techId)
+  }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2319,6 +2352,7 @@ async function initDepMap(){
     depRGroup=L.layerGroup().addTo(depMapObj)
   }else{depRGroup.clearLayers();depMapObj.invalidateSize()}
   depMarkers={}
+  depRouteLines={}
   const mkI=(l,bg,big)=>L.divIcon({
     html:`<div style="width:${big?38:30}px;height:${big?38:30}px;background:${bg};color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:${big?15:12}px;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.4)">${l}</div>`,
     className:"",iconSize:[big?38:30,big?38:30],iconAnchor:[big?19:15,big?19:15],popupAnchor:[0,-18]
@@ -2441,7 +2475,8 @@ async function initDepMap(){
       if(data.routes?.[0]){
         totalKm+=Math.round(data.routes[0].distance/1000)
         totalTMin+=Math.round(data.routes[0].duration/60)
-        L.geoJSON(data.routes[0].geometry,{style:{color:techCol,weight:5,opacity:.85}}).addTo(depRGroup)
+        if(depRouteLines[tech.id])depRGroup.removeLayer(depRouteLines[tech.id])
+        depRouteLines[tech.id]=L.geoJSON(data.routes[0].geometry,{style:{color:techCol,weight:5,opacity:.85}}).addTo(depRGroup)
       }
     }catch(e){}
   }

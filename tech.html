@@ -705,6 +705,7 @@ function dropCard(targetId){
   _dragId=null
   renderDepart()
   refreshLiveETAs()
+  if(mapObj&&!building) calcMap()
   // Mettre à jour les numéros sur la carte
   order.forEach((id,idx)=>{
     if(mapMarkers[id]){
@@ -745,6 +746,7 @@ function reverseTechRoute(){
   saveRouteOrder(date)
   renderDepart()
   refreshLiveETAs()
+  if(mapObj&&!building) calcMap()
 }
 function setFirstTechIv(ivId){
   const date=depDate()
@@ -759,6 +761,7 @@ function setFirstTechIv(ivId){
   saveRouteOrder(date)
   renderDepart()
   refreshLiveETAs()
+  if(mapObj&&!building) calcMap()
 }
 
 let toastTimer
