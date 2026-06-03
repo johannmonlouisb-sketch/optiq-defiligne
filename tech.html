@@ -228,7 +228,7 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
       <div id="top-title">OptiTechX Tech</div>
       <div id="top-sub"></div>
     </div>
-    <button id="btn-gps-all" onclick="openGPSAll()">📍 GPS tournée</button>
+    <button id="btn-gps-all" onclick="openGPSAll()">🗺️ Ouvrir Maps</button>
     <button id="btn-tech" onclick="openTechSelect()">👤 —</button>
   </div>
 
@@ -243,7 +243,7 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
         <input type="time" id="dep-time" value="08:00" title="Heure de départ du dépôt" style="font-size:14px;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit" onchange="techCfg.startTime=this.value;saveCfg()"/>
         <button class="btn btn-blue btn-sm" onclick="calcMap()">🗺️ Itinéraire</button>
         <button id="btn-map-toggle" class="btn btn-gray btn-sm" style="display:none" onclick="toggleDepMap()">📋 Liste</button>
-        <button id="btn-reoptimize" class="btn btn-green btn-sm" style="display:none" onclick="reoptimizeFromGPS()" title="Recalculer la tournée depuis votre position GPS">📍 Recalculer</button>
+        <button id="btn-reoptimize" class="btn btn-green btn-sm" style="display:none" onclick="reoptimizeFromDepot()" title="Recalculer depuis votre position GPS (ou dépôt si GPS indisponible)">📍 Recalculer</button>
         <button id="btn-notion-pull" class="btn btn-sm" style="background:#F3E5F5;color:#6A1B9A;border:1.5px solid #CE93D8" onclick="showNotionPanelTech()">🔄 Notion</button>
         <button id="btn-start-tour" class="btn btn-sm" style="background:#4CAF50;color:#fff;border:1.5px solid #4CAF50;font-weight:700" onclick="startTournee()" title="Démarrer le minuteur de la tournée">▶️ Démarrer</button>
         <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:var(--gray)">
@@ -1638,121 +1638,137 @@ function openGPSAll(){
 }
 
 // ════════════════════════════════════════════
-// RÉOPTIMISATION DEPUIS POSITION GPS
+// RÉOPTIMISATION DEPUIS LA POSITION ACTUELLE (GPS téléphone ou dépôt en fallback)
 // ════════════════════════════════════════════
-function reoptimizeFromGPS(){
+async function reoptimizeFromDepot(){
   if(building) return
+  building=true
+  toast("📍 Localisation en cours...","#1565C0",5000)
+
+  // 1. Essayer le GPS du téléphone (haute précision)
+  let startCoords=null
+  if(navigator.geolocation){
+    try{
+      startCoords=await new Promise((resolve,reject)=>{
+        navigator.geolocation.getCurrentPosition(
+          pos=>{
+            const c={lat:pos.coords.latitude,lng:pos.coords.longitude}
+            if(isFrance(c.lat,c.lng)) resolve(c)
+            else reject(new Error(`GPS hors France (${c.lat.toFixed(2)},${c.lng.toFixed(2)}) — vérifiez les permissions GPS`))
+          },
+          err=>reject(new Error(["","GPS refusé","GPS indisponible","Délai GPS"][err.code]||"GPS indisponible")),
+          {enableHighAccuracy:true,timeout:8000,maximumAge:10000}
+        )
+      })
+    }catch(e){
+      toast(`⚠️ ${e.message} — recalcul depuis le dépôt`,"#E65100",4000)
+    }
+  }
+
   const date=depDate()
   const allIvs=myIvs(date)
   const remaining=allIvs.filter(iv=>!validated[iv.id]&&!failed[iv.id])
-  if(!remaining.length){toast("Aucun arrêt restant 🎉","#2E7D32");return}
-  if(!navigator.geolocation){toast("GPS non disponible sur cet appareil","#C62828");return}
-  building=true
-  toast("📍 Localisation en cours...","#1565C0",8000)
+  if(!remaining.length){building=false;toast("Aucun arrêt restant 🎉","#2E7D32");return}
 
-  navigator.geolocation.getCurrentPosition(async pos=>{
-    const gps={lat:pos.coords.latitude,lng:pos.coords.longitude}
-
-    // Validation : rejet si position hors France (GPS incorrect, VPN, IP approximative)
-    if(!isFrance(gps.lat,gps.lng)){
-      building=false
-      toast(`❌ Position GPS hors France (${gps.lat.toFixed(2)}, ${gps.lng.toFixed(2)}) — géolocalisation incorrecte. Utiliser l'optimisation normale.`,"#C62828",7000)
-      return
+  try{
+    // 2. Fallback dépôt si GPS indisponible ou hors France
+    const tc=TB(curTech)
+    const depotAddr=tc.depotAddr||DEPOT
+    let dc=startCoords
+    if(!dc){
+      dc=gCache[depotAddr]
+      if(!dc){
+        dc=(await _geocodeAddok(depotAddr))||(await _geocodeNominatim(depotAddr))||{lat:48.965,lng:1.967}
+        if(isFrance(dc.lat,dc.lng)) gCache[depotAddr]=dc
+      }
     }
+    if(!startCoords) toast("🏠 Position GPS non disponible — recalcul depuis le dépôt","#1565C0",3000)
 
+    const[sh,sm]=depStartTime().split(':').map(Number)
     const curMin=nowMinParis()
 
-    try{
-      // Récupère les coordonnées des arrêts restants (depuis le cache Leaflet)
-      const pts=[]
-      for(const iv of remaining){
-        const c=gCache[iv.addr]||await geocodeWithFallback(iv.addr,iv.client,iv.siege||'')
-        pts.push({iv,c:c||null})
-      }
-      const geocodedPts=pts.filter(p=>p.c)
-      const noGeoIds=pts.filter(p=>!p.c).map(p=>p.iv.id)
-
-      let newOrderIds=remaining.map(iv=>iv.id)
-
-      // Essai API optimize-route avec GPS comme point de départ
-      let apiOk=false
-      if(!location.protocol.startsWith("file")&&geocodedPts.length>1){
-        try{
-          const sh=Math.floor(curMin/60),sm=curMin%60
-          const payload={techs:[{
-            id:curTech,depot:gps,startH:sh,startMin:sm,
-            stops:geocodedPts.map(p=>({
-              id:p.iv.id,lat:p.c.lat,lng:p.c.lng,label:p.iv.client,
-              duration:dur(p.iv.type,p.iv.form),
-              timeWindow:(p.iv.timeStart||p.iv.timeEnd)?{start:p.iv.timeStart||"00:00",end:p.iv.timeEnd||"23:59"}:null
-            }))
-          }]}
-          const res=await fetch("/api/optimize-route",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)})
-          if(res.ok){
-            const data=await res.json()
-            const r=data.results?.[curTech]
-            if(r?.orderedIds?.length){
-              newOrderIds=[...r.orderedIds,...noGeoIds]
-              const arrs=r.estimatedArrivals||{}
-              geocodedPts.forEach(p=>{
-                const eta=arrs[p.iv.id]
-                if(eta) techETAs[p.iv.id]={eta,leave:addMinToTime(eta,dur(p.iv.type,p.iv.form))}
-              })
-              apiOk=true
-            }
-          }
-        }catch(e){}
-      }
-
-      if(!apiOk){
-        // Fallback : nearest-neighbor local depuis la position GPS
-        const reordered=localOptimizeRoute(gps,geocodedPts)
-        newOrderIds=[...reordered.map(p=>p.iv.id),...noGeoIds]
-        let tMin=curMin,prev=gps
-        reordered.forEach(p=>{
-          const dLat=(p.c.lat-prev.lat)*Math.PI/180,dLng=(p.c.lng-prev.lng)*Math.PI/180
-          const a=Math.sin(dLat/2)**2+Math.cos(prev.lat*Math.PI/180)*Math.cos(p.c.lat*Math.PI/180)*Math.sin(dLng/2)**2
-          tMin+=Math.round(6371*2*Math.asin(Math.sqrt(a))*1.3/50*60)
-          const eta=`${String(Math.floor(tMin/60)).padStart(2,"0")}:${String(tMin%60).padStart(2,"0")}`
-          const workMin=dur(p.iv.type,p.iv.form)
-          techETAs[p.iv.id]={eta,leave:addMinToTime(eta,workMin)}
-          tMin+=workMin;prev=p.c
-        })
-      }
-
-      // Ordre final : arrêts terminés d'abord (ordre inchangé), puis nouvel ordre restants
-      const curOrder=techRouteOrder[date]||allIvs.map(i=>i.id)
-      const doneIds=curOrder.filter(id=>validated[id]||failed[id])
-      techRouteOrder[date]=[...doneIds,...newOrderIds]
-      saveRouteOrder(date)
-      renderDepart()
-
-      // Renuméroter les marqueurs sur la carte
-      techRouteOrder[date].forEach((id,idx)=>{
-        if(!mapMarkers[id]) return
-        const iv=ivs.find(i=>i.id===id)
-        const done=validated[id],fail=failed[id]
-        const col=done?"#2E7D32":fail?"#C62828":TYPES[iv?.type||"maintenance_simple"].color
-        mapMarkers[id].setIcon(mkIcon(done?"✓":fail?"✗":(idx+1),col))
-      })
-
-      // Marqueur de position GPS sur la carte
-      if(mapObj){
-        L.circleMarker([gps.lat,gps.lng],{radius:11,color:"#E65100",fillColor:"#E65100",fillOpacity:.9,weight:3})
-          .addTo(mapObj).bindPopup("<strong>📍 Votre position actuelle</strong>").openPopup()
-        mapObj.panTo([gps.lat,gps.lng],{animate:true})
-      }
-
-      toast(`✅ ${newOrderIds.length} arrêts recalculés depuis votre position`,"#2E7D32")
-    }catch(e){
-      toast("Erreur recalcul : "+e.message,"#C62828")
+    // Géocoder les arrêts restants (adresses uniquement)
+    const pts=[]
+    for(const iv of remaining){
+      const kizeoC=(iv.lat&&iv.lng&&isFrance(iv.lat,iv.lng))?{lat:iv.lat,lng:iv.lng}:null
+      const c=gCache[iv.addr]||kizeoC||await geocodeWithFallback(iv.addr,iv.client,iv.siege||'')
+      if(c&&isFrance(c.lat,c.lng)){if(!gCache[iv.addr])gCache[iv.addr]=c;pts.push({iv,c})}
     }
-    building=false
-  },err=>{
-    const msgs={1:"Permission GPS refusée",2:"Position GPS indisponible",3:"Délai GPS dépassé"}
-    toast(msgs[err.code]||"GPS indisponible","#C62828")
-    building=false
-  },{enableHighAccuracy:true,timeout:10000,maximumAge:30000})
+    const noGeoIds=remaining.filter(iv=>!pts.find(p=>p.iv.id===iv.id)).map(iv=>iv.id)
+
+    let newOrderIds=remaining.map(iv=>iv.id)
+
+    // API optimize-route avec le dépôt comme point de départ
+    let apiOk=false
+    if(isDeployedApp&&pts.length>1){
+      try{
+        const payload={techs:[{
+          id:curTech,depot:dc,startH:sh,startMin:sm,
+          stops:pts.map(p=>({
+            id:p.iv.id,lat:p.c.lat,lng:p.c.lng,label:p.iv.client,
+            duration:dur(p.iv.type,p.iv.form),
+            timeWindow:(p.iv.timeStart||p.iv.timeEnd)?{start:p.iv.timeStart||"00:00",end:p.iv.timeEnd||"23:59"}:null
+          }))
+        }]}
+        const res=await fetch("/api/optimize-route",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)})
+        if(res.ok){
+          const data=await res.json()
+          const r=data.results?.[curTech]
+          if(r?.orderedIds?.length){
+            newOrderIds=[...r.orderedIds,...noGeoIds]
+            const arrs=r.estimatedArrivals||{}
+            pts.forEach(p=>{const eta=arrs[p.iv.id];if(eta)techETAs[p.iv.id]={eta,leave:addMinToTime(eta,dur(p.iv.type,p.iv.form))}})
+            apiOk=true
+          }
+        }
+      }catch(e){}
+    }
+
+    if(!apiOk){
+      const reordered=localOptimizeRoute(dc,pts,sh*60+sm)
+      newOrderIds=[...reordered.map(p=>p.iv.id),...noGeoIds]
+      let tMin=Math.max(sh*60+sm,curMin),prev=dc
+      reordered.forEach(p=>{
+        const dLat=(p.c.lat-prev.lat)*Math.PI/180,dLng=(p.c.lng-prev.lng)*Math.PI/180
+        const a=Math.sin(dLat/2)**2+Math.cos(prev.lat*Math.PI/180)*Math.cos(p.c.lat*Math.PI/180)*Math.sin(dLng/2)**2
+        tMin+=Math.round(6371*2*Math.asin(Math.sqrt(a))*1.3/50*60)
+        if(p.iv.timeStart){const[th,tm]=p.iv.timeStart.split(':').map(Number);if(tMin<th*60+tm)tMin=th*60+tm}
+        techETAs[p.iv.id]={eta:toHHMM(tMin),leave:toHHMM(tMin+dur(p.iv.type,p.iv.form))}
+        tMin+=dur(p.iv.type,p.iv.form);prev=p.c
+      })
+    }
+
+    const curOrder=techRouteOrder[date]||allIvs.map(i=>i.id)
+    const doneIds=curOrder.filter(id=>validated[id]||failed[id])
+    techRouteOrder[date]=[...doneIds,...newOrderIds]
+    saveRouteOrder(date)
+    refreshLiveETAs()
+    renderDepart()
+
+    // Renuméroter les marqueurs sur la carte
+    techRouteOrder[date].forEach((id,idx)=>{
+      if(!mapMarkers[id]) return
+      const iv=ivs.find(i=>i.id===id)
+      const done=validated[id],fail=failed[id]
+      const col=done?"#2E7D32":fail?"#C62828":TYPES[iv?.type||"maintenance_simple"].color
+      mapMarkers[id].setIcon(mkIcon(done?"✓":fail?"✗":(idx+1),col))
+    })
+
+    // Marqueur position actuelle sur la carte (bleu = GPS réel, orange = dépôt)
+    if(mapObj){
+      const col=startCoords?"#1565C0":"#E65100"
+      const label=startCoords?"📍 Votre position":"🏠 Dépôt"
+      L.circleMarker([dc.lat,dc.lng],{radius:11,color:col,fillColor:col,fillOpacity:.9,weight:3})
+        .addTo(mapObj).bindPopup(`<strong>${label}</strong>`).openPopup()
+      mapObj.panTo([dc.lat,dc.lng],{animate:true})
+    }
+
+    const src=startCoords?"votre position GPS":"le dépôt"
+    toast(`✅ Ordre recalculé depuis ${src} — ${newOrderIds.length} arrêts${noGeoIds.length?" ("+noGeoIds.length+" sans adresse)":""}`, "#2E7D32")
+  }catch(e){
+    toast("Erreur recalcul : "+e.message,"#C62828")
+  }
+  building=false
 }
 
 // ════════════════════════════════════════════
