@@ -246,6 +246,7 @@ tr:hover td{background:var(--bg)}
             </div>
           </div>
           <div id="dep-techs-chips" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"></div>
+          <div id="dep-day-badge" style="display:flex;align-items:center"></div>
           <button class="bb bsm" onclick="initDepMap()">🗺️ Calculer carte</button>
           <button class="bg bsm" onclick="openGoogleMaps()">📍 Ouvrir dans GPS</button>
         </div>
@@ -2215,6 +2216,13 @@ function rDepart(){
   di.value=selDate
   di.onchange=()=>{selDate=di.value;depRouteOrder={};loadRouteOrder(selDate);_saveUIState();rDepart()}
   const date=selDate
+  // Badge "Jour en cours" si on affiche aujourd'hui
+  const dayBadgeEl=document.getElementById("dep-day-badge")
+  if(dayBadgeEl) dayBadgeEl.innerHTML=date===TODAY
+    ? `<span style="padding:3px 10px;border-radius:100px;background:#E8F5E9;color:#2E7D32;font-size:11px;font-weight:700">● Aujourd'hui</span>`
+    : date>TODAY
+      ? `<span style="padding:3px 10px;border-radius:100px;background:#E3F2FD;color:#1565C0;font-size:11px;font-weight:700">📅 Planifié</span>`
+      : `<span style="padding:3px 10px;border-radius:100px;background:#FFF3E0;color:#E65100;font-size:11px;font-weight:700">🕐 Passé</span>`
   // ─── Dropdown label ──────────────────────────────────
   const lbl=document.getElementById("dep-tech-label")
   if(lbl)lbl.textContent=!depSelectedTechs.length?"Tous les techniciens":depSelectedTechs.length===1?TB(depSelectedTechs[0]).name:`${depSelectedTechs.length} techniciens`
@@ -6942,7 +6950,8 @@ function initCloud(){
   // Restaurer la dernière vue + date + sous-onglet
   try{
     const ui = JSON.parse(localStorage.getItem('optiq_ui_state')||'{}')
-    if(ui.selDate) selDate = ui.selDate
+    // Ne restaurer que si c'est aujourd'hui ou une date future (sinon → aujourd'hui)
+    if(ui.selDate && ui.selDate >= TODAY) selDate = ui.selDate
     if(ui.view && VT[ui.view]) curView = ui.view
     if(ui.subTab) _depSubTab = ui.subTab
   }catch(e){}

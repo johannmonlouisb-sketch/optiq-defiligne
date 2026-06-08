@@ -2480,10 +2480,11 @@ function startNotionPolling(){
 // INIT
 // ════════════════════════════════════════════
 try{const s=localStorage.getItem("tech_id");if(s)curTech=parseInt(s)}catch(e){}
-// Restaurer la date précédente (sinon aujourd'hui)
+// Restaurer la date si c'est aujourd'hui ou une date future (sinon → aujourd'hui)
 ;(()=>{
-  let d=TODAY()
-  try{const s=localStorage.getItem('optiq_tech_date');if(s)d=s}catch(e){}
+  const _t=TODAY()
+  let d=_t
+  try{const s=localStorage.getItem('optiq_tech_date');if(s&&s>=_t)d=s}catch(e){}
   document.getElementById("dep-date").value=d
 })()
 if(techCfg.startTime){const te=document.getElementById("dep-time");if(te)te.value=techCfg.startTime}
