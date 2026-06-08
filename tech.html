@@ -718,7 +718,7 @@ function saveTechAddresses(){
   if(!tc) return
   const dep=(document.getElementById("cfg-depot")?.value||"").trim()
   const arr=(document.getElementById("cfg-arrival")?.value||"").trim()
-  if(dep) tc.depotAddr=dep
+  tc.depotAddr=dep||DEPOT
   if(arr!==undefined) tc.arrivalAddr=arr  // vide = identique au départ
   try{localStorage.setItem("tech_depots",JSON.stringify(TECHS))}catch(e){}
   toast("✅ Adresses enregistrées","#2E7D32",2000)
@@ -2008,7 +2008,7 @@ function renderProfil(){
   document.getElementById("cfg-uid").value=techCfg.userId||""
   const dEl=document.getElementById("cfg-depot")
   const aEl=document.getElementById("cfg-arrival")
-  if(dEl) dEl.value=tc.depotAddr||""
+  if(dEl) dEl.value=tc.depotAddr||DEPOT
   if(aEl) aEl.value=tc.arrivalAddr||""
 }
 
