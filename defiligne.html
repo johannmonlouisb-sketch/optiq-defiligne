@@ -296,6 +296,7 @@ tr:hover td{background:var(--bg)}
             <input type="time" id="map-time" value="08:00" title="Heure de départ" style="width:auto;padding:6px 10px;font-size:13px"/>
             <select id="map-tech" style="width:auto;padding:6px 10px;font-size:13px"></select>
             <button class="bb" onclick="calcRoute()">🧭 Calculer</button>
+            <button class="bg bsm" onclick="calcRouteNow()" title="Recalculer depuis l'heure actuelle">🕐 Maintenant</button>
           </div>
           <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--gray)">
             <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
@@ -1882,7 +1883,13 @@ function switchDepSub(tab){
     document.getElementById("depot-txt").textContent=depot
     document.getElementById("map-di").value=mapDate
     refreshMapTechSel()
+    // Synchroniser l'heure de départ depuis l'onglet "Départ du jour"
+    const depT=document.getElementById('dep-time')?.value
+    const mapT=document.getElementById('map-time')
+    if(depT&&mapT) mapT.value=depT
     if(mapObj)setTimeout(()=>mapObj.invalidateSize(),200)
+    // Calculer automatiquement avec l'heure de départ définie
+    setTimeout(()=>{if(!building) calcRoute()},400)
   }
 }
 function _saveUIState(){
@@ -5254,6 +5261,14 @@ function checkLaborLaw(travelMin, workMin){
 function refreshMapTechSel(){
   const s=document.getElementById("map-tech");if(!s)return
   s.innerHTML='<option value="0">Tous les techniciens</option>'+TECHS.map(t=>`<option value="${t.id}">${t.name}</option>`).join("")
+}
+
+function calcRouteNow(){
+  const now=new Date()
+  const hhmm=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
+  const el=document.getElementById('map-time')
+  if(el) el.value=hhmm
+  calcRoute()
 }
 
 async function calcRoute(){
