@@ -367,6 +367,19 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
           </div>
         </div>
 
+        <!-- Lieux de départ / arrivée -->
+        <div class="card" style="margin:0 0 12px">
+          <div style="font-size:14px;font-weight:700;margin-bottom:12px">🏠 Lieux de départ / arrivée</div>
+          <div style="margin-bottom:8px">
+            <div style="font-size:12px;color:var(--gray);margin-bottom:4px">Adresse de départ</div>
+            <input class="inp" id="cfg-depot" placeholder="Ex: 7 rue des entrepreneurs, 78540 Vernouillet" oninput="saveTechAddresses()"/>
+          </div>
+          <div>
+            <div style="font-size:12px;color:var(--gray);margin-bottom:4px">Adresse d'arrivée <span style="font-weight:400;font-size:11px">(si différente du départ)</span></div>
+            <input class="inp" id="cfg-arrival" placeholder="Identique au départ si vide" oninput="saveTechAddresses()"/>
+          </div>
+        </div>
+
         <!-- Config Kizeo -->
         <div class="card" style="margin:0 0 12px">
           <div style="font-size:14px;font-weight:700;margin-bottom:12px">🔗 Kizeo Forms</div>
@@ -699,6 +712,17 @@ function myIvs(date){
   return ivs.filter(i=>i.date===date&&(i.techId===curTech||!i.techId))
 }
 function saveCfg(){try{localStorage.setItem("techCfg2",JSON.stringify(techCfg))}catch(e){}}
+
+function saveTechAddresses(){
+  const tc=TB(curTech)
+  if(!tc) return
+  const dep=(document.getElementById("cfg-depot")?.value||"").trim()
+  const arr=(document.getElementById("cfg-arrival")?.value||"").trim()
+  if(dep) tc.depotAddr=dep
+  if(arr!==undefined) tc.arrivalAddr=arr  // vide = identique au départ
+  try{localStorage.setItem("tech_depots",JSON.stringify(TECHS))}catch(e){}
+  toast("✅ Adresses enregistrées","#2E7D32",2000)
+}
 function saveVF(){saveIvs()} // état dérivé de iv.status, persisté via saveIvs
 
 // ── Ordre de tournée partagé admin ↔ tech ──
@@ -1476,7 +1500,21 @@ async function calcMap(){
     gCache[depotAddr]=dc
   }
   L.marker([dc.lat,dc.lng],{icon:mkIcon("D","#2E7D32")}).addTo(mapObj)
-    .bindPopup(`<strong>🏠 Dépôt ${tc.name||''}</strong><br><small>${depotAddr}</small>`)
+    .bindPopup(`<strong>🏠 Départ ${tc.name||''}</strong><br><small>${depotAddr}</small>`)
+
+  // Adresse d'arrivée (si différente du départ)
+  let ac=dc
+  const arrivalAddr=tc.arrivalAddr&&tc.arrivalAddr.trim()?tc.arrivalAddr.trim():null
+  if(arrivalAddr&&arrivalAddr!==depotAddr){
+    ac=gCache[arrivalAddr]
+    if(!ac){
+      ac=(await _geocodeAddok(arrivalAddr))||(await _geocodeNominatim(arrivalAddr))||dc
+      if(ac&&isFrance(ac.lat,ac.lng)) gCache[arrivalAddr]=ac
+    }
+    if(techRoundTrip)
+      L.marker([ac.lat,ac.lng],{icon:mkIcon("A","#C62828")}).addTo(mapObj)
+        .bindPopup(`<strong>🏁 Arrivée ${tc.name||''}</strong><br><small>${arrivalAddr}</small>`)
+  }
 
   // Géocoder toutes les interventions
   const pts=[], noGeoIvs=[]
@@ -1604,7 +1642,7 @@ async function calcMap(){
 
   setProgress(80,"Calcul itinéraire avec trafic...")
   if(orderedPts.length>0){
-    const all=techRoundTrip?[dc,...orderedPts.map(p=>p.c),dc]:[dc,...orderedPts.map(p=>p.c)]
+    const all=techRoundTrip?[dc,...orderedPts.map(p=>p.c),ac]:[dc,...orderedPts.map(p=>p.c)]
     try{
       const startHHMM=depStartTime()
       const res=await fetch('/api/route-traffic',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({waypoints:all,departureHHMM:startHHMM})})
@@ -1709,7 +1747,8 @@ function openGPSAll(){
   if(!rem.length){toast("Toutes validées 🎉","#2E7D32");return}
   const tc=TB(curTech)
   const depotAddr=tc.depotAddr||DEPOT
-  const pts=[depotAddr,...rem.map(i=>i.addr)].map(a=>encodeURIComponent(a))
+  const arrAddr=tc.arrivalAddr&&tc.arrivalAddr.trim()?tc.arrivalAddr.trim():depotAddr
+  const pts=[depotAddr,...rem.map(i=>i.addr),arrAddr].map(a=>encodeURIComponent(a))
   window.open("https://www.google.com/maps/dir/"+pts.join("/"),"_blank")
 }
 
@@ -1967,6 +2006,10 @@ function renderProfil(){
   document.getElementById("cfg-token").value=techCfg.token||""
   document.getElementById("cfg-form").value=techCfg.formId||""
   document.getElementById("cfg-uid").value=techCfg.userId||""
+  const dEl=document.getElementById("cfg-depot")
+  const aEl=document.getElementById("cfg-arrival")
+  if(dEl) dEl.value=tc.depotAddr||""
+  if(aEl) aEl.value=tc.arrivalAddr||""
 }
 
 function getWeek(ref){
