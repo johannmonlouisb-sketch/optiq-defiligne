@@ -2407,6 +2407,56 @@ function updateDepMarker(id){
 }
 
 let depBuilding=false
+// Recalcule les horaires depuis une nouvelle heure de départ sans refaire la carte
+async function refreshDepETAs(techId, startHHMM){
+  const date=selDate
+  const savedOrd=(depRouteOrder[techId]||[]).filter(iv=>iv.date===date)
+  if(!savedOrd.length) return
+  const[sh,sm]=startHHMM.split(':').map(Number)
+  if(isNaN(sh)||isNaN(sm)) return
+  // Reconstruire les stops depuis le cache de géocodage
+  const stops=savedOrd.map(iv=>{
+    const coords=gcache[iv.addr]
+    if(!coords) return null
+    return{id:iv.id,lat:coords.lat,lng:coords.lng,label:iv.client,
+      duration:dur(iv.type,iv.form),
+      timeWindow:(iv.timeStart||iv.timeEnd)?{start:iv.timeStart||"00:00",end:iv.timeEnd||"23:59"}:null}
+  }).filter(Boolean)
+  if(!stops.length) return
+  const tech=TB(techId)
+  const dc=gcache[tech?.depotAddr||depot]||{lat:window.dispatchCfg?.depotLat||48.96,lng:window.dispatchCfg?.depotLng||1.97}
+  try{
+    const res=await fetch('/api/optimize-route',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({techs:[{id:techId,depot:dc,startH:sh,startMin:sm,stops}]})})
+    if(!res.ok) return
+    const data=await res.json()
+    const r=data.results?.[techId]
+    if(!r?.estimatedArrivals) return
+    const arrs=r.estimatedArrivals
+    let prevLeaveMin=sh*60+sm
+    savedOrd.forEach(iv=>{
+      const eta=arrs[iv.id]
+      if(eta){
+        const[eh,em]=eta.split(':').map(Number)
+        const etaMin=eh*60+em
+        const travelMin=Math.max(0,etaMin-prevLeaveMin)
+        const wm=dur(iv.type,iv.form)
+        const[tsh,tsm]=iv.timeStart?(iv.timeStart.split(':').map(Number)):[0,0]
+        const tsMin=iv.timeStart?tsh*60+tsm:0
+        const waitMin=tsMin>etaMin?tsMin-etaMin:0
+        depETAs[iv.id]={eta,leave:addMinToTime(eta,waitMin+wm),travelMin}
+        prevLeaveMin=etaMin+waitMin+wm
+      }
+    })
+    // Mettre à jour input + cache
+    const dtEl=document.getElementById('dep-time')
+    if(dtEl) dtEl.value=startHHMM
+    try{localStorage.setItem('optiq_dep_etas',JSON.stringify({date,etas:depETAs,depTime:startHHMM}))}catch(e){}
+    rDepart()
+    showToast(`🚀 ${tech?.name||'Tech'} a démarré à ${startHHMM} — horaires mis à jour`,'#1B5E20')
+  }catch(e){}
+}
+
 async function initDepMap(){
   const date=document.getElementById("dep-date")?.value||selDate
   const techIds=depSelectedTechs.length?depSelectedTechs:TECHS.map(t=>t.id)
@@ -2602,6 +2652,9 @@ async function initDepMap(){
   if(rs&&(totalKm||totalWorkMin))rs.style.display="grid"
   if(allBounds.length)depMapObj.fitBounds(L.latLngBounds(allBounds),{padding:[40,40]})
   setP(100,"✓ Tournée calculée")
+  // Persister les ETAs pour survie au refresh
+  const depTimeVal=document.getElementById('dep-time')?.value||'08:00'
+  try{localStorage.setItem('optiq_dep_etas',JSON.stringify({date:selDate,etas:depETAs,depTime:depTimeVal}))}catch(e){}
   setTimeout(()=>{if(pb)pb.style.display="none";rDepart()},1200)
   depBuilding=false
 }
@@ -6984,6 +7037,18 @@ function initCloud(){
 
   loadRouteOrder(selDate)
 
+  // Restaurer les ETAs calculées + heure de départ pour la date courante
+  try{
+    const etaCache=JSON.parse(localStorage.getItem('optiq_dep_etas')||'{}')
+    if(etaCache.date===selDate && etaCache.etas){
+      depETAs=etaCache.etas
+      if(etaCache.depTime){
+        const dtEl=document.getElementById('dep-time')
+        if(dtEl) dtEl.value=etaCache.depTime
+      }
+    }
+  }catch(e){}
+
   // Mettre à jour analyseMonth sur le dernier mois avec des données
   if(ivs.length){
     const lastDate = ivs.map(i=>i.date).filter(Boolean).sort().reverse()[0]
@@ -7032,6 +7097,15 @@ function initCloud(){
     }
     if(e.key==='optiq_tour_progress'){
       renderTourTracker()
+      // Si un tech vient de démarrer, recalculer les ETAs depuis l'heure réelle
+      try{
+        const prog=JSON.parse(e.newValue||'{}')
+        Object.values(prog).forEach(t=>{
+          if(t.status==='running'&&t.startTime&&t.date===selDate&&/^\d{2}:\d{2}$/.test(t.startTime)){
+            refreshDepETAs(t.techId, t.startTime)
+          }
+        })
+      }catch(err){}
     }
   })
   startTrackerPolling()

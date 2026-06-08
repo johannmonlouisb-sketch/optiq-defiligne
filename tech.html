@@ -602,7 +602,7 @@ function saveTourProgress(status){
   const date=depDate()
   const dayIvs=myIvs(date)
   const tc=TB(curTech)
-  const startTimeStr=tourStartTime?tourStartTime.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}):''
+  const startTimeStr=tourStartTime?`${String(tourStartTime.getHours()).padStart(2,'0')}:${String(tourStartTime.getMinutes()).padStart(2,'0')}`:''
   try{
     const stored=JSON.parse(localStorage.getItem('optiq_tour_progress')||'{}')
     const key=`${curTech}_${date}`
