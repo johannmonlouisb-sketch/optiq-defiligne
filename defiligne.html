@@ -7530,7 +7530,7 @@ async function pullFromNotion(dateFrom, dateTo, mode='merge'){
           id: prev.id,
           // Préserver les données matériel locales (overrides admin + enrichissement Kizeo précédent)
           arm:              prev.arm  || 0,
-          dea:              prev.dea  && prev.dea !== 0 ? prev.dea : '',
+          dea:              prev.dea  && prev.dea !== 0 ? prev.dea : (iv.dea || ''),
           bat:              prev.bat  || 0,
           padPak:           prev.padPak  || false,
           padPakDate:       prev.padPakDate  || '',
