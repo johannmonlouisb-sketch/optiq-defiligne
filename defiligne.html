@@ -2539,8 +2539,12 @@ async function initDepMap(){
                 const etaMin=eh*60+em
                 const travelMin=Math.max(0,etaMin-prevLeaveMin)
                 const wm=dur(iv.type,iv.form)
-                depETAs[iv.id]={eta,leave:addMinToTime(eta,wm),travelMin}
-                prevLeaveMin=etaMin+wm
+                // Tenir compte de l'attente si le créneau commence après l'arrivée
+                const[tsh,tsm]=iv.timeStart?(iv.timeStart.split(':').map(Number)):[0,0]
+                const tsMin=iv.timeStart?tsh*60+tsm:0
+                const waitMin=tsMin>etaMin?tsMin-etaMin:0
+                depETAs[iv.id]={eta,leave:addMinToTime(eta,waitMin+wm),travelMin}
+                prevLeaveMin=etaMin+waitMin+wm
               }
             })
             const conflicts=r.conflicts||[]
