@@ -235,7 +235,7 @@ tr:hover td{background:var(--bg)}
       <div style="padding:12px 16px 0;display:flex;flex-direction:column;gap:8px;flex-shrink:0">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <input type="date" id="dep-date" style="width:auto;font-size:13px;padding:6px 10px"/>
-          <input type="time" id="dep-time" value="08:00" title="Heure de départ du dépôt" style="width:auto;font-size:13px;padding:6px 10px"/>
+          <input type="time" id="dep-time" value="08:00" title="Heure de départ du dépôt" style="width:auto;font-size:13px;padding:6px 10px" oninput="const _mt=document.getElementById('map-time');if(_mt)_mt.value=this.value"/>
           <div style="position:relative;display:inline-block">
             <button id="dep-tech-btn" onclick="toggleDepTechDropdown(event)" style="padding:6px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;font-size:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:8px;min-width:190px;white-space:nowrap">
               <span id="dep-tech-label" style="flex:1;text-align:left">Tous les techniciens</span>
@@ -7060,6 +7060,8 @@ function initCloud(){
       if(etaCache.depTime){
         const dtEl=document.getElementById('dep-time')
         if(dtEl) dtEl.value=etaCache.depTime
+        const mtEl=document.getElementById('map-time')
+        if(mtEl) mtEl.value=etaCache.depTime
       }
     }
   }catch(e){}
