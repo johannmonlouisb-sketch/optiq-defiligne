@@ -2483,26 +2483,41 @@ async function initDepMap(){
     }
     const feasibleIds=new Set(feasibleIvs.map(i=>i.id))
     const ivcFiltered=ivcRaw.filter(x=>feasibleIds.has(x.iv.id))
-    // ── Filtre et tri horaire (EDF — Earliest Deadline First) ──
-    const withTime=ivcFiltered.filter(x=>x.iv.timeStart||x.iv.timeEnd)
-    const free=ivcFiltered.filter(x=>!x.iv.timeStart&&!x.iv.timeEnd)
-    // ── Si l'ordre est verrouillé, utiliser l'ordre sauvegardé ──
-    let ivc
-    if(isRouteLocked(tech.id,date)){
-      const savedOrd=(depRouteOrder[tech.id]||[]).filter(iv=>iv.date===date)
-      if(savedOrd.length){
-        const byId=Object.fromEntries(ivcFiltered.map(x=>[x.iv.id,x]))
-        const locked_ivc=savedOrd.map(iv=>byId[iv.id]).filter(Boolean)
-        const lockedIds=new Set(locked_ivc.map(x=>x.iv.id))
-        const newIvcs=ivcFiltered.filter(x=>!lockedIds.has(x.iv.id))
-        ivc=[...locked_ivc,...newIvcs]
-        if(warnEl&&!warnEl.innerHTML){warnEl.style.display="block";warnEl.innerHTML+=`<div style="background:#f0fdf4;border:1px solid #16a34a;border-radius:8px;padding:8px 12px;font-size:12px;color:#16a34a;margin-bottom:4px">🔒 <strong>${tech.name}</strong> — Ordre verrouillé, tournée inchangée</div>`}
-      }
+
+    // ── Séparer stops terminés (dans leur ordre actuel) vs restants ──────────
+    const savedOrd=(depRouteOrder[tech.id]||[]).filter(iv=>iv.date===date)
+    const byIdAll=Object.fromEntries(ivcFiltered.map(x=>[x.iv.id,x]))
+    // Stops terminés/échoués : garder l'ordre sauvegardé, sinon ordre DB
+    const ivcDone = (savedOrd.length
+      ? savedOrd.map(iv=>byIdAll[iv.id]).filter(Boolean)
+      : ivcFiltered
+    ).filter(x=>depValidated[x.iv.id]||depFailed[x.iv.id])
+    const doneIds=new Set(ivcDone.map(x=>x.iv.id))
+    // Stops restants à optimiser
+    const ivcPending=ivcFiltered.filter(x=>!doneIds.has(x.iv.id))
+    // Point de départ pour l'optimisation = dernier stop terminé (ou dépôt si aucun)
+    const lastDoneCoords=ivcDone.length ? ivcDone[ivcDone.length-1].coords : dc
+
+    if(ivcDone.length&&warnEl){
+      warnEl.style.display="block"
+      warnEl.innerHTML+=`<div style="background:#f0fdf4;border:1px solid #16a34a;border-radius:8px;padding:8px 12px;font-size:12px;color:#2E7D32;margin-bottom:4px">✅ <strong>${tech.name}</strong> — ${ivcDone.length} stop${ivcDone.length>1?'s':''} terminé${ivcDone.length>1?'s':''} conservé${ivcDone.length>1?'s':''}, recalcul depuis le dernier point</div>`
     }
-    // ── Appel Netlify Function optimize-route (si non verrouillé) ──
-    if(!ivc){
+
+    let ivcOptimized
+    // ── Si ordre verrouillé : respecter l'ordre sauvegardé pour les restants ──
+    if(isRouteLocked(tech.id,date)){
+      const lockedPending=savedOrd.length
+        ? savedOrd.map(iv=>byIdAll[iv.id]).filter(Boolean).filter(x=>!doneIds.has(x.iv.id))
+        : ivcPending
+      const lockedIds=new Set(lockedPending.map(x=>x.iv.id))
+      const newOnes=ivcPending.filter(x=>!lockedIds.has(x.iv.id))
+      ivcOptimized=[...lockedPending,...newOnes]
+      if(warnEl){warnEl.style.display="block";warnEl.innerHTML+=`<div style="background:#f0fdf4;border:1px solid #16a34a;border-radius:8px;padding:8px 12px;font-size:12px;color:#16a34a;margin-bottom:4px">🔒 <strong>${tech.name}</strong> — Ordre verrouillé, tournée inchangée</div>`}
+    }
+    // ── Appel Netlify Function optimize-route sur les stops RESTANTS seulement ──
+    if(!ivcOptimized&&ivcPending.length){
       try{
-        const payload={techs:[{id:tech.id,depot:dc,startH:depSH,startMin:depSM,stops:ivcFiltered.map(x=>({
+        const payload={techs:[{id:tech.id,depot:lastDoneCoords,startH:depSH,startMin:depSM,stops:ivcPending.map(x=>({
           id:x.iv.id, lat:x.coords.lat, lng:x.coords.lng, label:x.iv.client,
           duration:dur(x.iv.type,x.iv.form),
           timeWindow:(x.iv.timeStart||x.iv.timeEnd)?{start:x.iv.timeStart||"00:00",end:x.iv.timeEnd||"23:59"}:null
@@ -2513,14 +2528,14 @@ async function initDepMap(){
           const r=data.results?.[tech.id]
           const orderedIds=r?.orderedIds
           if(orderedIds?.length){
-            const byId=Object.fromEntries(ivcFiltered.map(x=>[x.iv.id,x]))
-            ivc=orderedIds.map(id=>byId[id]).filter(Boolean)
+            const byIdP=Object.fromEntries(ivcPending.map(x=>[x.iv.id,x]))
+            ivcOptimized=orderedIds.map(id=>byIdP[id]).filter(Boolean)
             const arrs=r.estimatedArrivals||{}
             let prevLeaveMin=depSH*60+depSM
-            ivc.forEach(({iv})=>{
+            ivcOptimized.forEach(({iv})=>{
               const eta=arrs[iv.id]
               if(eta){
-                const [eh,em]=eta.split(':').map(Number)
+                const[eh,em]=eta.split(':').map(Number)
                 const etaMin=eh*60+em
                 const travelMin=Math.max(0,etaMin-prevLeaveMin)
                 const wm=dur(iv.type,iv.form)
@@ -2536,11 +2551,18 @@ async function initDepMap(){
         }
       }catch(e){}
       // Fallback navigateur si la Function échoue
-      if(!ivc){
-        withTime.sort((a,b)=>(a.iv.timeEnd||a.iv.timeStart||"23:59").localeCompare(b.iv.timeEnd||b.iv.timeStart||"23:59"))
-        ivc=[...withTime,...(free.length>1?optimizeNN(dc,free):free)]
+      if(!ivcOptimized){
+        const withTimePending=ivcPending.filter(x=>x.iv.timeStart||x.iv.timeEnd)
+        const freePending=ivcPending.filter(x=>!x.iv.timeStart&&!x.iv.timeEnd)
+        withTimePending.sort((a,b)=>(a.iv.timeEnd||a.iv.timeStart||"23:59").localeCompare(b.iv.timeEnd||b.iv.timeStart||"23:59"))
+        ivcOptimized=[...withTimePending,...(freePending.length>1?optimizeNN(lastDoneCoords,freePending):freePending)]
       }
     }
+    // Aucun stop restant
+    if(!ivcOptimized) ivcOptimized=[]
+
+    // Résultat final : terminés (figés) + restants (optimisés)
+    const ivc=[...ivcDone,...ivcOptimized]
     depRouteOrder[tech.id]=ivc.map(x=>x.iv)
     saveRouteOrder(selDate)
     totalWorkMin+=ivc.reduce((a,{iv})=>a+dur(iv.type,iv.form),0)
