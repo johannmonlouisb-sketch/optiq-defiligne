@@ -7168,7 +7168,6 @@ async function cloudLoad(){
 }
 
 // cloudSave : localStorage + Supabase app_state (non-bloquant)
-let cloudSaveTimer = null
 function cloudSave(immediate = false){
   clearTimeout(cloudSaveTimer)
   const delay = immediate ? 0 : 1500
