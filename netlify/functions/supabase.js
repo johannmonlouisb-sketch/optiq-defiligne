@@ -1,7 +1,5 @@
 // netlify/functions/supabase.js
-// Proxy Supabase — opérations qui nécessitent la clé service_role
-// (kizeo sync depuis Notion, opérations admin)
-// Les lectures simples peuvent appeler Supabase REST API directement depuis le browser.
+// Proxy Supabase — kizeo sync, app state, opérations admin
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -9,28 +7,50 @@ const CORS = {
   'Content-Type': 'application/json'
 }
 
-// Supabase REST API helper (PostgREST)
-async function sb(url, opts = {}) {
-  const SUPABASE_URL      = process.env.SUPABASE_URL
-  const SUPABASE_KEY      = process.env.SUPABASE_SERVICE_ROLE_KEY  // clé service (jamais exposée au browser)
-  if (!SUPABASE_URL || !SUPABASE_KEY) throw new Error('SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY manquant dans les variables ENV Netlify')
+function getEnv() {
+  const url = process.env.SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url) throw new Error('SUPABASE_URL manquant dans Netlify → Site config → Environment variables')
+  if (!key) throw new Error('SUPABASE_SERVICE_ROLE_KEY manquant dans Netlify → Site config → Environment variables')
+  return { url, key }
+}
 
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/${url}`, {
-    ...opts,
+// GET depuis Supabase REST API
+async function sbGet(table, query = '') {
+  const { url, key } = getEnv()
+  const endpoint = `${url}/rest/v1/${table}${query ? '?' + query : ''}`
+  const r = await fetch(endpoint, {
+    method: 'GET',
     headers: {
-      'apikey': SUPABASE_KEY,
-      'Authorization': `Bearer ${SUPABASE_KEY}`,
-      'Content-Type': 'application/json',
-      'Prefer': opts.prefer || 'return=representation',
-      ...(opts.headers || {})
+      'apikey': key,
+      'Authorization': `Bearer ${key}`,
+      'Accept': 'application/json'
     }
   })
   const text = await r.text()
-  if (!r.ok) throw new Error(`Supabase ${r.status}: ${text}`)
+  if (!r.ok) throw new Error(`Supabase GET ${r.status}: ${text.substring(0, 200)}`)
   return text ? JSON.parse(text) : []
 }
 
-// Lire la base Notion Kizeo (copie du cas query_kizeo de notion.js)
+// POST/UPSERT vers Supabase REST API
+async function sbPost(table, data, prefer = 'resolution=merge-duplicates,return=minimal') {
+  const { url, key } = getEnv()
+  const r = await fetch(`${url}/rest/v1/${table}`, {
+    method: 'POST',
+    headers: {
+      'apikey': key,
+      'Authorization': `Bearer ${key}`,
+      'Content-Type': 'application/json',
+      'Prefer': prefer
+    },
+    body: JSON.stringify(data)
+  })
+  const text = await r.text()
+  if (!r.ok) throw new Error(`Supabase POST ${r.status}: ${text.substring(0, 200)}`)
+  return text ? JSON.parse(text) : []
+}
+
+// Lire la base Notion Kizeo
 async function fetchNotionKizeo() {
   const NOTION_VERSION = '2022-06-28'
   const NOTION_BASE    = 'https://api.notion.com/v1'
@@ -57,7 +77,7 @@ async function fetchNotionKizeo() {
     return ''
   }
 
-  const toDateOrNull = s => {
+  const toDate = s => {
     if (!s || typeof s !== 'string') return null
     const d = s.substring(0, 10)
     return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : null
@@ -92,11 +112,11 @@ async function fetchNotionKizeo() {
       type_intervention:     nP(p, 'Type intervention')|| '',
       statut:                nP(p, 'Statut intervention') || 'Actif',
       maintenance_planifiee: nP(p, 'Maintenance planifiée') || '',
-      pad_pak_date_adulte:   toDateOrNull(nP(p, 'Expiration PAD PAK Adulte')),
-      pad_pak_date_ped:      toDateOrNull(nP(p, 'Expiration PAD PAK Pédiatrique')),
-      bat_date:              toDateOrNull(nP(p, 'Expiration Batterie')),
-      electrode_date:        toDateOrNull(nP(p, 'Expiration Électrodes')),
-      prochaine_expiration:  toDateOrNull(nP(p, 'Prochaine Expiration')),
+      pad_pak_date_adulte:   toDate(nP(p, 'Expiration PAD PAK Adulte')),
+      pad_pak_date_ped:      toDate(nP(p, 'Expiration PAD PAK Pédiatrique')),
+      bat_date:              toDate(nP(p, 'Expiration Batterie')),
+      electrode_date:        toDate(nP(p, 'Expiration Électrodes')),
+      prochaine_expiration:  toDate(nP(p, 'Prochaine Expiration')),
       pma:                   nP(p, 'Prochaine Maintenance Annuelle') || '',
       derniere_intervention: nP(p, 'Dernière Intervention Kizeo')    || '',
       urgence_pad_pak:       nP(p, 'Urgence PAD PAK')      || '',
@@ -109,7 +129,7 @@ async function fetchNotionKizeo() {
       email:                 nP(p, 'Email site')       || '',
       notes:                 nP(p, 'Notes')             || '',
     }
-  }).filter(s => s.societe)  // exclure les entrées sans société
+  }).filter(s => s.societe)
 }
 
 exports.handler = async (event) => {
@@ -132,15 +152,19 @@ exports.handler = async (event) => {
   try {
     switch (action) {
 
-      // ── GET KIZEO SITES ─────────────────────────────────────────
-      // Lecture depuis Supabase (rapide, remplace query_kizeo Notion)
+      // ── PING : tester la connexion Supabase ──────────────────────
+      case 'ping': {
+        const { url, key } = getEnv()
+        return {
+          statusCode: 200, headers: CORS,
+          body: JSON.stringify({ ok: true, url: url.replace(/^https:\/\//, '').split('.')[0] + '...' })
+        }
+      }
+
+      // ── GET KIZEO SITES : lecture depuis Supabase ────────────────
       case 'kizeo_get': {
-        // Seulement les sites actifs (pas les DOUBLON ARCHIVÉ)
-        const sites = await sb('kizeo_sites?statut=neq.Annulée&select=*&order=societe.asc', {
-          method: 'GET',
-          prefer: 'return=representation'
-        })
-        // Normaliser le format pour être compatible avec l'existant (notion.js)
+        // Exclure les doublons archivés — encoder Annulée correctement
+        const sites = await sbGet('kizeo_sites', 'statut=neq.Annul%C3%A9e&select=*&order=societe.asc')
         const normalized = sites.map(s => ({
           id:                    s.id,
           notionId:              s.notion_id,
@@ -178,40 +202,35 @@ exports.handler = async (event) => {
       }
 
       // ── SYNC KIZEO : Notion → Supabase ───────────────────────────
-      // À déclencher manuellement depuis l'app ou un cron Netlify
       case 'kizeo_sync': {
+        console.log('[kizeo_sync] Démarrage fetch Notion...')
         const sites = await fetchNotionKizeo()
+        console.log(`[kizeo_sync] ${sites.length} sites Notion récupérés`)
+
         if (!sites.length) return {
           statusCode: 200, headers: CORS,
-          body: JSON.stringify({ synced: 0, msg: 'Aucun site Notion trouvé' })
+          body: JSON.stringify({ synced: 0, msg: 'Aucun site trouvé dans Notion' })
         }
 
-        // Upsert par batch de 100 (limite PostgREST recommandée)
         let total = 0
         for (let i = 0; i < sites.length; i += 100) {
           const batch = sites.slice(i, i + 100)
-          await sb('kizeo_sites', {
-            method: 'POST',
-            prefer: 'resolution=merge-duplicates,return=minimal',
-            body: JSON.stringify(batch)
-          })
+          await sbPost('kizeo_sites', batch)
           total += batch.length
+          console.log(`[kizeo_sync] Batch ${i}–${i + batch.length} → Supabase OK`)
         }
 
         return {
           statusCode: 200, headers: CORS,
-          body: JSON.stringify({ synced: total, msg: `${total} sites Kizeo synchronisés depuis Notion` })
+          body: JSON.stringify({ synced: total, msg: `${total} sites Kizeo synchronisés depuis Notion → Supabase` })
         }
       }
 
       // ── APP STATE : GET ──────────────────────────────────────────
-      // Lecture d'une clé d'état (route_orders, zone_assignments…)
       case 'state_get': {
         const { key } = body
         if (!key) return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'key manquant' }) }
-        const rows = await sb(`app_state?key=eq.${encodeURIComponent(key)}&select=value`, {
-          method: 'GET', prefer: 'return=representation'
-        })
+        const rows = await sbGet('app_state', `key=eq.${encodeURIComponent(key)}&select=value`)
         return {
           statusCode: 200, headers: CORS,
           body: JSON.stringify({ value: rows[0]?.value ?? null })
@@ -222,11 +241,7 @@ exports.handler = async (event) => {
       case 'state_set': {
         const { key, value } = body
         if (!key) return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'key manquant' }) }
-        await sb('app_state', {
-          method: 'POST',
-          prefer: 'resolution=merge-duplicates,return=minimal',
-          body: JSON.stringify({ key, value })
-        })
+        await sbPost('app_state', { key, value })
         return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true }) }
       }
 
@@ -234,6 +249,7 @@ exports.handler = async (event) => {
         return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: `Action inconnue: ${action}` }) }
     }
   } catch (e) {
+    console.error('[supabase]', e.message)
     return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: e.message }) }
   }
 }

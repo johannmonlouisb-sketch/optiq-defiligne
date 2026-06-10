@@ -8027,13 +8027,24 @@ function showNotionPanel(){
     <div style="border-top:1px solid #E3F2FD;margin-top:12px;padding-top:12px">
       <div style="font-size:13px;font-weight:600;color:#1565C0;margin-bottom:8px">⚡ Base Kizeo → Supabase</div>
       <div style="font-size:12px;color:#757575;margin-bottom:8px">Synchronise la base Kizeo (Notion → Supabase) pour des accès ultra-rapides (~50ms vs 800ms).</div>
-      <div id="supabase-kizeo-status" style="font-size:12px;color:#616161;margin-bottom:8px"></div>
-      <button class="bb bsm" style="background:#1565C0" onclick="(async()=>{
-        const el=document.getElementById('supabase-kizeo-status')
-        if(el) el.innerHTML='⏳ Synchronisation en cours...'
-        const r=await syncKizeoToSupabase()
-        if(el) el.innerHTML=r.error?'❌ '+r.error:'✅ '+r.msg
-      })()">🔄 Sync Kizeo → Supabase</button>
+      <div id="supabase-kizeo-status" style="font-size:12px;background:#F5F5F5;border-radius:6px;padding:6px 10px;margin-bottom:8px;display:none"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="bg bsm" onclick="(async()=>{
+          const el=document.getElementById('supabase-kizeo-status')
+          el.style.display='block';el.innerHTML='⏳ Test connexion...'
+          try{
+            const r=await fetch('/api/supabase',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'ping'})})
+            const d=await r.json()
+            el.innerHTML=d.ok?'✅ Supabase connecté ('+d.url+')':'❌ '+JSON.stringify(d)
+          }catch(e){el.innerHTML='❌ Erreur réseau : '+e.message}
+        })()">🔌 Tester connexion</button>
+        <button class="bb bsm" style="background:#1565C0" onclick="(async()=>{
+          const el=document.getElementById('supabase-kizeo-status')
+          el.style.display='block';el.innerHTML='⏳ Synchronisation en cours (peut prendre 10-20s)...'
+          const r=await syncKizeoToSupabase()
+          el.innerHTML=r.error?'❌ '+r.error:'✅ '+r.msg
+        })()">🔄 Sync Kizeo → Supabase</button>
+      </div>
     </div>
   </div>
 </div>
