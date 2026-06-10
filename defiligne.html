@@ -1867,9 +1867,10 @@ const DAYS=["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"]
 // ═══════════════════════════════════════════════════════
 function fmtMin(m){if(m<60)return m+"min";const h=Math.floor(m/60),mn=m%60;return mn>0?h+"h"+String(mn).padStart(2,"0"):h+"h00"}
 function addMinToTime(hhmm,mins){const[h,m]=hhmm.split(':').map(Number);const t=h*60+m+mins;return`${String(Math.floor(t/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`}
-function dur(t,f){return TYPES[t].dur+(f?10:0)}
+function dur(t,f){return (TYPES[t]||TYPES.maintenance_simple).dur+(f?10:0)}
 function bdg(label,color,bg,click=""){return `<span class="bdg${click?" bdg-click":""}" style="background:${bg};color:${color}"${click?` onclick="${click}"`:""}>${label}</span>`}
-function tBdg(t){const tp=TYPES[t];return bdg(tp.label+" · "+tp.dur+"min",tp.color,tp.color+"18")}
+function tBdg(t){const tp=TYPES[t]||TYPES.maintenance_simple;return bdg(tp.label+" · "+tp.dur+"min",tp.color,tp.color+"18")}
+function resetIvFilters(){fMode="all";fStatus="all";fTech=0;fClient="";const s=document.getElementById("iv-sq");if(s)s.value="";const sd=document.getElementById("iv-sd");if(sd)sd.value="";const ed=document.getElementById("iv-ed");if(ed)ed.value="";rIv()}
 function sBdg(s,clickFn=""){const st=STATUSES[s];return bdg(st.label,st.color,st.bg,clickFn)}
 function ava(init,sz=28,col="#1565C0"){return `<div class="ava" style="width:${sz}px;height:${sz}px;background:${col}22;color:${col};font-size:${Math.round(sz*.33)}px">${init}</div>`}
 function TB(id){return TECHS.find(t=>t.id===id)||{name:"?",init:"?"}}
@@ -2110,7 +2111,7 @@ function rDash(){
       </div>
       ${!day.length?`<div class="card" style="text-align:center;color:var(--gray);padding:36px">Aucune intervention</div>`:""}
       ${day.map(iv=>{const tc=TB(iv.techId);return `
-      <div class="ivc" style="border-left-color:${TYPES[iv.type].color}" onclick="editIv(${iv.id})">
+      <div class="ivc" style="border-left-color:${(TYPES[iv.type]||TYPES.maintenance_simple).color}" onclick="editIv(${iv.id})">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:6px">
           <div style="min-width:0"><div class="cn">${iv.client}</div><div class="ca">📍 ${iv.addr}</div>
 ${iv.contact?`<div style="font-size:11px;color:#6A1B9A;margin-top:2px">👤 ${iv.contact}${iv.cphone?" · "+iv.cphone:""}</div>`:""}</div>
@@ -2815,7 +2816,7 @@ function planHdr(navHtml){
 function ivCard(iv, idx, showNum){
   const tc=TB(iv.techId)
   const done=depValidated[iv.id],fail=depFailed[iv.id]
-  return `<div class="ivc" style="border-left-color:${TYPES[iv.type].color};${done?"opacity:.55":fail?"opacity:.55":""}" onclick="editIv(${iv.id})">
+  return `<div class="ivc" style="border-left-color:${(TYPES[iv.type]||TYPES.maintenance_simple).color};${done?"opacity:.55":fail?"opacity:.55":""}" onclick="editIv(${iv.id})">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:5px">
       <div style="min-width:0;display:flex;align-items:center;gap:6px">
         ${showNum?`<span style="font-weight:700;color:var(--blue);font-size:12px;flex-shrink:0">#${idx+1}</span>`:""}
@@ -3033,11 +3034,12 @@ function rIv(){
   if(sq)list=list.filter(i=>[i.client,i.addr,i.notes].some(s=>s.toLowerCase().includes(sq.toLowerCase())))
   if(sd)list=list.filter(i=>i.date>=sd)
   if(ed)list=list.filter(i=>i.date<=ed)
+  const filtersActive=fMode!=="all"||fStatus!=="all"||fTech>0||!!fClient||!!sq||!!sd||!!ed
   const activeF=(fClient||fTech>0)&&`<span style="font-size:12px;color:var(--blue);background:var(--blueLight);padding:3px 10px;border-radius:100px">🔍 ${fClient||TB(fTech).name} <span onclick="fClient='';fTech=0;rIv()" style="cursor:pointer">✕</span></span>`
 
   document.getElementById("d-iv").innerHTML=`
   <div class="fbar" style="margin-bottom:6px">
-    <button class="${fMode==="all"?"bb":"bg"} bsm" onclick="fMode='all';rIv()">📋 Toutes</button>
+    <button class="${fMode==="all"?"bb":"bg"} bsm" onclick="fMode='all';rIv()">📋 Toutes${fMode!=="all"?" ✕":""}</button>
     <button class="${fMode==="physique"?"bb":"bg"} bsm" onclick="fMode='physique';rIv()" style="${fMode==="physique"?"":"border-color:#1565C0;color:#1565C0"}">🔧 Physique</button>
     <button class="${fMode==="tele"?"bb":"bg"} bsm" onclick="fMode='tele';rIv()" style="${fMode==="tele"?"background:#00897B;border-color:#00897B":"border-color:#00897B;color:#00897B"}">📱 Télémaintenance</button>
   </div>
@@ -3050,10 +3052,10 @@ function rIv(){
     <input id="iv-ed" type="date" value="${ed}" title="Au" style="width:auto;font-size:12px;padding:5px 8px" onchange="rIv()"/>
     <span style="font-size:12px;color:var(--gray);margin-left:4px">${list.length} résultat${list.length>1?"s":""}</span>
   </div>
-  ${!list.length?`<div class="card" style="text-align:center;color:var(--gray);padding:36px">Aucune intervention trouvée</div>`:""}
+  ${!list.length?`<div class="card" style="text-align:center;color:var(--gray);padding:36px">Aucune intervention trouvée${filtersActive?`<br><button class="bg bsm" style="margin-top:10px" onclick="resetIvFilters()">↩ Réinitialiser les filtres</button>`:" (aucune intervention créée)"}</div>`:""}
   ${list.map(iv=>{
     const tc=TB(iv.techId)
-    return `<div class="ivc" style="border-left-color:${TYPES[iv.type].color};display:flex;align-items:center;gap:12px;justify-content:space-between" onclick="editIv(${iv.id})">
+    return `<div class="ivc" style="border-left-color:${(TYPES[iv.type]||TYPES.maintenance_simple).color};display:flex;align-items:center;gap:12px;justify-content:space-between" onclick="editIv(${iv.id})">
       <div style="flex:1;min-width:0"><div class="cn">${iv.client}</div><div class="ca">${iv.addr}</div>
       ${iv.notes?`<div style="font-size:11px;color:var(--orange);margin-top:3px">📝 ${iv.notes.substring(0,60)}${iv.notes.length>60?"...":""}</div>`:""}
       </div>
@@ -3194,7 +3196,7 @@ function rMat(){
     ${!day.length?`<div style="text-align:center;color:var(--gray);padding:24px">Aucune intervention avec ces filtres</div>`:''}
     ${day.map(iv=>{
       const tc=TB(iv.techId)
-      return `<div class="ivc" style="border-left-color:${TYPES[iv.type].color}" onclick="editIv(${iv.id})">
+      return `<div class="ivc" style="border-left-color:${(TYPES[iv.type]||TYPES.maintenance_simple).color}" onclick="editIv(${iv.id})">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
           <div style="flex:1;min-width:0">
             <div class="cn">${iv.client}</div>
