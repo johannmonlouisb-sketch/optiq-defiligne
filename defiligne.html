@@ -527,9 +527,10 @@ tr:hover td{background:var(--bg)}
       <div class="np-prop">
         <div class="np-lbl">🏷️ Type</div>
         <select id="m-type" class="np-val" onchange="autoSaveField()">
-          <option value="maintenance_simple">Maintenance (15 min)</option>
-          <option value="maintenance_complex">Maintenance+ (25 min)</option>
+          <option value="maintenance_simple">Maintenance physique (15 min)</option>
+          <option value="maintenance_complex">Maintenance physique+ (25 min)</option>
           <option value="installation">Installation (35 min)</option>
+          <option value="tele_maintenance">Télémaintenance (10 min)</option>
         </select>
       </div>
       <div class="np-prop">
@@ -735,9 +736,10 @@ let TECHS=[
   {id:5,name:"Johann",    init:"JO",vehicle:"—",              conso:7.0,avail:true, color:"#E65100"},
 ]
 const TYPES={
-  maintenance_simple: {label:"Maintenance",   dur:15,color:"#1565C0"},
-  maintenance_complex:{label:"Maintenance +", dur:25,color:"#6A1B9A"},
-  installation:       {label:"Installation",  dur:35,color:"#1B5E20"},
+  maintenance_simple: {label:"Maintenance",      dur:15,color:"#1565C0"},
+  maintenance_complex:{label:"Maintenance +",    dur:25,color:"#6A1B9A"},
+  installation:       {label:"Installation",     dur:35,color:"#1B5E20"},
+  tele_maintenance:   {label:"Télémaintenance",  dur:10,color:"#00897B"},
 }
 const STATUSES={
   completed:    {label:"Terminé",    color:"#2E7D32",bg:"#E8F5E9"},
@@ -1839,7 +1841,7 @@ let curView="dashboard"
 let selDate=new Date().toISOString().split("T")[0]
 let mapDate=new Date().toISOString().split("T")[0]
 let depot="7 rue des entrepreneurs, 78540 Vernouillet"
-let fStatus="all",fTech=0,fClient=""
+let fStatus="all",fTech=0,fClient="",fMode="all"
 let depValidated={}
 let depFailed={}
 let depMapObj=null,depRGroup=null,depMarkers={}
@@ -3023,6 +3025,8 @@ function rIv(){
   const sq=document.getElementById("iv-sq")?.value||""
   const sd=document.getElementById("iv-sd")?.value||""
   const ed=document.getElementById("iv-ed")?.value||""
+  if(fMode==="physique")list=list.filter(i=>i.type!=="tele_maintenance")
+  if(fMode==="tele")list=list.filter(i=>i.type==="tele_maintenance")
   if(fStatus!=="all")list=list.filter(i=>i.status===fStatus)
   if(fTech>0)list=list.filter(i=>i.techId===fTech)
   if(fClient)list=list.filter(i=>i.client===fClient)
@@ -3032,6 +3036,11 @@ function rIv(){
   const activeF=(fClient||fTech>0)&&`<span style="font-size:12px;color:var(--blue);background:var(--blueLight);padding:3px 10px;border-radius:100px">🔍 ${fClient||TB(fTech).name} <span onclick="fClient='';fTech=0;rIv()" style="cursor:pointer">✕</span></span>`
 
   document.getElementById("d-iv").innerHTML=`
+  <div class="fbar" style="margin-bottom:6px">
+    <button class="${fMode==="all"?"bb":"bg"} bsm" onclick="fMode='all';rIv()">📋 Toutes</button>
+    <button class="${fMode==="physique"?"bb":"bg"} bsm" onclick="fMode='physique';rIv()" style="${fMode==="physique"?"":"border-color:#1565C0;color:#1565C0"}">🔧 Physique</button>
+    <button class="${fMode==="tele"?"bb":"bg"} bsm" onclick="fMode='tele';rIv()" style="${fMode==="tele"?"background:#00897B;border-color:#00897B":"border-color:#00897B;color:#00897B"}">📱 Télémaintenance</button>
+  </div>
   <div class="fbar">
     <input id="iv-sq" value="${sq}" placeholder="🔍 Rechercher..." style="max-width:220px;font-size:13px;padding:6px 10px" oninput="rIv()"/>
     ${["all","completed","confirmed","pending","not_responded"].map((v,i)=>{const labels=["Toutes","Terminées","Confirmées","En attente","Non répondu"];return `<button class="${fStatus===v&&!fClient&&!fTech?"bb":"bg"} bsm" onclick="fStatus='${v}';fClient='';fTech=0;rIv()">${labels[i]}</button>`}).join("")}
