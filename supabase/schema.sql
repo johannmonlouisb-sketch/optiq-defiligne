@@ -174,9 +174,9 @@ ALTER TABLE public.app_state     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.interventions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.techniciens   ENABLE ROW LEVEL SECURITY;
 
--- kizeo_sites : lecture publique, écriture via service_role uniquement
-CREATE POLICY "anon_read_kizeo" ON public.kizeo_sites
-  FOR SELECT TO anon USING (true);
+-- kizeo_sites : lecture + écriture pour anon (sync Notion → Supabase via fonction Netlify)
+CREATE POLICY "anon_read_kizeo"  ON public.kizeo_sites FOR SELECT TO anon USING (true);
+CREATE POLICY "anon_write_kizeo" ON public.kizeo_sites FOR ALL    TO anon USING (true) WITH CHECK (true);
 
 -- app_state : lecture + écriture pour anon (l'app gère ses propres clés)
 CREATE POLICY "anon_read_state"  ON public.app_state FOR SELECT TO anon USING (true);

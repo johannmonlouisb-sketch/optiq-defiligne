@@ -9,9 +9,9 @@ const CORS = {
 
 function getEnv() {
   const url = process.env.SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url) throw new Error('SUPABASE_URL manquant dans Netlify → Site config → Environment variables')
-  if (!key) throw new Error('SUPABASE_SERVICE_ROLE_KEY manquant dans Netlify → Site config → Environment variables')
+  const key = process.env.SUPABASE_ANON_KEY   // clé anon publique (Settings → API → anon public)
+  if (!url) throw new Error('SUPABASE_URL manquant dans Netlify Environment variables')
+  if (!key) throw new Error('SUPABASE_ANON_KEY manquant dans Netlify Environment variables')
   return { url, key }
 }
 
