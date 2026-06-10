@@ -7139,65 +7139,30 @@ const isDeployed = location.hostname !== 'localhost' && location.protocol !== 'f
 let cloudSyncing = false
 let cloudSaveTimer = null
 
-// Appel Supabase state (route orders, zones, ETAs…)
-async function sbState(action, key, value){
-  if(!isDeployed) return null
-  try{
-    const body = action==='state_get' ? {action,key} : {action,key,value}
-    const r = await fetch(SUPABASE_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
-    if(!r.ok) return null
-    const d = await r.json()
-    return action==='state_get' ? d.value : d.ok
-  }catch(e){ console.warn('Supabase state:', e.message); return null }
-}
+// cloudLoad — localStorage uniquement
+async function cloudLoad(){ return false }
 
-// cloudLoad : localStorage d'abord, puis Supabase en background
-async function cloudLoad(){
-  // 1. Chargement immédiat depuis localStorage (synchrone → app prête immédiatement)
-  try{
-    const saved = localStorage.getItem('optiq_ivs_data')
-    if(saved){
-      const parsed = JSON.parse(saved)
-      if(Array.isArray(parsed) && parsed.length > 0){
-        ivs = parsed
-        nextId = Math.max(...ivs.map(i=>i.id)) + 1
-      }
-    }
-  }catch(e){}
-  return false
-}
-
-// cloudSave : localStorage + Supabase app_state (non-bloquant)
+// Sauvegarder dans localStorage
 function cloudSave(immediate = false){
   clearTimeout(cloudSaveTimer)
-  const delay = immediate ? 0 : 1500
+  const delay = immediate ? 0 : 1000
   cloudSaveTimer = setTimeout(() => {
-    // 1. localStorage (synchrone, instantané)
-    try{
+    try {
       localStorage.setItem('optiq_ivs_data', JSON.stringify(ivs))
       const el = document.getElementById('cloud-status')
       if(el) el.innerHTML = `💾 <span style="color:#1B5E20">Sauvegardé · ${ivs.length}</span>`
-    }catch(e){ console.warn('localStorage save:', e) }
-    // 2. Supabase app_state (async, cross-device)
-    if(isDeployed){
-      sbState('state_set', 'optiq_ivs_data', ivs).then(ok=>{
-        if(ok){
-          const el = document.getElementById('cloud-status')
-          if(el) el.innerHTML = `☁️ <span style="color:#1B5E20">Cloud · ${ivs.length}</span>`
-        }
-      })
-    }
+    } catch(e){ console.warn('Save error:', e) }
   }, delay)
 }
 
-// cloudPatch
+// cloudPatch — no-op localStorage
 async function cloudPatch(iv){ cloudSave() }
 
 // Init au chargement de la page
 function updateSbCount(){const el=document.getElementById("sb-count");if(el)el.textContent=ivs.length+" interventions"}
 
 function initCloud(){
-  // 1. Charger depuis localStorage (immédiat, app opérationnelle dès le démarrage)
+  // Charger depuis localStorage si données sauvegardées
   try {
     const saved = localStorage.getItem('optiq_ivs_data')
     if(saved){
@@ -7208,23 +7173,6 @@ function initCloud(){
       }
     }
   } catch(e){}
-
-  // 2. Récupérer depuis Supabase en background (sync cross-device)
-  //    Si Supabase a des données plus récentes, mettre à jour silencieusement
-  if(isDeployed){
-    sbState('state_get','optiq_ivs_data').then(remote=>{
-      if(!Array.isArray(remote)||!remote.length) return
-      if(remote.length > ivs.length){
-        ivs = remote
-        nextId = Math.max(...ivs.map(i=>i.id)) + 1
-        localStorage.setItem('optiq_ivs_data', JSON.stringify(ivs))
-        updateSbCount()
-        const el=document.getElementById('cloud-status')
-        if(el) el.innerHTML=`☁️ <span style="color:#1565C0">Sync cloud · ${ivs.length}</span>`
-        SV(curView) // re-render la vue courante avec les données fraîches
-      }
-    }).catch(()=>{})
-  }
 
   // Restaurer la dernière vue + date + sous-onglet
   try{
@@ -7602,40 +7550,19 @@ async function geocodeAllTechDepots(){
 // DB ID : 070dc2d3-7a07-4bc4-919e-0c9a875ee892
 // ═══════════════════════════════════════════════════════════════
 
-const NOTION_ENDPOINT   = '/api/notion'
-const SUPABASE_ENDPOINT = '/api/supabase'
+const NOTION_ENDPOINT = '/api/notion'
 const isDeployedApp = location.protocol !== 'file:'
 
 // ── Cache Kizeo (base sites & matériel) ──────────────────────────
-// Source : Supabase (rapide ~50ms) → fallback Notion si Supabase indispo
 let _kizeoCache = null, _kizeoFetchTs = 0
 
 async function fetchKizeoSites(){
   if(_kizeoCache && Date.now()-_kizeoFetchTs < 30*60000) return _kizeoCache
   try{
-    // Priorité Supabase (rapide)
-    const r = await fetch(SUPABASE_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'kizeo_get'})})
-    if(r.ok){
-      const data = await r.json()
-      if(data.sites?.length){ _kizeoCache = data.sites; _kizeoFetchTs = Date.now(); return _kizeoCache }
-    }
-  }catch(e){ console.warn('Supabase Kizeo fetch:', e.message) }
-  // Fallback Notion (si Supabase pas encore configuré)
-  try{
     const data = await notionCall('query_kizeo', {})
     if(data.sites?.length){ _kizeoCache = data.sites; _kizeoFetchTs = Date.now() }
-  }catch(e){ console.warn('Notion Kizeo fallback:', e.message) }
+  }catch(e){ console.warn('Kizeo fetch:', e.message) }
   return _kizeoCache || []
-}
-
-// Sync Notion → Supabase (appel admin, déclenché manuellement)
-async function syncKizeoToSupabase(){
-  try{
-    const r = await fetch(SUPABASE_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'kizeo_sync'})})
-    const d = await r.json()
-    _kizeoCache = null // invalider le cache pour prochain fetch
-    return d
-  }catch(e){ return {error:e.message} }
 }
 
 function matchKizeoSite(iv, sites){
@@ -8022,28 +7949,6 @@ function showNotionPanel(){
     </div>
     <div style="border-top:1px solid #F0F0F0;padding-top:12px;font-size:12px;color:#757575">
       ⚡ Les statuts validés/échec dans OptiQ sont <strong>automatiquement mis à jour dans Notion</strong> lors de chaque changement.
-    </div>
-    <div style="border-top:1px solid #E3F2FD;margin-top:12px;padding-top:12px">
-      <div style="font-size:13px;font-weight:600;color:#1565C0;margin-bottom:8px">⚡ Base Kizeo → Supabase</div>
-      <div style="font-size:12px;color:#757575;margin-bottom:8px">Synchronise la base Kizeo (Notion → Supabase) pour des accès ultra-rapides (~50ms vs 800ms).</div>
-      <div id="supabase-kizeo-status" style="font-size:12px;background:#F5F5F5;border-radius:6px;padding:6px 10px;margin-bottom:8px;display:none"></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="bg bsm" onclick="(async()=>{
-          const el=document.getElementById('supabase-kizeo-status')
-          el.style.display='block';el.innerHTML='⏳ Test connexion...'
-          try{
-            const r=await fetch('/api/supabase',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'ping'})})
-            const d=await r.json()
-            el.innerHTML=d.ok?'✅ Supabase connecté ('+d.url+')':'❌ '+JSON.stringify(d)
-          }catch(e){el.innerHTML='❌ Erreur réseau : '+e.message}
-        })()">🔌 Tester connexion</button>
-        <button class="bb bsm" style="background:#1565C0" onclick="(async()=>{
-          const el=document.getElementById('supabase-kizeo-status')
-          el.style.display='block';el.innerHTML='⏳ Synchronisation en cours (peut prendre 10-20s)...'
-          const r=await syncKizeoToSupabase()
-          el.innerHTML=r.error?'❌ '+r.error:'✅ '+r.msg
-        })()">🔄 Sync Kizeo → Supabase</button>
-      </div>
     </div>
   </div>
 </div>
