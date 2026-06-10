@@ -3,6 +3,14 @@
 -- À exécuter dans : Supabase Dashboard → SQL Editor → New Query → Run
 -- ═══════════════════════════════════════════════════════════════════
 
+-- Nettoyage des tables existantes (ancien schéma incompatible)
+DROP TABLE IF EXISTS public.route_cache   CASCADE;
+DROP TABLE IF EXISTS public.tournees      CASCADE;
+DROP TABLE IF EXISTS public.interventions CASCADE;
+DROP TABLE IF EXISTS public.techniciens   CASCADE;
+DROP TABLE IF EXISTS public.kizeo_sites   CASCADE;
+DROP TABLE IF EXISTS public.app_state     CASCADE;
+
 -- ──────────────────────────────────────────────────────────────────
 -- TABLE : kizeo_sites
 -- Remplace la base Notion Kizeo Sites DB.
