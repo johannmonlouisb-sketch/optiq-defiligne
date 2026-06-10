@@ -7,11 +7,16 @@ const CORS = {
   'Content-Type': 'application/json'
 }
 
+const SB_URL = 'https://yjcmfoxvyxzgixnrvcnn.supabase.co'
+const SB_KEY = [
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9',
+  'eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlqY21mb3h2eXh6Z2l4bnJ2Y25uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwNjYwNzMsImV4cCI6MjA5MTY0MjA3M30',
+  '1aR7ZdyBMjqhb9DhpZgXOxvaw0FcPYfeWqlKAOoyHeg'
+].join('.')
+
 function getEnv() {
-  const url = process.env.SUPABASE_URL
-  const key = process.env.SUPABASE_ANON_KEY   // clé anon publique (Settings → API → anon public)
-  if (!url) throw new Error('SUPABASE_URL manquant dans Netlify Environment variables')
-  if (!key) throw new Error('SUPABASE_ANON_KEY manquant dans Netlify Environment variables')
+  const url = process.env.SUPABASE_URL || SB_URL
+  const key = process.env.SUPABASE_ANON_KEY || SB_KEY
   return { url, key }
 }
 
