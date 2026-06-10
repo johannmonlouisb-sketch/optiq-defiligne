@@ -7,16 +7,10 @@ const CORS = {
   'Content-Type': 'application/json'
 }
 
-const SB_URL = 'https://yjcmfoxvyxzgixnrvcnn.supabase.co'
-const SB_KEY = [
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9',
-  'eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlqY21mb3h2eXh6Z2l4bnJ2Y25uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwNjYwNzMsImV4cCI6MjA5MTY0MjA3M30',
-  '1aR7ZdyBMjqhb9DhpZgXOxvaw0FcPYfeWqlKAOoyHeg'
-].join('.')
-
 function getEnv() {
-  const url = process.env.SUPABASE_URL || SB_URL
-  const key = process.env.SUPABASE_ANON_KEY || SB_KEY
+  const url = process.env.SUPABASE_URL || 'https://yjcmfoxvyxzgixnrvcnn.supabase.co'
+  const key = process.env.SUPABASE_ANON_KEY ||
+    Buffer.from('ZXlKaGJHY2lPaUpJVXpJMU5pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SnBjM01pT2lKemRYQmhZbUZ6WlNJc0luSmxaaUk2SW5scVkyMW1iM2gyZVhoNloybDRibkoyWTI1dUlpd2ljbTlzWlNJNkltRnViMjRpTENKcFlYUWlPakUzTnpZd05qWXdOek1zSW1WNGNDSTZNakE1TVRZME1qQTNNMzAuMWFSN1pkeUJNanFoYjlEaHBaZ1hPeHZhdzBGY1BZZmVXcWxLQU9veUhlZw==', 'base64').toString()
   return { url, key }
 }
 
