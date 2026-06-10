@@ -473,8 +473,8 @@ tr:hover td{background:var(--bg)}
 <!-- BARRE CHAT IA (bas de #main) -->
 
 <!-- MODAL EDIT / ADD -->
-<div id="m-edit" class="mo">
-  <div class="md">
+<div id="m-edit" class="mo" onclick="closeEdit()">
+  <div class="md" onclick="event.stopPropagation()">
 
     <!-- En-tête style Notion -->
     <div class="np-header">
