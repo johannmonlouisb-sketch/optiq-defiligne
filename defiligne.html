@@ -2937,6 +2937,7 @@ function shiftYear(n){
 // INTERVENTIONS
 // ═══════════════════════════════════════════════════════
 function rIv(){
+  const sqFocused=document.activeElement?.id==="iv-sq"
   let list=ivs
   const sq=document.getElementById("iv-sq")?.value||""
   const sd=document.getElementById("iv-sd")?.value||""
@@ -2975,6 +2976,7 @@ function rIv(){
         </select>
       </div>
     </div>`}).join("")}`
+  if(sqFocused){const el=document.getElementById("iv-sq");if(el){el.focus();const l=el.value.length;el.setSelectionRange(l,l)}}
 }
 
 // ═══════════════════════════════════════════════════════
@@ -3239,6 +3241,7 @@ function applyPrevYearMonth(){
 }
 
 function rPrev(){
+  const sqFocused=document.activeElement?.id==="prev-sq"
   // Dernière maintenance connue par client+addr
   const lastMaint={}
   ivs.filter(i=>i.status==="completed").forEach(i=>{
@@ -3402,6 +3405,7 @@ function rPrev(){
   ${!list.length?`<div class="card" style="text-align:center;color:var(--gray);padding:36px">Aucun client dans cette période</div>`:""}
   ${list.map(f=>prevCard(f)).join("")}
   `
+  if(sqFocused){const el=document.getElementById("prev-sq");if(el){el.focus();const l=el.value.length;el.setSelectionRange(l,l)}}
 }
 
 function prevCard(f){
