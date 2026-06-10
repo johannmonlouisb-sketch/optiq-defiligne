@@ -26,6 +26,11 @@
   status = 200
 
 [[redirects]]
+  from   = "/api/supabase"
+  to     = "/.netlify/functions/supabase"
+  status = 200
+
+[[redirects]]
   from   = "/api/config"
   to     = "/.netlify/functions/config"
   status = 200
