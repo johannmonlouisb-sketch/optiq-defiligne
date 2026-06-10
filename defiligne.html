@@ -88,6 +88,34 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);display:flex;h
 .mo{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:600;align-items:center;justify-content:center;padding:20px}
 .mo.open{display:flex}
 .md{background:#fff;border-radius:12px;padding:22px;width:100%;max-width:540px;max-height:90vh;overflow-y:auto}
+/* NOTION EDIT PANEL */
+#m-edit.mo{padding:0;justify-content:flex-end}
+#m-edit .md{max-width:560px;height:100%;max-height:100%;border-radius:16px 0 0 16px;padding:0;display:flex;flex-direction:column;overflow:hidden}
+#m-edit.mo.open .md{animation:npIn .22s cubic-bezier(.4,0,.2,1) both}
+@keyframes npIn{from{transform:translateX(100%)}to{transform:translateX(0)}}
+.np-header{padding:16px 20px 12px;border-bottom:1px solid var(--border);flex-shrink:0;background:#fff}
+.np-title-row{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+#m-client.np-title{border:none;font-size:21px;font-weight:700;padding:4px 6px;flex:1;border-radius:6px;background:transparent;color:var(--dark)}
+#m-client.np-title:hover,#m-client.np-title:focus{background:#f0f4ff;outline:none}
+.np-meta{display:flex;align-items:center;gap:6px;margin-bottom:10px}
+.np-crumb{font-size:12px;color:var(--gray);font-weight:500}
+#np-saved{font-size:12px;color:#2E7D32;margin-left:auto;opacity:0;transition:opacity .4s;font-weight:500}
+#np-saved.show{opacity:1}
+.np-hactions{display:flex;gap:6px}
+.np-body{flex:1;overflow-y:auto;padding:4px 0 32px}
+.np-sec-title{font-size:11px;font-weight:600;color:var(--gray);text-transform:uppercase;letter-spacing:.8px;padding:14px 20px 4px}
+.np-prop{display:flex;align-items:center;padding:5px 12px;border-radius:6px;margin:1px 8px;min-height:34px;transition:background .1s}
+.np-prop:hover{background:#f7f7f7}
+.np-lbl{width:172px;flex-shrink:0;font-size:13px;color:#888;user-select:none}
+.np-val{flex:1;border:none;background:transparent;font-size:14px;padding:3px 7px;border-radius:5px;color:var(--dark);font-family:inherit}
+.np-val:hover{background:#eee}
+.np-val:focus{background:#e8f0fe;outline:none}
+.np-val[type=checkbox]{flex:0;width:18px;height:18px;cursor:pointer;accent-color:var(--blue)}
+.np-div{height:1px;background:var(--border);margin:8px 20px}
+.np-notes{padding:6px 20px 4px}
+.np-notes-ta{width:100%;border:none;background:transparent;font-size:14px;padding:8px;resize:vertical;min-height:80px;font-family:inherit;border-radius:6px;box-sizing:border-box;color:var(--dark)}
+.np-notes-ta:hover,.np-notes-ta:focus{background:#f7f7f7;outline:none}
+.np-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0;background:#fafafa}
 /* INPUTS */
 input,select,textarea{font-family:inherit;border:1px solid var(--border);border-radius:7px;padding:8px 11px;font-size:14px;color:var(--dark);background:#fff;width:100%}
 input:focus,select:focus,textarea:focus{outline:2px solid var(--blue);border-color:var(--blue);outline-offset:0}
@@ -447,145 +475,198 @@ tr:hover td{background:var(--bg)}
 <!-- MODAL EDIT / ADD -->
 <div id="m-edit" class="mo">
   <div class="md">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
-      <div style="display:flex;align-items:center;gap:10px">
-        <div style="width:5px;height:22px;background:var(--blue);border-radius:3px"></div>
-        <h2 id="m-title" style="font-size:16px;font-weight:700">Intervention</h2>
+
+    <!-- En-tête style Notion -->
+    <div class="np-header">
+      <div class="np-title-row">
+        <span style="font-size:26px;flex-shrink:0;line-height:1">📋</span>
+        <input id="m-client" class="np-title" placeholder="Nom du client..." onblur="autoSaveField()"/>
       </div>
-      <div style="display:flex;gap:8px">
+      <div class="np-meta">
+        <span style="font-size:12px;color:var(--gray)">Interventions /</span>
+        <span id="m-title" class="np-crumb">Modifier</span>
+        <span id="np-saved" class="np-saved">✓ Sauvegardé</span>
+      </div>
+      <div class="np-hactions">
         <button id="m-del" onclick="deleteIv()" class="bg bsm" style="color:var(--red);border-color:var(--red)">🗑️ Supprimer</button>
-        <button onclick="closeEdit()" class="bicon">✕</button>
+        <button onclick="closeEdit()" class="bicon" style="margin-left:auto">✕</button>
       </div>
     </div>
-    <div style="display:grid;gap:12px">
-      <input type="hidden" id="m-id"/>
-      <div><label class="lbl">Client *</label><input id="m-client" placeholder="Nom du client"/></div>
-      <div>
-        <label class="lbl">Adresse *</label>
-        <input id="m-addr" placeholder="Adresse complète (avec code postal)" oninput="suggestDates()" onblur="suggestDates()"/>
-      </div>
+
+    <input type="hidden" id="m-id"/>
+
+    <!-- Corps du panneau -->
+    <div class="np-body">
+
       <!-- Suggestions de dates -->
-      <div id="date-suggestions" style="display:none;background:var(--blueLight);border-radius:8px;padding:10px 12px">
+      <div id="date-suggestions" style="display:none;background:var(--blueLight);border-radius:8px;padding:10px 12px;margin:8px 20px">
         <p style="font-size:12px;font-weight:600;color:var(--blue);margin-bottom:8px">📅 Créneaux disponibles pour cette adresse</p>
         <div id="date-slots" style="display:grid;gap:6px"></div>
         <p id="date-suggest-warn" style="font-size:11px;color:#E65100;margin-top:6px;display:none"></p>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div><label class="lbl">Type</label>
-          <select id="m-type">
-            <option value="maintenance_simple">Maintenance (15min)</option>
-            <option value="maintenance_complex">Maintenance+ (25min)</option>
-            <option value="installation">Installation (35min)</option>
-          </select>
-        </div>
-        <div><label class="lbl">Statut</label>
-          <select id="m-status">
-            <option value="pending">En attente</option>
-            <option value="confirmed">Confirmé</option>
-            <option value="completed">Terminé</option>
-            <option value="not_responded">Non répondu</option>
-          </select>
+
+      <!-- ── Informations ── -->
+      <div class="np-sec-title">Informations</div>
+
+      <div class="np-prop">
+        <div class="np-lbl">📍 Adresse</div>
+        <input id="m-addr" class="np-val" placeholder="Adresse complète (avec code postal)" oninput="suggestDates()" onblur="autoSaveField()"/>
+      </div>
+      <div class="np-prop">
+        <div class="np-lbl">📅 Date <span style="font-size:10px;color:var(--blue);font-weight:normal">(auto-suggérée)</span></div>
+        <input type="date" id="m-date" class="np-val" onchange="onDateChange();autoSaveField()"/>
+      </div>
+      <div class="np-prop">
+        <div class="np-lbl">👤 Technicien</div>
+        <select id="m-tech" class="np-val" onchange="autoSaveField()"></select>
+      </div>
+      <div id="m-commercial-row" class="np-prop" style="display:none">
+        <div class="np-lbl">💼 Commercial</div>
+        <span id="m-commercial-name" style="font-size:14px;color:#1d4ed8;font-weight:600;padding:3px 7px"></span>
+      </div>
+      <div class="np-prop">
+        <div class="np-lbl">🏷️ Type</div>
+        <select id="m-type" class="np-val" onchange="autoSaveField()">
+          <option value="maintenance_simple">Maintenance (15 min)</option>
+          <option value="maintenance_complex">Maintenance+ (25 min)</option>
+          <option value="installation">Installation (35 min)</option>
+        </select>
+      </div>
+      <div class="np-prop">
+        <div class="np-lbl">📊 Statut</div>
+        <select id="m-status" class="np-val" onchange="autoSaveField()">
+          <option value="pending">En attente</option>
+          <option value="confirmed">Confirmé</option>
+          <option value="completed">Terminé</option>
+          <option value="not_responded">Non répondu</option>
+        </select>
+      </div>
+      <div class="np-prop">
+        <div class="np-lbl">🕐 Début souhaité</div>
+        <input type="time" id="m-timestart" class="np-val" onchange="autoSaveField()"/>
+      </div>
+      <div class="np-prop">
+        <div class="np-lbl">⏰ Heure limite</div>
+        <input type="time" id="m-timeend" class="np-val" onchange="autoSaveField()"/>
+      </div>
+      <div class="np-prop">
+        <div class="np-lbl">🎓 Formation</div>
+        <div style="flex:1;display:flex;align-items:center;gap:8px;padding:3px 7px">
+          <input type="checkbox" id="m-form" class="np-val" onchange="autoSaveField()"/>
+          <label for="m-form" style="font-size:13px;cursor:pointer;color:var(--dark)">+10 min</label>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div><label class="lbl">Date <span style="font-size:10px;color:var(--blue);font-weight:normal">(auto-suggérée)</span></label><input type="date" id="m-date" onchange="onDateChange()"/></div>
-        <div>
-          <label class="lbl">Technicien</label><select id="m-tech"></select>
-          <div id="m-commercial-row" style="display:none;margin-top:5px;padding:4px 8px;background:#f0f4ff;border-radius:6px;font-size:11px;color:#1d4ed8">
-            💼 Commercial : <span id="m-commercial-name" style="font-weight:600"></span>
+      <div id="unplanned-wrap" class="np-prop" style="display:none">
+        <div class="np-lbl">🔀 Détour non prévu</div>
+        <div style="flex:1;display:flex;align-items:center;gap:8px;padding:3px 7px">
+          <input type="checkbox" id="m-unplanned" class="np-val" onchange="autoSaveField()"/>
+          <label for="m-unplanned" style="font-size:13px;cursor:pointer;color:#E65100">Oui</label>
+        </div>
+      </div>
+
+      <div class="np-div"></div>
+
+      <!-- ── Matériel ── -->
+      <div class="np-sec-title">Matériel</div>
+
+      <div class="np-prop">
+        <div class="np-lbl">🛡️ Armoire / Support</div>
+        <select id="m-arm" class="np-val" onchange="autoSaveField()">
+          <option value="">— Aucun —</option>
+          <option value="Armoire">Armoire</option>
+          <option value="Support acier">Support acier</option>
+          <option value="Armoire intérieure">Armoire intérieure</option>
+          <option value="Armoire extérieure">Armoire extérieure</option>
+          <option value="Autre modèle">Autre modèle</option>
+        </select>
+      </div>
+      <div class="np-prop">
+        <div class="np-lbl">💙 Modèle DAE</div>
+        <select id="m-dea" class="np-val" onchange="onDeaChange();autoSaveField()">
+          <option value="">— Aucun —</option>
+          <option value="HS300P">HS300P</option>
+          <option value="HS350P">HS350P</option>
+          <option value="HS360P">HS360P</option>
+          <option value="HS500P">HS500P</option>
+          <option value="CR2">CR2</option>
+          <option value="AUTRE">AUTRE</option>
+        </select>
+      </div>
+      <div class="np-prop">
+        <div class="np-lbl">⚡ Changer Pad Pak</div>
+        <div style="flex:1;display:flex;align-items:center;gap:8px;padding:3px 7px">
+          <input type="checkbox" id="m-padpak" class="np-val" onchange="autoSaveField()"/>
+          <span id="m-padpak-lbl" style="font-size:12px;color:var(--gray)">Électrodes DEA à remplacer</span>
+        </div>
+      </div>
+      <div class="np-prop">
+        <div class="np-lbl">📅 Péremption Pad Pak</div>
+        <input type="date" id="m-padpakdate" class="np-val" onchange="autoSaveField()"/>
+      </div>
+      <div id="m-bat-row" style="display:none">
+        <div class="np-prop">
+          <div class="np-lbl">🔋 Batterie à changer</div>
+          <div style="flex:1;display:flex;align-items:center;gap:8px;padding:3px 7px">
+            <input type="checkbox" id="m-batchg" class="np-val" onchange="autoSaveField()"/>
+            <label for="m-batchg" style="font-size:13px;cursor:pointer;color:#1B5E20">Oui</label>
           </div>
         </div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div><label class="lbl">🕐 Créneau souhaité (début)</label><input type="time" id="m-timestart" style="font-size:13px"/></div>
-        <div><label class="lbl">⏰ Heure limite (au plus tard)</label><input type="time" id="m-timeend" style="font-size:13px"/></div>
-      </div>
-      <div style="display:flex;align-items:center;gap:16px">
-        <div style="display:flex;align-items:center;gap:8px">
-          <input type="checkbox" id="m-form" style="width:auto"/>
-          <label style="font-size:13px;cursor:pointer" for="m-form">Formation (+10 min)</label>
-        </div>
-        <div id="unplanned-wrap" style="display:none;align-items:center;gap:8px">
-          <input type="checkbox" id="m-unplanned" style="width:auto"/>
-          <label style="font-size:13px;cursor:pointer;color:#E65100" for="m-unplanned">🔀 Détour non prévu</label>
+        <div class="np-prop">
+          <div class="np-lbl">📅 Péremption Batterie</div>
+          <input type="date" id="m-batdate" class="np-val" onchange="autoSaveField()"/>
         </div>
       </div>
-      <div><label class="lbl">Matériel</label>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div><label class="lbl" style="margin-bottom:2px">Support / Armoire</label>
-            <select id="m-arm">
-              <option value="">— Aucun —</option>
-              <option value="Armoire">Armoire</option>
-              <option value="Support acier">Support acier</option>
-              <option value="Armoire intérieure">Armoire intérieure</option>
-              <option value="Armoire extérieure">Armoire extérieure</option>
-              <option value="Autre modèle">Autre modèle</option>
-            </select>
-          </div>
-          <div><label class="lbl" style="margin-bottom:2px">Modèle DAE</label>
-            <select id="m-dea" onchange="onDeaChange()">
-              <option value="">— Aucun —</option>
-              <option value="HS300P">HS300P</option>
-              <option value="HS350P">HS350P</option>
-              <option value="HS360P">HS360P</option>
-              <option value="HS500P">HS500P</option>
-              <option value="CR2">CR2</option>
-              <option value="AUTRE">AUTRE</option>
-            </select>
-          </div>
-        </div>
+
+      <div class="np-div"></div>
+
+      <!-- ── Notes (corps de page) ── -->
+      <div class="np-sec-title">Notes</div>
+      <div class="np-notes">
+        <textarea id="m-notes" class="np-notes-ta" rows="4" placeholder="Ajouter des notes, informations spécifiques..." onblur="autoSaveField()"></textarea>
       </div>
-      <div><label class="lbl">Notes</label><textarea id="m-notes" rows="2" placeholder="Informations spécifiques..."></textarea></div>
-      <!-- Pad Pak -->
-      <div style="display:grid;gap:8px">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-          <div style="display:flex;align-items:center;gap:10px;padding:10px;background:#FFF3E0;border-radius:8px">
-            <input type="checkbox" id="m-padpak" style="width:auto;width:18px;height:18px;cursor:pointer"/>
-            <div>
-              <label for="m-padpak" style="font-size:13px;font-weight:600;cursor:pointer;color:#E65100">⚡ Changer Pad Pak</label>
-              <p id="m-padpak-lbl" style="font-size:11px;color:var(--gray);margin-top:1px">Électrodes DEA à remplacer</p>
-            </div>
-          </div>
-          <div>
-            <label class="lbl">Date péremption Pad Pak</label>
-            <input type="date" id="m-padpakdate" style="font-size:13px"/>
-          </div>
-        </div>
-        <div id="m-bat-row" style="display:none;grid-template-columns:1fr 1fr;gap:10px">
-          <div style="display:flex;align-items:center;gap:10px;padding:10px;background:#E8F5E9;border-radius:8px">
-            <input type="checkbox" id="m-batchg" style="width:auto;width:18px;height:18px;cursor:pointer"/>
-            <div>
-              <label for="m-batchg" style="font-size:13px;font-weight:600;cursor:pointer;color:#1B5E20">🔋 Batterie à changer</label>
-              <p style="font-size:11px;color:var(--gray);margin-top:1px">Batterie séparée du Pad Pak</p>
-            </div>
-          </div>
-          <div>
-            <label class="lbl">Date péremption Batterie</label>
-            <input type="date" id="m-batdate" style="font-size:13px"/>
-          </div>
-        </div>
+
+      <div class="np-div"></div>
+
+      <!-- ── Contacts Kizeo ── -->
+      <div class="np-sec-title">Contacts Kizeo</div>
+
+      <div class="np-prop">
+        <div class="np-lbl">👤 Contact site</div>
+        <input id="m-contact" class="np-val" placeholder="Nom du contact" onblur="autoSaveField()"/>
       </div>
-      <div style="border-top:1px solid var(--border);padding-top:10px;margin-top:2px">
-        <p style="font-size:11px;color:var(--gray);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📋 Informations Kizeo (technicien)</p>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-          <div><label class="lbl">Personne à contacter sur site</label><input id="m-contact" placeholder="Nom du contact"/></div>
-          <div><label class="lbl">Téléphone site</label><input id="m-cphone" placeholder="06 xx xx xx xx" type="tel"/></div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px">
-          <div><label class="lbl">Email site</label><input id="m-cemail" placeholder="contact@client.fr" type="email"/></div>
-          <div><label class="lbl">Adresse siège</label><input id="m-siege" placeholder="Siège social du client"/></div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:8px">
-          <div><label class="lbl">Contact siège</label><input id="m-cscontact" placeholder="Nom contact siège"/></div>
-          <div><label class="lbl">Email siège</label><input id="m-csemail" placeholder="email@siege.fr" type="email"/></div>
-          <div><label class="lbl">Tél. siège</label><input id="m-csphone" placeholder="01 xx xx xx xx" type="tel"/></div>
-        </div>
+      <div class="np-prop">
+        <div class="np-lbl">📞 Téléphone site</div>
+        <input id="m-cphone" class="np-val" placeholder="06 xx xx xx xx" type="tel" onblur="autoSaveField()"/>
       </div>
-      <div style="display:flex;gap:10px;justify-content:flex-end;padding-top:4px">
-        <button class="bg" onclick="closeEdit()">Annuler</button>
-        <button class="bb" onclick="saveEdit()">💾 Enregistrer</button>
+      <div class="np-prop">
+        <div class="np-lbl">📧 Email site</div>
+        <input id="m-cemail" class="np-val" placeholder="contact@client.fr" type="email" onblur="autoSaveField()"/>
       </div>
+      <div class="np-prop">
+        <div class="np-lbl">🏢 Adresse siège</div>
+        <input id="m-siege" class="np-val" placeholder="Siège social du client" onblur="autoSaveField()"/>
+      </div>
+      <div class="np-prop">
+        <div class="np-lbl">👤 Contact siège</div>
+        <input id="m-cscontact" class="np-val" placeholder="Nom contact siège" onblur="autoSaveField()"/>
+      </div>
+      <div class="np-prop">
+        <div class="np-lbl">📧 Email siège</div>
+        <input id="m-csemail" class="np-val" placeholder="email@siege.fr" type="email" onblur="autoSaveField()"/>
+      </div>
+      <div class="np-prop">
+        <div class="np-lbl">📞 Tél. siège</div>
+        <input id="m-csphone" class="np-val" placeholder="01 xx xx xx xx" type="tel" onblur="autoSaveField()"/>
+      </div>
+
+    </div><!-- /np-body -->
+
+    <!-- Pied -->
+    <div class="np-foot">
+      <button class="bg" onclick="closeEdit()">Fermer</button>
+      <button class="bb" onclick="saveEdit()">💾 Enregistrer</button>
     </div>
+
   </div>
 </div>
 
@@ -1802,7 +1883,7 @@ function onDeaChange(){
   const isHS=["HS300P","HS350P","HS360P","HS500P"].includes(dea)
   const batRow=document.getElementById("m-bat-row")
   const padLbl=document.getElementById("m-padpak-lbl")
-  if(batRow)batRow.style.display=(!dea||isHS)?"none":"grid"
+  if(batRow)batRow.style.display=(!dea||isHS)?"none":"block"
   if(padLbl)padLbl.textContent=isHS?"Pad Pak (batterie incluse)":"Électrodes DEA à remplacer"
   if(isHS||!dea){const bc=document.getElementById("m-batchg");if(bc)bc.checked=false;const bd=document.getElementById("m-batdate");if(bd)bd.value=""}
 }
@@ -4304,7 +4385,7 @@ function editIv(id){
   const mcommRow=document.getElementById("m-commercial-row")
   const mcommName=document.getElementById("m-commercial-name")
   if(mcommRow&&mcommName){
-    if(iv.commercial){mcommName.textContent=iv.commercial;mcommRow.style.display="block"}
+    if(iv.commercial){mcommName.textContent=iv.commercial;mcommRow.style.display="flex"}
     else mcommRow.style.display="none"
   }
   document.getElementById("m-edit").classList.add("open")
@@ -4358,6 +4439,43 @@ function saveEdit(){
   else if(curView==="interventions")rIv()
   else if(curView==="materiel")rMat()
   else if(curView==="previsions")rPrev()
+  cloudSave()
+}
+function autoSaveField(){
+  const id=parseInt(document.getElementById("m-id").value)||null
+  if(!id)return
+  const c=document.getElementById("m-client").value.trim()
+  const a=document.getElementById("m-addr").value.trim()
+  if(!c||!a)return
+  const obj={
+    client:c,addr:a,
+    type:document.getElementById("m-type").value,
+    status:document.getElementById("m-status").value,
+    date:document.getElementById("m-date").value,
+    techId:+document.getElementById("m-tech").value,
+    form:document.getElementById("m-form").checked,
+    arm:document.getElementById("m-arm").value,
+    dea:document.getElementById("m-dea").value,
+    bat:document.getElementById("m-padpak").checked?1:0,
+    batChange:document.getElementById("m-batchg")?.checked||false,
+    batDate:document.getElementById("m-batdate")?.value||"",
+    notes:document.getElementById("m-notes").value,
+    padPak:document.getElementById("m-padpak").checked,
+    padPakDate:document.getElementById("m-padpakdate").value,
+    timeStart:document.getElementById("m-timestart").value||"",
+    timeEnd:document.getElementById("m-timeend").value||"",
+    unplanned:document.getElementById("m-unplanned")?.checked||false,
+    contact:document.getElementById("m-contact").value.trim(),
+    cphone:document.getElementById("m-cphone").value.trim(),
+    cemail:document.getElementById("m-cemail").value.trim(),
+    siege:document.getElementById("m-siege").value.trim(),
+    contact_siege:document.getElementById("m-cscontact")?.value.trim()||"",
+    email_siege:document.getElementById("m-csemail")?.value.trim()||"",
+    phone_siege:document.getElementById("m-csphone")?.value.trim()||""
+  }
+  ivs=ivs.map(i=>i.id===id?{...i,...obj}:i)
+  const ind=document.getElementById("np-saved")
+  if(ind){ind.classList.add("show");clearTimeout(ind._t);ind._t=setTimeout(()=>ind.classList.remove("show"),1800)}
   cloudSave()
 }
 function deleteIv(){
