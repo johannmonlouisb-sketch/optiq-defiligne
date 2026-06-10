@@ -7987,8 +7987,8 @@ function showNotionPanel(){
 </script>
 
 <!-- ══ MODAL NOTION SYNC ══ -->
-<div id="notion-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:900;align-items:center;justify-content:center">
-  <div style="background:#fff;border-radius:16px;padding:24px;width:460px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.2)">
+<div id="notion-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:900;align-items:center;justify-content:center" onclick="document.getElementById('notion-modal').style.display='none'">
+  <div style="background:#fff;border-radius:16px;padding:24px;width:460px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.2)" onclick="event.stopPropagation()">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
       <h2 style="font-size:16px;font-weight:700">🔗 Synchronisation Notion</h2>
       <button onclick="document.getElementById('notion-modal').style.display='none'"
