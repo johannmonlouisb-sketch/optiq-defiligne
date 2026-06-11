@@ -7139,10 +7139,20 @@ const isDeployed = location.hostname !== 'localhost' && location.protocol !== 'f
 let cloudSyncing = false
 let cloudSaveTimer = null
 
-// cloudLoad — localStorage uniquement
-async function cloudLoad(){ return false }
+async function cloudLoad(){
+  if(!isDeployed) return false
+  try{
+    const rows = await sbGet('app_state?key=eq.optiq_ivs_data&select=value')
+    const val = rows[0]?.value
+    if(Array.isArray(val) && val.length){
+      ivs = val
+      nextId = Math.max(0, ...ivs.map(i=>i.id||0)) + 1
+      return true
+    }
+  }catch(e){ console.warn('Supabase load:', e.message) }
+  return false
+}
 
-// Sauvegarder dans localStorage
 function cloudSave(immediate = false){
   clearTimeout(cloudSaveTimer)
   const delay = immediate ? 0 : 1000
@@ -7152,6 +7162,12 @@ function cloudSave(immediate = false){
       const el = document.getElementById('cloud-status')
       if(el) el.innerHTML = `💾 <span style="color:#1B5E20">Sauvegardé · ${ivs.length}</span>`
     } catch(e){ console.warn('Save error:', e) }
+    if(isDeployed){
+      sbUpsert('app_state', {key:'optiq_ivs_data', value:ivs}).then(()=>{
+        const el = document.getElementById('cloud-status')
+        if(el) el.innerHTML = `☁️ <span style="color:#1B5E20">Cloud · ${ivs.length}</span>`
+      }).catch(e => console.warn('Supabase save:', e.message))
+    }
   }, delay)
 }
 
@@ -7553,16 +7569,74 @@ async function geocodeAllTechDepots(){
 const NOTION_ENDPOINT = '/api/notion'
 const isDeployedApp = location.protocol !== 'file:'
 
+// ── Supabase direct (clé anon publique) ─────────────────────────
+const SB_URL = 'https://yjcmfoxvyxzgixnrvcnn.supabase.co'
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9' +
+  '.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlqY21mb3h2eXh6Z2l4bnJ2Y25uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwNjYwNzMsImV4cCI6MjA5MTY0MjA3M30' +
+  '.1aR7ZdyBMjqhb9DhpZgXOxvaw0FcPYfeWqlKAOoyHeg'
+
+async function sbGet(path){
+  const r = await fetch(`${SB_URL}/rest/v1/${path}`,{headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`}})
+  const t = await r.text()
+  if(!r.ok) throw new Error(`SB ${r.status}`)
+  return t ? JSON.parse(t) : []
+}
+
+async function sbUpsert(table, data){
+  const r = await fetch(`${SB_URL}/rest/v1/${table}`,{
+    method:'POST',
+    headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+    body:JSON.stringify(data)
+  })
+  if(!r.ok){ const t=await r.text(); throw new Error(`SB POST ${r.status}: ${t.substring(0,100)}`) }
+}
+
 // ── Cache Kizeo (base sites & matériel) ──────────────────────────
 let _kizeoCache = null, _kizeoFetchTs = 0
 
 async function fetchKizeoSites(){
   if(_kizeoCache && Date.now()-_kizeoFetchTs < 30*60000) return _kizeoCache
   try{
+    const rows = await sbGet('kizeo_sites?statut=neq.Annul%C3%A9e&select=*&order=societe.asc')
+    if(rows?.length){
+      _kizeoCache = rows.map(s=>({
+        id:s.notion_id||s.id, nomSite:s.nom_site||'', societe:s.societe||'',
+        adresse:s.adresse||'', adresseSiege:s.adresse_siege||'',
+        codePostal:s.code_postal||'', ville:s.ville||'',
+        technicien:s.technicien||'', commercial:s.commercial||'',
+        daeModele:s.dae_modele||'', nSerie:s.n_serie||'',
+        typeIntervention:s.type_intervention||'', statut:s.statut||'',
+        maintenancePlanifiee:s.maintenance_planifiee||'',
+        padPakDateAdulte:s.pad_pak_date_adulte||'', padPakDatePed:s.pad_pak_date_ped||'',
+        batDate:s.bat_date||'', electrodeDate:s.electrode_date||'',
+        prochaineExpiration:s.prochaine_expiration||'', pma:s.pma||'',
+        derniereIntervention:s.derniere_intervention||'',
+        urgencePadPak:s.urgence_pad_pak||'', urgenceElectrodes:s.urgence_electrodes||'',
+        urgenceAnnuelle:s.urgence_annuelle||'',
+        lat:s.lat, lng:s.lng, contact:s.contact||'', phone:s.phone||'',
+        email:s.email||'', notes:s.notes||''
+      }))
+      _kizeoFetchTs = Date.now()
+      return _kizeoCache
+    }
+  }catch(e){ console.warn('Supabase kizeo:', e.message) }
+  // Fallback Notion
+  try{
     const data = await notionCall('query_kizeo', {})
     if(data.sites?.length){ _kizeoCache = data.sites; _kizeoFetchTs = Date.now() }
-  }catch(e){ console.warn('Kizeo fetch:', e.message) }
+  }catch(e){ console.warn('Notion kizeo fallback:', e.message) }
   return _kizeoCache || []
+}
+
+async function syncKizeoToSupabase(){
+  try{
+    const r = await fetch('/api/supabase',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'kizeo_fetch_notion'})})
+    const d = await r.json()
+    if(!d.sites?.length) return {error:'Aucun site Notion'}
+    for(let i=0;i<d.sites.length;i+=100) await sbUpsert('kizeo_sites', d.sites.slice(i,i+100))
+    _kizeoCache = null
+    return {synced: d.sites.length}
+  }catch(e){ return {error:e.message} }
 }
 
 function matchKizeoSite(iv, sites){
