@@ -7138,19 +7138,50 @@ async function autoDetectKizeoUsers(){
 const isDeployed = location.hostname !== 'localhost' && location.protocol !== 'file:'
 let cloudSyncing = false
 let cloudSaveTimer = null
+let _cloudUpdatedAt = null
 
 async function cloudLoad(){
   if(!isDeployed) return false
   try{
-    const rows = await sbGet('app_state?key=eq.optiq_ivs_data&select=value')
-    const val = rows[0]?.value
+    const rows = await sbGet('app_state?key=eq.optiq_ivs_data&select=value,updated_at')
+    const row = rows[0]
+    if(!row) return false
+    const val = row.value
     if(Array.isArray(val) && val.length){
       ivs = val
       nextId = Math.max(0, ...ivs.map(i=>i.id||0)) + 1
+      _cloudUpdatedAt = row.updated_at || null
       return true
     }
   }catch(e){ console.warn('Supabase load:', e.message) }
   return false
+}
+
+async function cloudPoll(){
+  if(!isDeployed) return
+  try{
+    const rows = await sbGet('app_state?key=eq.optiq_ivs_data&select=updated_at')
+    const ts = rows[0]?.updated_at
+    if(!ts) return
+    if(_cloudUpdatedAt && ts !== _cloudUpdatedAt){
+      const loaded = await cloudLoad()
+      if(loaded){
+        updateSbCount()
+        const cv = document.querySelector('.view.on')?.id?.replace('v-','')
+        if(cv==='depart') rDepart()
+        else if(cv==='planning') rPlan()
+        else if(cv==='dash') rDash()
+        else if(cv==='iv') rIv()
+        const el = document.getElementById('cloud-status')
+        if(el){
+          el.innerHTML=`☁️ <span style="color:#1565C0">🔄 Sync · ${ivs.length}</span>`
+          setTimeout(()=>{ if(el)el.innerHTML=`☁️ <span style="color:#1B5E20">Cloud · ${ivs.length}</span>` },2000)
+        }
+      }
+    } else if(!_cloudUpdatedAt){
+      _cloudUpdatedAt = ts
+    }
+  }catch(e){ console.warn('Cloud poll:', e.message) }
 }
 
 function cloudSave(immediate = false){
@@ -7163,9 +7194,12 @@ function cloudSave(immediate = false){
       if(el) el.innerHTML = `💾 <span style="color:#1B5E20">Sauvegardé · ${ivs.length}</span>`
     } catch(e){ console.warn('Save error:', e) }
     if(isDeployed){
-      sbUpsert('app_state', {key:'optiq_ivs_data', value:ivs}).then(()=>{
+      sbUpsert('app_state', {key:'optiq_ivs_data', value:ivs}).then(async ()=>{
         const el = document.getElementById('cloud-status')
         if(el) el.innerHTML = `☁️ <span style="color:#1B5E20">Cloud · ${ivs.length}</span>`
+        // Mémoriser le timestamp pour ne pas se re-déclencher soi-même au poll
+        const rows = await sbGet('app_state?key=eq.optiq_ivs_data&select=updated_at').catch(()=>[])
+        if(rows[0]?.updated_at) _cloudUpdatedAt = rows[0].updated_at
       }).catch(e => console.warn('Supabase save:', e.message))
     }
   }, delay)
@@ -7235,6 +7269,15 @@ function initCloud(){
   const el = document.getElementById('cloud-status')
   if(el) el.innerHTML = `💾 <span style="color:#1B5E20">${ivs.length} interventions</span>`
   SV(curView)
+
+  // Sync cross-device : charger depuis Supabase au démarrage + polling 30s
+  if(isDeployed){
+    cloudLoad().then(loaded=>{
+      if(loaded){ updateSbCount(); SV(curView) }
+      setInterval(cloudPoll, 30000)
+      document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) cloudPoll() })
+    })
+  }
 
   // Sync temps réel quand l'app tech modifie les données dans un autre onglet
   window.addEventListener('storage',e=>{
