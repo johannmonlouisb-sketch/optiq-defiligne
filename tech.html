@@ -630,8 +630,9 @@ function saveTourProgress(status){
   const dayIvs=myIvs(date)
   const tc=TB(curTech)
   const startTimeStr=tourStartTime?`${String(tourStartTime.getHours()).padStart(2,'0')}:${String(tourStartTime.getMinutes()).padStart(2,'0')}`:''
+  let stored={}
   try{
-    const stored=JSON.parse(localStorage.getItem('optiq_tour_progress')||'{}')
+    stored=JSON.parse(localStorage.getItem('optiq_tour_progress')||'{}')
     const key=`${curTech}_${date}`
     if(status==='idle'){ delete stored[key] }
     else{
@@ -646,6 +647,18 @@ function saveTourProgress(status){
     }
     localStorage.setItem('optiq_tour_progress',JSON.stringify(stored))
   }catch(e){}
+  // Sync vers Supabase — merge pour ne pas écraser les autres techs
+  if(_sbClient){
+    ;(async()=>{
+      try{
+        const {data} = await _sbClient.from('app_state').select('value').eq('key','optiq_tour_progress').maybeSingle()
+        const sbVal = (data?.value && typeof data.value === 'object') ? data.value : {}
+        const merged = {...sbVal, ...stored}
+        await _sbClient.from('app_state').upsert({key:'optiq_tour_progress', value:merged},{onConflict:'key'})
+        _setSbDot('#22c55e',`Tour sync · ${tc.name} ${status}`)
+      }catch(e){ _setSbDot('#f59e0b','Tour sync: '+e.message) }
+    })()
+  }
 }
 
 function startTournee(){

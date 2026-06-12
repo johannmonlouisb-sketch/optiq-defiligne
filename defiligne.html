@@ -2056,13 +2056,25 @@ function closeSearch(){document.getElementById("gsearch-res").classList.remove("
 // ═══════════════════════════════════════════════════════
 // TRACKER TOURNÉES EN DIRECT
 // ═══════════════════════════════════════════════════════
+let _tourProgressData = {}
+
 function renderTourTracker(){
   const el=document.getElementById('tour-tracker')
   if(!el) return
   try{
-    const stored=JSON.parse(localStorage.getItem('optiq_tour_progress')||'{}')
+    // Fusionner : Supabase (cross-device) + localStorage (fallback même appareil)
+    const local=JSON.parse(localStorage.getItem('optiq_tour_progress')||'{}')
+    const stored={..._tourProgressData, ...local}
+    // Préférer les données les plus récentes
+    const merged={}
+    Object.keys(stored).forEach(k=>{
+      const l=local[k], s=_tourProgressData[k]
+      if(!l) merged[k]=s
+      else if(!s) merged[k]=l
+      else merged[k]=(l.updatedAt||0)>=(s.updatedAt||0)?l:s
+    })
     const today=selDate
-    const active=Object.values(stored).filter(t=>t.date===today&&(t.status==='running'||t.status==='done'))
+    const active=Object.values(merged).filter(t=>t.date===today&&(t.status==='running'||t.status==='done'))
     // Badge topbar
     const running=active.filter(t=>t.status==='running')
     const badge=document.getElementById('topbar-tour-badge')
@@ -7375,6 +7387,25 @@ function initCloud(){
             }
           })
           .subscribe()
+
+        // Canal séparé pour la progression des tournées (chaque tech = clé indépendante)
+        sbClient.channel('tour-sync')
+          .on('postgres_changes',{
+            event:'*', schema:'public', table:'app_state',
+            filter:'key=eq.optiq_tour_progress'
+          }, payload => {
+            const val = payload.new?.value
+            if(!val || typeof val !== 'object') return
+            _tourProgressData = val
+            if(curView==='dashboard') renderTourTracker()
+          })
+          .subscribe()
+
+        // Chargement initial de la progression des tournées
+        sbGet('app_state?key=eq.optiq_tour_progress&select=value')
+          .then(rows=>{ if(rows[0]?.value){ _tourProgressData=rows[0].value; renderTourTracker() } })
+          .catch(e=>console.warn('Tour load:', e.message))
+
       }catch(e){ console.warn('Realtime init:', e.message) }
 
       // Fallback : rechargement au retour d'onglet (si WebSocket coupé)
@@ -7408,10 +7439,11 @@ function initCloud(){
       }catch{}
     }
     if(e.key==='optiq_tour_progress'){
-      renderTourTracker()
-      // Si un tech vient de démarrer, recalculer les ETAs depuis l'heure réelle
       try{
         const prog=JSON.parse(e.newValue||'{}')
+        // Fusionner dans _tourProgressData (le localStorage local prime sur Supabase pour même appareil)
+        _tourProgressData={..._tourProgressData,...prog}
+        renderTourTracker()
         Object.values(prog).forEach(t=>{
           if(t.status==='running'&&t.startTime&&t.date===selDate&&/^\d{2}:\d{2}$/.test(t.startTime)){
             refreshDepETAs(t.techId, t.startTime)
