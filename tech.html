@@ -229,6 +229,7 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
       <div id="top-sub"></div>
     </div>
     <button id="btn-gps-all" onclick="openGPSAll()">🗺️ Ouvrir Maps</button>
+    <div id="sb-status" title="Statut Supabase" style="width:8px;height:8px;border-radius:50%;background:#666;flex-shrink:0;cursor:pointer" onclick="showSbStatus()"></div>
     <button id="btn-tech" onclick="openTechSelect()">👤 —</button>
   </div>
 
@@ -2717,29 +2718,41 @@ if ('serviceWorker' in navigator) {
   })
 }
 
+// ── Statut Supabase visible (point coloré dans topbar) ──────────
+let _sbLastSync = null
+function _setSbDot(color, title){ const d=document.getElementById('sb-status'); if(d){d.style.background=color;d.title=title} }
+function showSbStatus(){
+  const msg = _sbLastSync
+    ? `☁️ Supabase connecté\nDernier sync : ${_sbLastSync}\n${ivs.length} interventions`
+    : '⚠️ Supabase non connecté\nDonnées locales uniquement'
+  alert(msg)
+}
+
 // Supabase Realtime — sync avec l'app dispatch (même source app_state)
 document.addEventListener('DOMContentLoaded', async () => {
-  let attempts = 0
-  while (!supabase && attempts < 20) {
-    await new Promise(r => setTimeout(r, 300))
-    attempts++
-  }
-  if (!supabase) { console.warn('Supabase offline'); return }
+  if (!supabase) { _setSbDot('#ef4444','Supabase non initialisé'); return }
+
+  _setSbDot('#f59e0b','Connexion...')
 
   // Charger les dernières données depuis Supabase au démarrage
   try {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('app_state')
       .select('value, updated_at')
       .eq('key', 'optiq_ivs_data')
       .single()
+    if (error) throw error
     if (data?.value && Array.isArray(data.value) && data.value.length) {
       ivs = data.value
       saveIvs()
       if (typeof renderDepart === 'function') renderDepart()
       if (typeof updateBadges === 'function') updateBadges()
+      _sbLastSync = new Date().toLocaleTimeString('fr-FR')
+      _setSbDot('#22c55e', `Sync OK · ${ivs.length} interventions`)
+    } else {
+      _setSbDot('#f59e0b','Connecté — aucune donnée cloud')
     }
-  } catch(e) { console.warn('Supabase load:', e.message) }
+  } catch(e) { _setSbDot('#ef4444','Erreur : '+e.message) }
 
   // Écouter les modifications du dispatch en temps réel
   supabase.channel('tech-app-sync')
@@ -2753,11 +2766,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       saveIvs()
       if (typeof renderDepart === 'function') renderDepart()
       if (typeof updateBadges === 'function') updateBadges()
-      console.log('🔄 Sync dispatch →', ivs.length, 'interventions')
+      _sbLastSync = new Date().toLocaleTimeString('fr-FR')
+      _setSbDot('#22c55e', `Sync ${_sbLastSync} · ${ivs.length} interv.`)
     })
-    .subscribe()
-
-  console.log('✓ Supabase Realtime actif — sync dispatch/tech')
+    .subscribe(status => {
+      if (status === 'SUBSCRIBED') _setSbDot('#22c55e', `Connecté · ${ivs.length} interventions`)
+      if (status === 'CHANNEL_ERROR') _setSbDot('#ef4444', 'Erreur WebSocket')
+    })
 })
 </script>
 
