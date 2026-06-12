@@ -122,9 +122,14 @@ input,select,textarea{font-family:inherit;border:1px solid var(--border);border-
 input:focus,select:focus,textarea:focus{outline:2px solid var(--blue);border-color:var(--blue);outline-offset:0}
 .lbl{font-size:12px;color:var(--gray);font-weight:500;display:block;margin-bottom:3px}
 /* DEPART TAB */
-#dep-layout{display:grid;grid-template-columns:1fr 360px;gap:12px;flex:1;min-height:0;padding:12px 16px}
-#dep-map-frame{border-radius:10px;overflow:hidden;border:1px solid var(--border);background:#f0f0f0;display:flex;flex-direction:column}
-#dep-list{display:flex;flex-direction:column;gap:8px;overflow-y:auto}
+#dep-layout{display:flex;flex-direction:column;flex:1;min-height:0;padding:12px 16px 0}
+#dep-map-frame{flex:1;min-height:200px;border-radius:10px;overflow:hidden;border:1px solid var(--border);background:#f0f0f0;display:flex;flex-direction:column}
+#dep-sheet{flex-shrink:0;background:#fff;border-top:2px solid var(--border);border-radius:12px 12px 0 0;box-shadow:0 -4px 18px rgba(0,0,0,.09);max-height:420px;overflow:hidden;transition:max-height .35s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column}
+#dep-sheet.closed{max-height:44px}
+#dep-sheet-handle{display:flex;align-items:center;gap:10px;padding:11px 16px;cursor:pointer;flex-shrink:0;user-select:none;background:#fff;border-radius:12px 12px 0 0}
+#dep-list{overflow-y:auto;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:4px 16px 16px}
+#dep-list .dep-grp-hdr{grid-column:1 / -1}
+#dep-list>.card{grid-column:1 / -1}
 .dep-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px;cursor:pointer;transition:all 0.15s;border-left:4px solid var(--blue)}
 .dep-card.done{border-left-color:#4CAF50;opacity:0.65}
 .dep-card:hover:not(.done){box-shadow:0 2px 12px rgba(0,0,0,0.1)}
@@ -160,7 +165,9 @@ tr:hover td{background:var(--bg)}
   #logo-z img{height:24px}
   #logo-z p{display:none}
   #gsearch-wrap{max-width:180px}
-  #dep-layout{grid-template-columns:1fr;grid-template-rows:300px auto}
+  #dep-layout{padding:8px 8px 0}
+  #dep-sheet{max-height:55%}
+  #dep-list{grid-template-columns:1fr}
   .kpig{grid-template-columns:repeat(2,1fr)}
   .g2{grid-template-columns:1fr}
 }
@@ -278,7 +285,7 @@ tr:hover td{background:var(--bg)}
       <div class="surf" style="border-left:3px solid var(--orange);display:flex;align-items:center;gap:8px;padding:8px 12px"><span>🔧</span><div><div class="lbl">Travail</div><div id="dsw" style="font-size:16px;font-weight:700;color:var(--orange)">—</div></div></div>
       <div class="surf" style="border-left:3px solid var(--green);display:flex;align-items:center;gap:8px;padding:8px 12px"><span>📍</span><div><div class="lbl">Validés</div><div id="dsv" style="font-size:16px;font-weight:700;color:var(--green)">—</div></div></div>
     </div>
-    <div id="dep-layout" style="flex:1;min-height:0">
+    <div id="dep-layout">
       <div id="dep-map-frame">
         <div id="dep-mapid" style="width:100%;height:100%;min-height:300px"></div>
         <div id="dep-map-pb" style="display:none;padding:10px 14px;background:var(--blueLight)">
@@ -289,7 +296,14 @@ tr:hover td{background:var(--bg)}
           Sélectionnez une date et des techniciens
         </div>
       </div>
-      <div id="dep-list"></div>
+      <div id="dep-sheet">
+        <div id="dep-sheet-handle" onclick="toggleDepSheet()">
+          <div style="width:36px;height:4px;background:var(--border);border-radius:2px;flex-shrink:0"></div>
+          <span id="dep-sheet-lbl" style="font-size:13px;font-weight:600;flex:1">Interventions</span>
+          <span id="dep-sheet-arrow" style="font-size:11px;color:var(--gray);font-weight:700">▼</span>
+        </div>
+        <div id="dep-list"></div>
+      </div>
     </div>
   </div>
 
@@ -1912,6 +1926,14 @@ function depNow(){
   _autoDepTime()
   _schedDepMap()
 }
+let _depSheetOpen=true
+function toggleDepSheet(){
+  _depSheetOpen=!_depSheetOpen
+  const sh=document.getElementById('dep-sheet')
+  const arr=document.getElementById('dep-sheet-arrow')
+  if(sh) sh.classList.toggle('closed',!_depSheetOpen)
+  if(arr) arr.textContent=_depSheetOpen?'▼':'▲'
+}
 
 function togDepTech2(id,e){
   if(e)e.stopPropagation()
@@ -2337,6 +2359,8 @@ function rDepart(){
   const failCount=dayIvs.filter(i=>depFailed[i.id]).length
   document.getElementById("dep-stats").innerHTML=
     `✅ <strong style="color:var(--green)">${doneCount}</strong> validées · ❌ <strong style="color:#C62828">${failCount}</strong> échecs · ${dayIvs.length} total`
+  const _shlbl=document.getElementById('dep-sheet-lbl')
+  if(_shlbl) _shlbl.textContent=`${dayIvs.length} intervention${dayIvs.length>1?'s':''}${doneCount?' · ✅ '+doneCount:''}`
   const el=document.getElementById("dsv")
   if(el)el.textContent=`${doneCount}/${dayIvs.length}`
 
@@ -2378,7 +2402,7 @@ function rDepart(){
       const locked=isRouteLocked(tid,date)
       // ── En-tête du groupe technicien ──
       const isAbsent=isTechAbsent(tid,date)
-      html+=`<div style="display:flex;align-items:center;gap:8px;padding:8px 4px 4px;flex-shrink:0${isAbsent?';opacity:.5':''}">
+      html+=`<div class="dep-grp-hdr" style="display:flex;align-items:center;gap:8px;padding:8px 4px 4px;flex-shrink:0${isAbsent?';opacity:.5':''}">
         ${ava(tc.init,26,techCol)}
         <span style="font-weight:700;font-size:13px;color:${techCol}">${tc.name}</span>
         <span style="font-size:11px;color:var(--gray)">${techIvs.length} intervention${techIvs.length>1?'s':''}</span>
