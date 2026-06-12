@@ -245,115 +245,99 @@ tr:hover td{background:var(--bg)}
     <div id="d-dash"></div>
   </div>
 
-  <!-- DÉPART & CARTE (vue fusionnée) -->
+  <!-- DÉPART & ITINÉRAIRE DÉTAILLÉ (vue unifiée) -->
   <div id="p-depart" class="vp" style="flex-direction:column">
-    <!-- Sous-onglets -->
-    <div style="display:flex;border-bottom:1px solid var(--border);flex-shrink:0;background:#fff">
-      <button id="depsub-depart-btn" onclick="switchDepSub('depart')"
-        style="padding:10px 20px;border:none;border-bottom:2px solid var(--blue);background:none;cursor:pointer;font-size:13px;font-weight:600;color:var(--blue);font-family:inherit">
-        🚀 Départ du jour
-      </button>
-      <button id="depsub-carte-btn" onclick="switchDepSub('carte')"
-        style="padding:10px 20px;border:none;border-bottom:2px solid transparent;background:none;cursor:pointer;font-size:13px;font-weight:400;color:var(--gray);font-family:inherit">
-        🧭 Itinéraire détaillé
-      </button>
+
+    <!-- CONTRÔLES PARTAGÉS -->
+    <div style="padding:10px 16px;display:flex;flex-direction:column;gap:7px;flex-shrink:0;border-bottom:1px solid var(--border);background:#fff">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <input type="date" id="dep-date" style="width:auto;font-size:13px;padding:6px 10px" oninput="rDepart();_schedDepMap();_syncMapDate()"/>
+        <input type="time" id="dep-time" value="08:00" title="Heure de départ" style="width:auto;font-size:13px;padding:6px 10px" oninput="const _mt=document.getElementById('map-time');if(_mt)_mt.value=this.value;_schedCalcRoute()"/>
+        <div style="position:relative;display:inline-block">
+          <button id="dep-tech-btn" onclick="toggleDepTechDropdown(event)" style="padding:6px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;font-size:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:8px;min-width:160px;white-space:nowrap">
+            <span id="dep-tech-label" style="flex:1;text-align:left">Tous les techniciens</span>
+            <span style="font-size:10px;color:var(--gray)">▾</span>
+          </button>
+          <div id="dep-tech-dropdown" style="display:none;position:absolute;top:calc(100% + 4px);left:0;background:#fff;border:1.5px solid var(--border);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.15);z-index:200;min-width:220px;padding:8px">
+            <div id="dep-tech-list"></div>
+          </div>
+        </div>
+        <div id="dep-techs-chips" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"></div>
+        <div id="dep-day-badge" style="display:flex;align-items:center"></div>
+        <span style="color:var(--border);font-size:18px;margin:0 1px">|</span>
+        <select id="map-tech" style="width:auto;padding:6px 10px;font-size:13px" onchange="calcRoute()"></select>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:var(--gray)"><input type="checkbox" id="opt-return" checked style="width:auto"/> Retour</label>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:var(--gray)"><input type="checkbox" id="opt-optim" checked style="width:auto"/> Optimiser</label>
+        <span id="map-lc"></span>
+        <button class="bg bsm" onclick="openGoogleMaps()">📍 GPS</button>
+        <button class="bb bsm" onclick="calcRoute()">🧭 Itinéraire</button>
+        <button class="bg bsm" onclick="calcRouteNow()" title="Recalculer depuis l'heure actuelle">🕐 Maintenant</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span>🏠</span>
+        <div id="depot-disp" style="display:flex;align-items:center;gap:8px">
+          <span id="depot-txt" style="font-size:13px;font-weight:500;color:var(--gray)"></span>
+          <button onclick="editDepot()" class="bicon bsm">✏️</button>
+        </div>
+        <div id="depot-ed" style="display:none;gap:8px;align-items:center">
+          <input id="depot-in" style="font-size:13px;flex:1"/>
+          <button onclick="saveDepot()" class="bb bsm">✓</button>
+          <button onclick="cancelDepot()" class="bg bsm">✕</button>
+        </div>
+      </div>
+      <div id="dep-depots" style="display:none;gap:8px;flex-wrap:wrap"></div>
+      <div id="dep-stats" style="font-size:12px;color:var(--gray)"></div>
     </div>
 
-    <!-- Sous-section : Départ du jour -->
-    <div id="depsub-depart" style="display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden">
-      <div style="padding:12px 16px 0;display:flex;flex-direction:column;gap:8px;flex-shrink:0">
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <input type="date" id="dep-date" style="width:auto;font-size:13px;padding:6px 10px"/>
-          <input type="time" id="dep-time" value="08:00" title="Heure de départ du dépôt" style="width:auto;font-size:13px;padding:6px 10px" oninput="const _mt=document.getElementById('map-time');if(_mt)_mt.value=this.value"/>
-          <div style="position:relative;display:inline-block">
-            <button id="dep-tech-btn" onclick="toggleDepTechDropdown(event)" style="padding:6px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;font-size:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:8px;min-width:190px;white-space:nowrap">
-              <span id="dep-tech-label" style="flex:1;text-align:left">Tous les techniciens</span>
-              <span style="font-size:10px;color:var(--gray)">▾</span>
-            </button>
-            <div id="dep-tech-dropdown" style="display:none;position:absolute;top:calc(100% + 4px);left:0;background:#fff;border:1.5px solid var(--border);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.15);z-index:200;min-width:220px;padding:8px">
-              <div id="dep-tech-list"></div>
+    <!-- CORPS EN DEUX COLONNES -->
+    <div style="display:flex;flex:1;min-height:0">
+
+      <!-- GAUCHE : Carte dispatch + liste interventions -->
+      <div style="flex:1.2;display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--border)">
+        <div id="dep-rte-stats" style="display:none;grid-template-columns:repeat(4,1fr);gap:8px;padding:10px 16px 0">
+          <div class="surf" style="border-left:3px solid var(--blue);display:flex;align-items:center;gap:8px;padding:8px 12px"><span>🛣️</span><div><div class="lbl">Distance</div><div id="dsk" style="font-size:16px;font-weight:700;color:var(--blue)">—</div></div></div>
+          <div class="surf" style="border-left:3px solid var(--purple);display:flex;align-items:center;gap:8px;padding:8px 12px"><span>🚗</span><div><div class="lbl">Trajet</div><div id="dst" style="font-size:16px;font-weight:700;color:var(--purple)">—</div></div></div>
+          <div class="surf" style="border-left:3px solid var(--orange);display:flex;align-items:center;gap:8px;padding:8px 12px"><span>🔧</span><div><div class="lbl">Travail</div><div id="dsw" style="font-size:16px;font-weight:700;color:var(--orange)">—</div></div></div>
+          <div class="surf" style="border-left:3px solid var(--green);display:flex;align-items:center;gap:8px;padding:8px 12px"><span>📍</span><div><div class="lbl">Validés</div><div id="dsv" style="font-size:16px;font-weight:700;color:var(--green)">—</div></div></div>
+        </div>
+        <div id="dep-layout" style="flex:1;min-height:0">
+          <div id="dep-map-frame">
+            <div id="dep-mapid" style="width:100%;height:100%;min-height:300px"></div>
+            <div id="dep-map-pb" style="display:none;padding:10px 14px;background:var(--blueLight)">
+              <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span id="dep-pm">Chargement...</span><span id="dep-pp">0%</span></div>
+              <div class="prog-t"><div id="dep-pf" style="height:100%;background:var(--blue);border-radius:4px;width:0%;transition:width .3s"></div></div>
+            </div>
+            <div id="dep-map-msg" style="padding:10px 14px;background:var(--blueLight);font-size:12px;color:var(--blue);text-align:center">
+              Sélectionnez une date et des techniciens
             </div>
           </div>
-          <div id="dep-techs-chips" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"></div>
-          <div id="dep-day-badge" style="display:flex;align-items:center"></div>
-          <button class="bb bsm" onclick="initDepMap()">🗺️ Calculer carte</button>
-          <button class="bg bsm" onclick="openGoogleMaps()">📍 Ouvrir dans GPS</button>
+          <div id="dep-list"></div>
         </div>
-        <div id="dep-depots" style="display:none;gap:8px;flex-wrap:wrap"></div>
-        <div id="dep-stats" style="font-size:12px;color:var(--gray)"></div>
       </div>
-      <div id="dep-rte-stats" style="display:none;grid-template-columns:repeat(4,1fr);gap:8px;padding:10px 16px 0">
-        <div class="surf" style="border-left:3px solid var(--blue);display:flex;align-items:center;gap:8px;padding:8px 12px"><span>🛣️</span><div><div class="lbl">Distance</div><div id="dsk" style="font-size:16px;font-weight:700;color:var(--blue)">—</div></div></div>
-        <div class="surf" style="border-left:3px solid var(--purple);display:flex;align-items:center;gap:8px;padding:8px 12px"><span>🚗</span><div><div class="lbl">Trajet</div><div id="dst" style="font-size:16px;font-weight:700;color:var(--purple)">—</div></div></div>
-        <div class="surf" style="border-left:3px solid var(--orange);display:flex;align-items:center;gap:8px;padding:8px 12px"><span>🔧</span><div><div class="lbl">Travail</div><div id="dsw" style="font-size:16px;font-weight:700;color:var(--orange)">—</div></div></div>
-        <div class="surf" style="border-left:3px solid var(--green);display:flex;align-items:center;gap:8px;padding:8px 12px"><span>📍</span><div><div class="lbl">Validés</div><div id="dsv" style="font-size:16px;font-weight:700;color:var(--green)">—</div></div></div>
-      </div>
-      <div id="dep-layout" style="flex:1;min-height:0">
-        <div id="dep-map-frame">
-          <div id="dep-mapid" style="width:100%;height:100%;min-height:300px"></div>
-          <div id="dep-map-pb" style="display:none;padding:10px 14px;background:var(--blueLight)">
-            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span id="dep-pm">Chargement...</span><span id="dep-pp">0%</span></div>
-            <div class="prog-t"><div id="dep-pf" style="height:100%;background:var(--blue);border-radius:4px;width:0%;transition:width .3s"></div></div>
-          </div>
-          <div id="dep-map-msg" style="padding:10px 14px;background:var(--blueLight);font-size:12px;color:var(--blue);text-align:center">
-            Sélectionnez une date et cliquez <strong>Calculer carte</strong>
-          </div>
+
+      <!-- DROITE : Itinéraire détaillé -->
+      <div style="flex:1;display:flex;flex-direction:column;overflow-y:auto;padding:14px;gap:10px;min-width:0">
+        <div id="rte-stats" style="display:none;grid-template-columns:repeat(5,1fr);gap:10px">
+          <div class="surf" style="border-left:3px solid var(--blue);display:flex;align-items:center;gap:8px"><span style="font-size:18px">🛣️</span><div><div class="lbl">Distance</div><div id="sk" style="font-size:18px;font-weight:700;color:var(--blue)">—</div></div></div>
+          <div class="surf" style="border-left:3px solid var(--purple);display:flex;align-items:center;gap:8px"><span style="font-size:18px">🚗</span><div><div class="lbl">Trajet</div><div id="st" style="font-size:18px;font-weight:700;color:var(--purple)">—</div><div id="st-sub" style="font-size:10px;color:var(--gray);margin-top:1px"></div></div></div>
+          <div class="surf" style="border-left:3px solid var(--orange);display:flex;align-items:center;gap:8px"><span style="font-size:18px">🔧</span><div><div class="lbl">Travail</div><div id="sw" style="font-size:18px;font-weight:700;color:var(--orange)">—</div></div></div>
+          <div class="surf" style="border-left:3px solid #C62828;display:flex;align-items:center;gap:8px"><span style="font-size:18px">⏰</span><div><div class="lbl">Journée totale</div><div id="stot" style="font-size:18px;font-weight:700;color:#C62828">—</div></div></div>
+          <div class="surf" style="border-left:3px solid var(--green);display:flex;align-items:center;gap:8px"><span style="font-size:18px">📍</span><div><div class="lbl">Arrêts</div><div id="ss" style="font-size:18px;font-weight:700;color:var(--green)">—</div></div></div>
         </div>
-        <div id="dep-list"></div>
+        <div id="pb" style="display:none" class="card">
+          <div style="display:flex;justify-content:space-between;margin-bottom:5px"><span id="pm" style="font-size:13px;color:var(--gray)">...</span><span id="pp" style="font-size:13px;font-weight:600;color:var(--blue)">0%</span></div>
+          <div class="prog-t"><div id="pf" style="height:100%;background:var(--blue);border-radius:4px;width:0%;transition:width .4s"></div></div>
+        </div>
+        <div id="map-labor" style="display:none;padding:8px 14px"></div>
+        <div id="ms" class="card" style="text-align:center;color:var(--gray);padding:18px">Sélectionnez un technicien pour voir l'itinéraire détaillé</div>
+        <div id="map-con" style="border-radius:10px;overflow:hidden;border:1px solid var(--border);flex-shrink:0;min-height:380px"><div id="mapid" style="width:100%;height:100%;min-height:380px"></div></div>
+        <div id="map-ivl"></div>
       </div>
     </div>
 
-    <!-- Sous-section : Itinéraire détaillé -->
-    <div id="depsub-carte" style="display:none;flex-direction:column;flex:1;min-height:0;overflow-y:auto;padding:18px;gap:12px">
-      <div class="card" style="display:flex;align-items:center;gap:12px;flex-shrink:0">
-        <span style="font-size:24px">🏠</span>
-        <div style="flex:1">
-          <p class="lbl" style="text-transform:uppercase;letter-spacing:.5px">Dépôt — Point de départ</p>
-          <div id="depot-disp" style="display:flex;align-items:center;gap:10px">
-            <span id="depot-txt" style="font-size:14px;font-weight:500"></span>
-            <button onclick="editDepot()" class="bicon bsm">✏️</button>
-          </div>
-          <div id="depot-ed" style="display:none;gap:8px;align-items:center">
-            <input id="depot-in" style="font-size:13px;flex:1"/>
-            <button onclick="saveDepot()" class="bb bsm">✓</button>
-            <button onclick="cancelDepot()" class="bg bsm">✕</button>
-          </div>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;flex-shrink:0">
-          <div style="display:flex;gap:8px;align-items:center">
-            <input type="date" id="map-di" style="width:auto;padding:6px 10px;font-size:13px"/>
-            <input type="time" id="map-time" value="08:00" title="Heure de départ" style="width:auto;padding:6px 10px;font-size:13px"/>
-            <select id="map-tech" style="width:auto;padding:6px 10px;font-size:13px"></select>
-            <button class="bb" onclick="calcRoute()">🧭 Calculer</button>
-            <button class="bg bsm" onclick="calcRouteNow()" title="Recalculer depuis l'heure actuelle">🕐 Maintenant</button>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--gray)">
-            <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
-              <input type="checkbox" id="opt-return" checked style="width:auto"/> Retour dépôt
-            </label>
-            <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
-              <input type="checkbox" id="opt-optim" checked style="width:auto"/> Optimiser tournée
-            </label>
-            <span id="map-lc"></span>
-          </div>
-        </div>
-      </div>
-      <div id="rte-stats" style="display:none;grid-template-columns:repeat(5,1fr);gap:10px">
-        <div class="surf" style="border-left:3px solid var(--blue);display:flex;align-items:center;gap:8px"><span style="font-size:18px">🛣️</span><div><div class="lbl">Distance</div><div id="sk" style="font-size:18px;font-weight:700;color:var(--blue)">—</div></div></div>
-        <div class="surf" style="border-left:3px solid var(--purple);display:flex;align-items:center;gap:8px"><span style="font-size:18px">🚗</span><div><div class="lbl">Trajet</div><div id="st" style="font-size:18px;font-weight:700;color:var(--purple)">—</div><div id="st-sub" style="font-size:10px;color:var(--gray);margin-top:1px"></div></div></div>
-        <div class="surf" style="border-left:3px solid var(--orange);display:flex;align-items:center;gap:8px"><span style="font-size:18px">🔧</span><div><div class="lbl">Travail</div><div id="sw" style="font-size:18px;font-weight:700;color:var(--orange)">—</div></div></div>
-        <div class="surf" style="border-left:3px solid #C62828;display:flex;align-items:center;gap:8px"><span style="font-size:18px">⏰</span><div><div class="lbl">Journée totale</div><div id="stot" style="font-size:18px;font-weight:700;color:#C62828">—</div></div></div>
-        <div class="surf" style="border-left:3px solid var(--green);display:flex;align-items:center;gap:8px"><span style="font-size:18px">📍</span><div><div class="lbl">Arrêts</div><div id="ss" style="font-size:18px;font-weight:700;color:var(--green)">—</div></div></div>
-      </div>
-      <div id="pb" style="display:none" class="card">
-        <div style="display:flex;justify-content:space-between;margin-bottom:5px"><span id="pm" style="font-size:13px;color:var(--gray)">...</span><span id="pp" style="font-size:13px;font-weight:600;color:var(--blue)">0%</span></div>
-        <div class="prog-t"><div id="pf" style="height:100%;background:var(--blue);border-radius:4px;width:0%;transition:width .4s"></div></div>
-      </div>
-      <div id="map-labor" style="display:none;padding:8px 14px"></div>
-      <div id="ms" class="card" style="text-align:center;color:var(--gray);padding:18px">Sélectionnez une date et cliquez <strong>Calculer</strong></div>
-      <div id="map-con" style="border-radius:10px;overflow:hidden;border:1px solid var(--border);flex:1;min-height:360px"><div id="mapid" style="width:100%;height:100%;min-height:360px"></div></div>
-      <div id="map-ivl"></div>
-    </div>
+    <!-- Inputs cachés pour compat JS (map-di synced depuis dep-date) -->
+    <input type="hidden" id="map-di"/>
+    <input type="hidden" id="map-time" value="08:00"/>
   </div>
 
   <!-- PLANNING -->
@@ -1955,6 +1939,11 @@ function rDepTechDropdownContent(){
     ${t.name}
   </div>`}).join("")}`
 }
+let _depMapAutoTimer=null
+function _schedDepMap(){clearTimeout(_depMapAutoTimer);_depMapAutoTimer=setTimeout(()=>initDepMap(),700)}
+let _calcRouteTimer=null
+function _schedCalcRoute(){clearTimeout(_calcRouteTimer);_calcRouteTimer=setTimeout(()=>calcRoute(),700)}
+
 function togDepTech2(id,e){
   if(e)e.stopPropagation()
   const i=depSelectedTechs.indexOf(id)
@@ -1964,6 +1953,7 @@ function togDepTech2(id,e){
   loadRouteOrder(selDate)
   rDepTechDropdownContent()
   rDepart()
+  _schedDepMap()
 }
 function clearDepTechs(e){
   if(e)e.stopPropagation()
@@ -1972,6 +1962,7 @@ function clearDepTechs(e){
   loadRouteOrder(selDate)
   rDepTechDropdownContent()
   rDepart()
+  _schedDepMap()
 }
 // Ferme dropdown sur clic externe — attaché une seule fois
 ;(function(){let ready=false;function attachClose(){if(ready)return;ready=true;document.addEventListener("click",()=>{if(depTechDropdownOpen){depTechDropdownOpen=false;const dd=document.getElementById("dep-tech-dropdown");if(dd)dd.style.display="none"}})}if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",attachClose);else attachClose()})()
@@ -1981,41 +1972,20 @@ function clearDepTechs(e){
 // ═══════════════════════════════════════════════════════
 const VT={dashboard:"Tableau de bord",depart:"Départ du jour & Itinéraire",planning:"Planning de la semaine",zones:"Zones & Techniciens",interventions:"Toutes les interventions",materiel:"Matériel du jour",previsions:"Prévisions maintenances",notifications:"Notifications clients",parametres:"Paramètres",import:"Import Kizeo"}
 let _depSubTab="depart"
-function switchDepSub(tab){
-  _depSubTab=tab
-  _saveUIState()
-  const sd=document.getElementById("depsub-depart")
-  const sc=document.getElementById("depsub-carte")
-  const bd=document.getElementById("depsub-depart-btn")
-  const bc=document.getElementById("depsub-carte-btn")
-  if(tab==="depart"){
-    sd.style.display="flex";sc.style.display="none"
-    bd.style.borderBottomColor="var(--blue)";bd.style.color="var(--blue)";bd.style.fontWeight="600"
-    bc.style.borderBottomColor="transparent";bc.style.color="var(--gray)";bc.style.fontWeight="400"
-    if(depMapObj)setTimeout(()=>depMapObj.invalidateSize(),200)
-  }else{
-    sd.style.display="none";sc.style.display="flex"
-    bc.style.borderBottomColor="var(--blue)";bc.style.color="var(--blue)";bc.style.fontWeight="600"
-    bd.style.borderBottomColor="transparent";bd.style.color="var(--gray)";bd.style.fontWeight="400"
-    mapDate=selDate
-    if(!mapObj)setTimeout(initMap,100)
-    document.getElementById("depot-txt").textContent=depot
-    document.getElementById("map-di").value=mapDate
-    refreshMapTechSel()
-    // Synchroniser l'heure de départ depuis l'onglet "Départ du jour"
-    const depT=document.getElementById('dep-time')?.value
-    const mapT=document.getElementById('map-time')
-    if(depT&&mapT) mapT.value=depT
-    if(mapObj)setTimeout(()=>mapObj.invalidateSize(),200)
-    // Calculer automatiquement avec l'heure de départ définie
-    setTimeout(()=>{if(!building) calcRoute()},400)
-  }
+function switchDepSub(tab){ _depSubTab=tab; _saveUIState() }
+function _syncMapDate(){
+  const d=document.getElementById('dep-date')?.value
+  const t=document.getElementById('dep-time')?.value
+  const md=document.getElementById('map-di')
+  const mt=document.getElementById('map-time')
+  if(md&&d){md.value=d;mapDate=d}
+  if(mt&&t) mt.value=t
 }
 function _saveUIState(){
   try{localStorage.setItem('optiq_ui_state',JSON.stringify({view:curView,subTab:_depSubTab,selDate}))}catch(e){}
 }
 function SV(v){
-  if(v==="carte"){SV("depart");switchDepSub("carte");return}
+  if(v==="carte"){SV("depart");return}
   curView=v
   document.querySelectorAll(".ni").forEach(e=>e.classList.remove("on"))
   const ni=document.getElementById("n-"+v);if(ni)ni.classList.add("on")
@@ -2025,7 +1995,18 @@ function SV(v){
   document.getElementById("sb-count").textContent=ivs.length+" interventions"
   _saveUIState()
   if(v==="dashboard")rDash()
-  else if(v==="depart"){rDepart();if(_depSubTab==="depart"&&depMapObj)setTimeout(()=>depMapObj.invalidateSize(),200);else if(_depSubTab==="carte"&&mapObj)setTimeout(()=>mapObj.invalidateSize(),200)}
+  else if(v==="depart"){
+    _syncMapDate()
+    document.getElementById("depot-txt").textContent=depot
+    refreshMapTechSel()
+    rDepart()
+    if(!mapObj)setTimeout(initMap,100)
+    setTimeout(()=>{
+      if(depMapObj)depMapObj.invalidateSize()
+      if(mapObj)mapObj.invalidateSize()
+      if(!building)calcRoute()
+    },300)
+  }
   else if(v==="planning")rPlan()
   else if(v==="interventions")rIv()
   else if(v==="materiel"){matFilter.date=selDate;rMat()}
@@ -2547,6 +2528,18 @@ function updateDepMarker(id){
     html:`<div style="width:30px;height:30px;background:${col};color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:${(done||fail)?15:12}px;border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.4)">${lbl}</div>`,
     className:"",iconSize:[30,30],iconAnchor:[15,15],popupAnchor:[0,-15]
   }))
+}
+
+function syncDepVF(){
+  ivs.forEach(iv=>{
+    if(iv.status==="completed"){depValidated[iv.id]=true;depFailed[iv.id]=false}
+    else if(iv.status==="not_responded"){depFailed[iv.id]=true;depValidated[iv.id]=false}
+    else{depValidated[iv.id]=false;depFailed[iv.id]=false}
+  })
+}
+
+function updateAllDepMarkers(){
+  Object.keys(depMarkers).forEach(k=>updateDepMarker(Number(k)))
 }
 
 let depBuilding=false
@@ -7238,6 +7231,7 @@ async function cloudLoad(){
       ivs = val
       nextId = Math.max(0, ...ivs.map(i=>i.id||0)) + 1
       _cloudUpdatedAt = row.updated_at || null
+      syncDepVF()
       return true
     }
   }catch(e){ console.warn('Supabase load:', e.message) }
@@ -7353,6 +7347,10 @@ function initCloud(){
   // Sidebar count
   updateSbCount()
 
+  _syncMapDate()
+  document.getElementById("depot-txt").textContent=depot
+  refreshMapTechSel()
+
   const el = document.getElementById('cloud-status')
   if(el) el.innerHTML = `💾 <span style="color:#1B5E20">${ivs.length} interventions</span>`
   SV(curView)
@@ -7377,6 +7375,8 @@ function initCloud(){
             nextId = Math.max(0, ...ivs.map(i=>i.id||0)) + 1
             _cloudUpdatedAt = payload.new?.updated_at || null
             localStorage.setItem('optiq_ivs_data', JSON.stringify(ivs))
+            syncDepVF()
+            updateAllDepMarkers()
             updateSbCount()
             if(curView==='depart') rDepart()
             else if(curView==='planning') rPlan()
