@@ -7218,7 +7218,7 @@ async function autoDetectKizeoUsers(){
 // Sauvegarde persistante entre sessions et appareils
 // ═══════════════════════════════════════════════════════
 
-const isDeployed = location.hostname !== 'localhost' && location.protocol !== 'file:'
+const isDeployed = location.protocol !== 'file:' // localhost inclus — Supabase toujours actif
 let cloudSyncing = false
 let cloudSaveTimer = null
 let _cloudUpdatedAt = null
