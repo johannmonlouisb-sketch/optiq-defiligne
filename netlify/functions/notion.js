@@ -240,6 +240,69 @@ exports.handler = async (event) => {
         return { statusCode: 200, headers: CORS, body: JSON.stringify({ sites }) }
       }
 
+      // ── FETCH ARCHIVE : historique interventions par plage de dates ────
+      // Retourne des objets déjà mappés (pas de pages Notion brutes)
+      case 'fetch_archive': {
+        const { dateFrom, dateTo } = body
+        if (!dateFrom || !dateTo)
+          return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'dateFrom et dateTo requis' }) }
+
+        const nP = (p, k) => {
+          const v = p[k]; if (!v) return ''
+          if (v.type === 'title')        return v.title?.map(t => t.plain_text).join('') || ''
+          if (v.type === 'rich_text')    return v.rich_text?.map(t => t.plain_text).join('') || ''
+          if (v.type === 'date')         return v.date?.start || ''
+          if (v.type === 'select')       return v.select?.name || ''
+          if (v.type === 'multi_select') return v.multi_select?.map(m => m.name).join(', ') || ''
+          if (v.type === 'checkbox')     return !!v.checkbox
+          return ''
+        }
+
+        const payload = {
+          page_size: 100,
+          sorts: [{ property: 'Date intervention', direction: 'ascending' }],
+          filter: {
+            and: [
+              { property: 'Date intervention', date: { on_or_after:  dateFrom } },
+              { property: 'Date intervention', date: { on_or_before: dateTo   } }
+            ]
+          }
+        }
+
+        let all = [], next = null
+        do {
+          if (next) payload.start_cursor = next
+          const r = await fetch(`${NOTION_BASE}/databases/${dbId}/query`, {
+            method: 'POST', headers, body: JSON.stringify(payload)
+          })
+          const d = await r.json()
+          if (!r.ok) return { statusCode: r.status, headers: CORS, body: JSON.stringify(d) }
+          all = all.concat(d.results || [])
+          next = d.has_more ? d.next_cursor : null
+        } while (next)
+
+        const ivs = all.map(page => {
+          const p   = page.properties || {}
+          const dateStr = nP(p, 'Date intervention') || ''
+          const terminer = nP(p, 'Terminer')
+          const echec    = nP(p, 'Echec')
+          return {
+            notionId: page.id,
+            client:   nP(p, 'Société') || nP(p, 'Nom Site') || '',
+            addr:     nP(p, 'Adresse Site') || nP(p, 'Adresse Siéges') || nP(p, 'Adresse') || '',
+            date:     dateStr.substring(0, 10),
+            tech:     (nP(p, 'Technicien') || nP(p, 'Technicien ') || '').trim(),
+            type:     nP(p, 'INTERVENTION'),
+            notes:    nP(p, 'INFO ') || nP(p, 'Motif') || '',
+            status:   echec ? 'not_responded' : terminer ? 'completed' : 'pending',
+            contact:  nP(p, 'Contact sur site') || '',
+            cphone:   nP(p, 'Téléphone site') || '',
+          }
+        }).filter(iv => iv.client && iv.date)
+
+        return { statusCode: 200, headers: CORS, body: JSON.stringify({ ivs }) }
+      }
+
       default:
         return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: `Action inconnue: ${action}` }) }
     }

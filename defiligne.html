@@ -2025,6 +2025,64 @@ function closeSearch(){document.getElementById("gsearch-res").classList.remove("
 // ═══════════════════════════════════════════════════════
 let _tourProgressData = {}
 
+// ── Cache Notion pour l'archive historique ───────────
+const _notionArchiveCache = {}   // { "2026-01-15": [{iv...}] }
+const _notionFetchedMonths = new Set() // "YYYY-MM" déjà chargés
+
+// Mappe un nom de technicien Notion vers un objet TECHS
+function _matchNotionTech(name){
+  if(!name) return null
+  const nm=name.toLowerCase().trim()
+  return TECHS.find(function(t){
+    const tn=t.name.toLowerCase()
+    const nw=nm.split(/\s+/)[0], tw=tn.split(/\s+/)[0]
+    return nw===tw||tn.includes(nw)||nm.includes(tw)
+  })||null
+}
+
+// Convertit le type Notion (multi_select string) en clé TYPES interne
+function _notionTypeToKey(s){
+  const t=(s||'').toLowerCase()
+  if(t.includes('pad pak')) return 'maintenance_simple'
+  if(t.includes('annuel'))  return 'maintenance_simple'
+  if(t.includes('install')) return 'installation'
+  if(t.includes('télé'))    return 'tele_maintenance'
+  return 'maintenance_simple'
+}
+
+// Charge toutes les interventions Notion d'un mois (YYYY-MM) et peuple _notionArchiveCache
+async function _fetchNotionMonth(ym){
+  if(_notionFetchedMonths.has(ym)) return
+  _notionFetchedMonths.add(ym)
+  try{
+    const[y,m]=ym.split('-').map(Number)
+    const lastDay=new Date(y,m,0).getDate()
+    const dateFrom=ym+'-01'
+    const dateTo=ym+'-'+String(lastDay).padStart(2,'0')
+    const res=await fetch('/api/notion',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:'fetch_archive',dateFrom,dateTo})
+    })
+    if(!res.ok) throw new Error('HTTP '+res.status)
+    const data=await res.json()
+    // Pré-remplir toutes les dates du mois avec tableau vide
+    for(let d=1;d<=lastDay;d++){
+      const dk=ym+'-'+String(d).padStart(2,'0')
+      if(!_notionArchiveCache[dk]) _notionArchiveCache[dk]=[]
+    }
+    // Remplir avec les données Notion
+    ;(data.ivs||[]).forEach(function(iv){
+      if(!iv.date) return
+      if(!_notionArchiveCache[iv.date]) _notionArchiveCache[iv.date]=[]
+      _notionArchiveCache[iv.date].push(iv)
+    })
+  }catch(e){
+    _notionFetchedMonths.delete(ym) // permettre un retry
+    console.warn('Notion archive fetch:',e.message)
+  }
+}
+
 function renderTourTracker(){
   const el=document.getElementById('tour-tracker')
   if(!el) return
@@ -2936,6 +2994,7 @@ function _ivArchiveRow(iv,idx){
 
 // ── Archive résumé d'une journée passée ──────────────
 function dayArchive(date){
+  // ── Tour progress (départ, statut) ────────────────
   let merged={}
   try{
     const local=JSON.parse(localStorage.getItem('optiq_tour_progress')||'{}')
@@ -2946,26 +3005,66 @@ function dayArchive(date){
       else merged[k]=(l.updatedAt||0)>=(s.updatedAt||0)?l:s
     })
   }catch(e){}
-  const dayIvs=ivs.filter(function(i){return i.date===date})
+
+  // ── Source d'interventions ─────────────────────────
+  let dayIvs=ivs.filter(function(i){return i.date===date})
   const dayEntries=Object.values(merged).filter(function(t){return t.date===date})
+  let fromNotion=false
+
+  if(!dayIvs.length){
+    // Essayer le cache Notion
+    const ym=date.substring(0,7)
+    if(!_notionFetchedMonths.has(ym)){
+      // Déclencher le chargement asynchrone puis re-rendre
+      _fetchNotionMonth(ym).then(function(){
+        if(selDate===date) rPlan()
+      })
+      return '<div class="card" style="display:flex;align-items:center;gap:10px;padding:20px 24px;color:var(--blue)"><span style="font-size:20px">🔄</span><span>Chargement de l\'historique Notion...</span></div>'
+    }
+    const notionDayIvs=_notionArchiveCache[date]||[]
+    if(notionDayIvs.length){
+      // Normaliser les IVs Notion pour _ivArchiveRow
+      dayIvs=notionDayIvs.map(function(n){
+        const tc=_matchNotionTech(n.tech)
+        return {
+          id:n.notionId, client:n.client, addr:n.addr,
+          date:n.date, type:_notionTypeToKey(n.type),
+          status:n.status, notes:n.notes||'',
+          contact:n.contact||'', cphone:n.cphone||'',
+          timeStart:'', techId:tc?tc.id:-1,
+          _notionTechName:n.tech
+        }
+      })
+      fromNotion=true
+    }
+  }
+
   if(!dayIvs.length&&!dayEntries.length)
     return '<div class="card" style="text-align:center;color:var(--gray);padding:24px">Aucune donnée pour cette journée</div>'
+
+  // ── Barre résumé ───────────────────────────────────
   const doneCnt=dayIvs.filter(function(i){return i.status==='completed'}).length
   const failCnt=dayIvs.filter(function(i){return i.status==='not_responded'}).length
   const pendCnt=dayIvs.length-doneCnt-failCnt
-  const techIds=[...new Set(dayIvs.map(function(i){return i.techId}))]
   let html='<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;background:var(--bg);border-radius:10px;padding:10px 14px;margin-bottom:14px">'
   html+='<span style="font-size:12px;color:var(--gray)">📋 <strong>'+dayIvs.length+'</strong> intervention'+(dayIvs.length>1?'s':'')+'</span>'
   html+='<span style="font-size:12px;color:#1B5E20;font-weight:600">✅ '+doneCnt+' validée'+(doneCnt>1?'s':'')+'</span>'
   if(failCnt) html+='<span style="font-size:12px;color:#C62828;font-weight:600">❌ '+failCnt+' échec'+(failCnt>1?'s':'')+'</span>'
   if(pendCnt) html+='<span style="font-size:12px;color:var(--gray)">⏳ '+pendCnt+' en attente</span>'
+  if(fromNotion) html+='<span style="font-size:11px;color:var(--gray);margin-left:auto;background:#F3E5F5;padding:2px 8px;border-radius:100px">📦 Notion</span>'
   html+='</div>'
+
+  // ── Grouper par technicien ─────────────────────────
+  const techIds=[...new Set(dayIvs.map(function(i){return i.techId}))]
   techIds.forEach(function(tid){
-    const tc=TB(tid)
-    const col=tc.color||'#1565C0'
     const tivs=dayIvs.filter(function(i){return i.techId===tid})
+    // Résoudre le tech : depuis TECHS ou depuis le nom Notion
+    let tc=TB(tid)
+    let tcName=tc.name||tivs[0]?._notionTechName||'Inconnu'
+    let col=(tc&&tc.color)||'#9ca3af'
+    let init=(tc&&tc.init)||(tcName.substring(0,2).toUpperCase())
     const entry=dayEntries.find(function(t){return t.techId===tid})
-    const depotAddr=(entry&&entry.depotAddr)||tc.depotAddr||''
+    const depotAddr=(entry&&entry.depotAddr)||(tc&&tc.depotAddr)||''
     const startTime=(entry&&entry.startTime)||''
     const status=entry&&entry.status
     const done=tivs.filter(function(i){return i.status==='completed'}).length
@@ -2974,12 +3073,12 @@ function dayArchive(date){
       ?'<span style="background:#E8F5E9;color:#1B5E20;padding:3px 10px;border-radius:100px;font-size:11px;font-weight:600">✅ Terminée</span>'
       :status==='running'
       ?'<span style="background:#E3F2FD;color:#1565C0;padding:3px 10px;border-radius:100px;font-size:11px;font-weight:600">🔄 En cours</span>'
-      :'<span style="background:#F5F5F5;color:#9ca3af;padding:3px 10px;border-radius:100px;font-size:11px;font-weight:600">Planifiée</span>'
+      :''
     html+='<div style="background:#fff;border:1px solid '+col+'22;border-left:4px solid '+col+';border-radius:10px;padding:14px 16px;margin-bottom:10px">'
     html+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">'
-    html+=ava(tc.init,30,col)
-    html+='<strong style="font-size:14px;color:'+col+'">'+tc.name+'</strong>'
-    html+=statusBadge
+    html+=ava(init,30,col)
+    html+='<strong style="font-size:14px;color:'+col+'">'+tcName+'</strong>'
+    if(statusBadge) html+=statusBadge
     html+='<span style="margin-left:auto;font-size:12px;color:var(--gray)">✅ '+done+' · ❌ '+fail+' · '+tivs.length+' total</span>'
     html+='</div>'
     if(startTime||depotAddr){
