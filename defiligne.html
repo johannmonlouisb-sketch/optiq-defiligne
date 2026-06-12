@@ -1950,6 +1950,7 @@ function SV(v){
   else if(v==="depart"){
     rDepart()
     if(depMapObj)setTimeout(()=>depMapObj.invalidateSize(),200)
+    _schedDepMap()
   }
   else if(v==="planning")rPlan()
   else if(v==="interventions")rIv()
