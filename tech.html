@@ -528,7 +528,20 @@ const TYPES={
 // Interventions — clé partagée avec l'app admin (optiq_ivs_data)
 let ivs=[]
 try{const s=localStorage.getItem("optiq_ivs_data");if(s){const p=JSON.parse(s);if(Array.isArray(p))ivs=p}}catch(e){}
-function saveIvs(){try{localStorage.setItem("optiq_ivs_data",JSON.stringify(ivs))}catch(e){}}
+let _saveIvsTimer = null
+function saveIvs(){
+  try{localStorage.setItem("optiq_ivs_data",JSON.stringify(ivs))}catch(e){}
+  // Sync vers Supabase (debounce 800ms pour éviter les appels en rafale)
+  clearTimeout(_saveIvsTimer)
+  _saveIvsTimer = setTimeout(async ()=>{
+    if(!_sbClient) return
+    try{
+      await _sbClient.from('app_state').upsert({key:'optiq_ivs_data',value:ivs},{onConflict:'key'})
+      _sbLastSync = new Date().toLocaleTimeString('fr-FR')
+      _setSbDot('#22c55e', `Envoyé ${_sbLastSync} · ${ivs.length} interv.`)
+    }catch(e){ _setSbDot('#f59e0b','Sync échoué : '+e.message) }
+  }, 800)
+}
 
 // ════════════════════════════════════════════
 // STATE
@@ -2773,12 +2786,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     }, payload => {
       const newVal = payload.new?.value
       if (!Array.isArray(newVal)) return
+      // Ignorer si c'est notre propre save (en cours de debounce)
+      if (_saveIvsTimer) return
       ivs = newVal
-      saveIvs()
+      try{localStorage.setItem("optiq_ivs_data",JSON.stringify(ivs))}catch(e){}
       if (typeof renderDepart === 'function') renderDepart()
       if (typeof updateBadges === 'function') updateBadges()
       _sbLastSync = new Date().toLocaleTimeString('fr-FR')
-      _setSbDot('#22c55e', `Sync ${_sbLastSync} · ${ivs.length} interv.`)
+      _setSbDot('#22c55e', `Reçu ${_sbLastSync} · ${ivs.length} interv.`)
     })
     .subscribe(status => {
       if (status === 'SUBSCRIBED') _setSbDot('#22c55e', `Connecté · ${ivs.length} interventions`)
