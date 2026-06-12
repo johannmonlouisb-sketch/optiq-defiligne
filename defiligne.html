@@ -2870,97 +2870,15 @@ function daySection(date){
     </div>`}).join("")
 }
 
-// ── Carte d'intervention pour l'archive ──────────────
-function _ivArchiveRow(iv, idx){
-  const isDone=iv.status==='completed'
-  const isFail=iv.status==='not_responded'
-  const tp=TYPES[iv.type]||TYPES.maintenance_simple
-  const bg=isDone?'#F1F8E9':isFail?'#FFEBEE':'#FAFAFA'
-  const border=isDone?'#66BB6A':isFail?'#EF5350':tp.color
-  const icon=isDone?'✅':isFail?'❌':'⏳'
-  let r='<div style="padding:8px 10px;border-radius:7px;background:'+bg+';border-left:3px solid '+border+'">'
-  r+='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
-  r+='<span style="font-size:11px;font-weight:700;color:var(--gray);flex-shrink:0">#'+(idx+1)+'</span>'
-  r+='<span style="font-weight:600;font-size:13px">'+icon+' '+iv.client+'</span>'
-  r+='<span style="font-size:11px;color:var(--gray)">'+tp.label+'</span>'
-  if(iv.timeStart) r+='<span style="font-size:11px;color:var(--gray)">· '+iv.timeStart+'</span>'
-  r+='</div>'
-  r+='<div style="font-size:11px;color:var(--gray);margin-top:3px">📍 '+iv.addr+'</div>'
-  if(iv.contact) r+='<div style="font-size:11px;color:#6A1B9A;margin-top:2px">👤 '+iv.contact+(iv.cphone?' · '+iv.cphone:'')+'</div>'
-  if(iv.notes) r+='<div style="font-size:11px;color:#E65100;margin-top:4px;background:#FFF3E0;padding:3px 8px;border-radius:4px">📝 '+iv.notes+'</div>'
-  r+='</div>'
-  return r
-}
-
-// ── Archive d'une journée passée ─────────────────────
-function dayArchive(date){
-  let merged={}
-  try{
-    const local=JSON.parse(localStorage.getItem('optiq_tour_progress')||'{}')
-    Object.keys(Object.assign({},_tourProgressData,local)).forEach(function(k){
-      const l=local[k],s=_tourProgressData[k]
-      if(!l) merged[k]=s
-      else if(!s) merged[k]=l
-      else merged[k]=(l.updatedAt||0)>=(s.updatedAt||0)?l:s
-    })
-  }catch(e){}
-  const dayIvs=ivs.filter(function(i){return i.date===date})
-  const dayEntries=Object.values(merged).filter(function(t){return t.date===date})
-  if(!dayIvs.length&&!dayEntries.length)
-    return '<div class="card" style="text-align:center;color:var(--gray);padding:24px">Aucune donnée pour cette journée</div>'
-  const doneCnt=dayIvs.filter(function(i){return i.status==='completed'}).length
-  const failCnt=dayIvs.filter(function(i){return i.status==='not_responded'}).length
-  const pendCnt=dayIvs.length-doneCnt-failCnt
-  const techIds=[...new Set(dayIvs.map(function(i){return i.techId}))]
-  let html='<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;background:var(--bg);border-radius:10px;padding:10px 14px;margin-bottom:14px">'
-  html+='<span style="font-size:12px;color:var(--gray)">📋 <strong>'+dayIvs.length+'</strong> intervention'+(dayIvs.length>1?'s':'')+'</span>'
-  html+='<span style="font-size:12px;color:#1B5E20;font-weight:600">✅ '+doneCnt+' validée'+(doneCnt>1?'s':'')+'</span>'
-  if(failCnt) html+='<span style="font-size:12px;color:#C62828;font-weight:600">❌ '+failCnt+' échec'+(failCnt>1?'s':'')+'</span>'
-  if(pendCnt) html+='<span style="font-size:12px;color:var(--gray)">⏳ '+pendCnt+' non renseignée'+(pendCnt>1?'s':'')+'</span>'
-  html+='</div>'
-  techIds.forEach(function(tid){
-    const tc=TB(tid)
-    const col=tc.color||'#1565C0'
-    const tivs=dayIvs.filter(function(i){return i.techId===tid})
-    const entry=dayEntries.find(function(t){return t.techId===tid})
-    const depotAddr=(entry&&entry.depotAddr)||tc.depotAddr||''
-    const startTime=(entry&&entry.startTime)||''
-    const status=entry&&entry.status
-    const done=tivs.filter(function(i){return i.status==='completed'}).length
-    const fail=tivs.filter(function(i){return i.status==='not_responded'}).length
-    const statusBadge=status==='done'
-      ?'<span style="background:#E8F5E9;color:#1B5E20;padding:3px 10px;border-radius:100px;font-size:11px;font-weight:600">✅ Terminée</span>'
-      :status==='running'
-      ?'<span style="background:#E3F2FD;color:#1565C0;padding:3px 10px;border-radius:100px;font-size:11px;font-weight:600">🔄 En cours</span>'
-      :'<span style="background:#F5F5F5;color:#9ca3af;padding:3px 10px;border-radius:100px;font-size:11px;font-weight:600">Planifiée</span>'
-    html+='<div style="background:#fff;border:1px solid '+col+'22;border-left:4px solid '+col+';border-radius:10px;padding:14px 16px;margin-bottom:10px">'
-    html+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">'
-    html+=ava(tc.init,30,col)
-    html+='<strong style="font-size:14px;color:'+col+'">'+tc.name+'</strong>'
-    html+=statusBadge
-    html+='<span style="margin-left:auto;font-size:12px;color:var(--gray)">✅ '+done+' · ❌ '+fail+' · '+tivs.length+' total</span>'
-    html+='</div>'
-    html+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'
-    if(startTime) html+='<span style="font-size:12px;background:var(--bg);padding:4px 10px;border-radius:6px">⏰ Départ à <strong>'+startTime+'</strong></span>'
-    if(depotAddr) html+='<span style="font-size:12px;background:var(--bg);padding:4px 10px;border-radius:6px;flex:1">🏠 <strong>'+depotAddr+'</strong></span>'
-    html+='</div>'
-    html+='<div style="display:flex;flex-direction:column;gap:5px">'
-    tivs.forEach(function(iv,idx){ html+=_ivArchiveRow(iv,idx) })
-    html+='</div></div>'
-  })
-  return html
-}
-
 // ── VUE JOUR ─────────────────────────────────────────
 function rPlanDay(el){
-  const isPast=selDate<TODAY
   const nav=`<button onclick="shiftDay(-1)" class="bg bsm">◀</button>
     <input type="date" value="${selDate}" onchange="selDate=this.value;rPlan()" style="width:auto;padding:5px 10px;font-size:13px"/>
     <button onclick="shiftDay(1)" class="bg bsm">▶</button>
     <button onclick="selDate=TODAY;rPlan()" class="bg bsm">Aujourd'hui</button>`
   el.innerHTML=planHdr(nav)+
-    `<h2 style="font-size:15px;font-weight:600;margin-bottom:12px">${fdl(selDate)}${isPast?` <span style="font-size:12px;font-weight:400;color:var(--gray)">· Archive</span>`:''}</h2>`+
-    (isPast?dayArchive(selDate):daySection(selDate))
+    `<h2 style="font-size:15px;font-weight:600;margin-bottom:12px">${fdl(selDate)}</h2>`+
+    daySection(selDate)
 }
 function shiftDay(n){
   const d=new Date(selDate+"T12:00:00");d.setDate(d.getDate()+n)
@@ -2995,8 +2913,8 @@ function rPlanWeek(el){
         ${done&&!isSel?`<div style="font-size:9px;color:#2E7D32;margin-top:1px">✓${done}</div>`:""}
       </div>`}).join("")}
   </div>
-  <h3 style="font-size:14px;font-weight:600;margin-bottom:10px">${fdl(selDate)}${selDate<TODAY?' <span style="font-size:12px;font-weight:400;color:var(--gray)">· Archive</span>':''}</h3>
-  ${selDate<TODAY?dayArchive(selDate):daySection(selDate)}`
+  <h3 style="font-size:14px;font-weight:600;margin-bottom:10px">${fdl(selDate)}</h3>
+  ${daySection(selDate)}`
 }
 function shiftWeek(n){
   const d=new Date(selDate+"T12:00:00");d.setDate(d.getDate()+n)
@@ -3041,8 +2959,8 @@ function rPlanMonth(el){
         </div>`}).join("")}
   </div>
   <div style="border-top:1px solid var(--border);padding-top:14px">
-    <h3 style="font-size:14px;font-weight:600;margin-bottom:10px">${fdl(selDate)}${selDate<TODAY?' <span style="font-size:12px;font-weight:400;color:var(--gray)">· Archive</span>':''}</h3>
-    ${selDate<TODAY?dayArchive(selDate):daySection(selDate)}
+    <h3 style="font-size:14px;font-weight:600;margin-bottom:10px">${fdl(selDate)}</h3>
+    ${daySection(selDate)}
   </div>`
 }
 function shiftMonth(n){
