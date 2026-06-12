@@ -4374,6 +4374,9 @@ function applySmartPlan(){
 // EDIT / ADD MODAL
 // ═══════════════════════════════════════════════════════
 function openAdd(){
+  _lastSuggestAddr=""
+  const tf=document.getElementById("suggest-tech-filter");if(tf)tf.value="0"
+  const box=document.getElementById("date-suggestions");if(box)box.style.display="none"
   refreshTechSels()
   document.getElementById("m-title").textContent="Nouvelle intervention"
   document.getElementById("m-id").value=""
