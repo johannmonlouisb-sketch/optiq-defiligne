@@ -2718,8 +2718,14 @@ if ('serviceWorker' in navigator) {
   })
 }
 
-// ── Statut Supabase visible (point coloré dans topbar) ──────────
+// ── Supabase inline (indépendant des fichiers externes cachés) ──
+const _SB_URL = 'https://yjcmfoxvyxzgixnrvcnn.supabase.co'
+const _SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9' +
+  '.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlqY21mb3h2eXh6Z2l4bnJ2Y25uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwNjYwNzMsImV4cCI6MjA5MTY0MjA3M30' +
+  '.1aR7ZdyBMjqhb9DhpZgXOxvaw0FcPYfeWqlKAOoyHeg'
+
 let _sbLastSync = null
+let _sbClient = null
 function _setSbDot(color, title){ const d=document.getElementById('sb-status'); if(d){d.style.background=color;d.title=title} }
 function showSbStatus(){
   const msg = _sbLastSync
@@ -2728,15 +2734,20 @@ function showSbStatus(){
   alert(msg)
 }
 
-// Supabase Realtime — sync avec l'app dispatch (même source app_state)
+// Supabase Realtime — sync avec l'app dispatch
 document.addEventListener('DOMContentLoaded', async () => {
-  if (!supabase) { _setSbDot('#ef4444','Supabase non initialisé'); return }
+  _setSbDot('#f59e0b', 'Connexion...')
 
-  _setSbDot('#f59e0b','Connexion...')
+  // Créer le client inline — indépendant de supabase-config.js
+  if (!window.supabase?.createClient) {
+    _setSbDot('#ef4444', 'CDN non chargé — rechargez la page')
+    return
+  }
+  _sbClient = window.supabase.createClient(_SB_URL, _SB_KEY)
 
-  // Charger les dernières données depuis Supabase au démarrage
+  // Charger les dernières données depuis Supabase
   try {
-    const { data, error } = await supabase
+    const { data, error } = await _sbClient
       .from('app_state')
       .select('value, updated_at')
       .eq('key', 'optiq_ivs_data')
@@ -2750,12 +2761,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       _sbLastSync = new Date().toLocaleTimeString('fr-FR')
       _setSbDot('#22c55e', `Sync OK · ${ivs.length} interventions`)
     } else {
-      _setSbDot('#f59e0b','Connecté — aucune donnée cloud')
+      _setSbDot('#f59e0b', 'Connecté — aucune donnée cloud')
     }
-  } catch(e) { _setSbDot('#ef4444','Erreur : '+e.message) }
+  } catch(e) { _setSbDot('#ef4444', 'Erreur chargement : ' + e.message) }
 
   // Écouter les modifications du dispatch en temps réel
-  supabase.channel('tech-app-sync')
+  _sbClient.channel('tech-app-sync')
     .on('postgres_changes', {
       event: '*', schema: 'public', table: 'app_state',
       filter: 'key=eq.optiq_ivs_data'
