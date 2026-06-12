@@ -529,14 +529,18 @@ const TYPES={
 let ivs=[]
 try{const s=localStorage.getItem("optiq_ivs_data");if(s){const p=JSON.parse(s);if(Array.isArray(p))ivs=p}}catch(e){}
 let _saveIvsTimer = null
+let _sbMyLastTs = null // updated_at de notre dernier envoi pour filtrer l'echo Realtime
 function saveIvs(){
   try{localStorage.setItem("optiq_ivs_data",JSON.stringify(ivs))}catch(e){}
-  // Sync vers Supabase (debounce 800ms pour éviter les appels en rafale)
   clearTimeout(_saveIvsTimer)
   _saveIvsTimer = setTimeout(async ()=>{
+    _saveIvsTimer = null // ← reset : on n'est plus "en train de sauvegarder"
     if(!_sbClient) return
     try{
       await _sbClient.from('app_state').upsert({key:'optiq_ivs_data',value:ivs},{onConflict:'key'})
+      // Lire le nouveau updated_at pour ignorer l'echo Realtime de notre propre save
+      const {data} = await _sbClient.from('app_state').select('updated_at').eq('key','optiq_ivs_data').single()
+      if(data?.updated_at) _sbMyLastTs = data.updated_at
       _sbLastSync = new Date().toLocaleTimeString('fr-FR')
       _setSbDot('#22c55e', `Envoyé ${_sbLastSync} · ${ivs.length} interv.`)
     }catch(e){ _setSbDot('#f59e0b','Sync échoué : '+e.message) }
@@ -2831,7 +2835,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }, payload => {
       const newVal = payload.new?.value
       if (!Array.isArray(newVal)) return
-      if (_saveIvsTimer) return // ignorer notre propre save en cours
+      if (_saveIvsTimer) return // save encore en debounce
+      if (payload.new?.updated_at && payload.new.updated_at === _sbMyLastTs) return // echo de notre propre save
       _applyRemoteIvs(newVal, 'WS')
     })
     .subscribe(status => {
@@ -2848,7 +2853,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       const ts = data?.updated_at
       if(!ts || ts === _sbPollTs) return
       _sbPollTs = ts
-      if(_saveIvsTimer) return // notre propre save vient de se terminer
+      if(_saveIvsTimer) return // save en debounce
+      if(ts === _sbMyLastTs) return // c'est notre propre dernière save
       const {data:d2} = await _sbClient.from('app_state').select('value').eq('key','optiq_ivs_data').single()
       if(Array.isArray(d2?.value) && d2.value.length) _applyRemoteIvs(d2.value, 'poll')
     }catch(e){}
