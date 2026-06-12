@@ -661,17 +661,27 @@ function saveTourProgress(status){
   }
 }
 
-function startTournee(){
-  if(tourRunning) return
-  tourStartTime=new Date()
-  tourRunning=true
-  saveTourProgress('running')
+// Lance l'intervalle du timer (factorisé pour init + startTournee)
+function _startTourInterval(){
+  clearInterval(tourTimer)
   tourTimer=setInterval(()=>{
     const elapsed=Math.floor((new Date()-tourStartTime)/60000)
     const el=document.getElementById('tour-timer')
     if(el) el.textContent=fmtDuration(elapsed)
-    renderDepart()
-  },1000)
+  },10000) // toutes les 10s suffit pour l'affichage minutes
+  // Mise à jour immédiate
+  const elapsed=Math.floor((new Date()-tourStartTime)/60000)
+  const el=document.getElementById('tour-timer')
+  if(el) el.textContent=fmtDuration(elapsed)
+}
+
+function startTournee(){
+  if(tourRunning) return
+  tourStartTime=new Date()
+  tourRunning=true
+  try{localStorage.setItem('optiq_tour_start_'+curTech, tourStartTime.toISOString())}catch(e){}
+  saveTourProgress('running')
+  _startTourInterval()
   refreshLiveETAs()
   startLiveETAs()
   _acquireWakeLock()
@@ -691,6 +701,7 @@ function endTournee(){
   const dayIvs=myIvs(date).length
   tourneesData[date]={startTime:startTimeStr,endTime:endTimeStr,duration:durationMin,validated:validatedCnt,failed:failedCnt,totalClients:dayIvs}
   try{localStorage.setItem("techTourneesData",JSON.stringify(tourneesData))}catch(e){}
+  try{localStorage.removeItem('optiq_tour_start_'+curTech)}catch(e){}
   tourRunning=false
   tourStartTime=null
   saveTourProgress('done')
@@ -883,9 +894,22 @@ function openTechSelect(){
   document.getElementById("tech-overlay").classList.add("open")
 }
 function closeTechSelect(){document.getElementById("tech-overlay").classList.remove("open")}
+function _restoreTourState(){
+  clearInterval(tourTimer); tourTimer=null
+  const saved=localStorage.getItem('optiq_tour_start_'+curTech)
+  if(saved){
+    tourStartTime=new Date(saved)
+    tourRunning=true
+    _startTourInterval()
+  } else {
+    tourStartTime=null
+    tourRunning=false
+  }
+}
 function selectTech(id){
   curTech=id;closeTechSelect()
   try{localStorage.setItem("tech_id",id)}catch(e){}
+  _restoreTourState()
   updateTopbar();updateBadges();goTab(curTab)
 }
 function updateTopbar(syncMsg){
@@ -2550,6 +2574,14 @@ function startNotionPolling(){
 // INIT
 // ════════════════════════════════════════════
 try{const s=localStorage.getItem("tech_id");if(s)curTech=parseInt(s)}catch(e){}
+// Restaurer le timer de tournée si la page a été rechargée pendant une tournée en cours
+;(()=>{
+  const saved=localStorage.getItem('optiq_tour_start_'+curTech)
+  if(!saved) return
+  tourStartTime=new Date(saved)
+  tourRunning=true
+  _startTourInterval() // DOM déjà prêt (scripts en bas de body)
+})()
 // Restaurer la date si c'est aujourd'hui ou une date future (sinon → aujourd'hui)
 ;(()=>{
   const _t=TODAY()
