@@ -4,23 +4,8 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9' +
   '.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlqY21mb3h2eXh6Z2l4bnJ2Y25uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwNjYwNzMsImV4cCI6MjA5MTY0MjA3M30' +
   '.1aR7ZdyBMjqhb9DhpZgXOxvaw0FcPYfeWqlKAOoyHeg'
 
+// CDN déjà chargé avant ce script — créer le client directement
 let supabase = null
-
-async function initSupabase() {
-  if (typeof window === 'undefined') return
-  if (!window.supabase) {
-    const script = document.createElement('script')
-    script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'
-    document.head.appendChild(script)
-    await new Promise(resolve => { script.onload = resolve })
-  }
-  const { createClient } = window.supabase
-  supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-  return supabase
-}
-
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initSupabase)
-} else {
-  initSupabase()
+if (window.supabase?.createClient) {
+  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 }
