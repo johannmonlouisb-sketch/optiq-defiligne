@@ -553,6 +553,8 @@ function saveIvs(){
 // Nettoyer coords invalides (hors France) déjà stockées — exécuté après isFrance définie
 function _cleanBadCoords(){ivs.forEach(iv=>{if(iv.lat&&iv.lng&&!isFrance(iv.lat,iv.lng)){delete iv.lat;delete iv.lng}})}
 let curTech=1, curTab="depart", planSel=TODAY(), gCache={}, mapObj=null, mapRoute=null
+// Charger le cache géocodes depuis localStorage (persist les adresses entre sessions)
+try{const g=localStorage.getItem('optiq_gcache');if(g){const p=JSON.parse(g);if(p&&typeof p==='object')gCache=p}}catch(e){}
 let mapMarkers={}, building=false, cmEditId=null, techRouteOrder={}, _dragId=null
 let validated={}, failed={}
 let techETAs={}  // { [ivId]: {eta:"08:32", leave:"08:47"} }
@@ -890,7 +892,11 @@ function goTab(tab){
   document.getElementById("v-"+tab).classList.add("on")
   document.getElementById("tab-"+tab).classList.add("on")
   document.getElementById("btn-gps-all").style.display=tab==="depart"?"block":"none"
-  if(tab==="depart")renderDepart()
+  if(tab==="depart"){
+    renderDepart()
+    // Leaflet perd sa taille quand le conteneur était caché — forcer recalcul
+    if(mapObj) setTimeout(()=>mapObj.invalidateSize(),300)
+  }
   else if(tab==="planning")renderPlanning()
   else if(tab==="materiel")renderMateriel()
   else if(tab==="profil")renderProfil()
@@ -1511,7 +1517,10 @@ async function geocode(addr){
   let c=await _geocodeAddok(addr)
   if(!c) c=await _geocodePhoton(addr)
   if(!c) c=await _geocodeNominatim(addr)
-  if(c) gCache[addr]=c
+  if(c){
+    gCache[addr]=c
+    try{localStorage.setItem('optiq_gcache',JSON.stringify(gCache))}catch(e){}
+  }
   return c||null
 }
 

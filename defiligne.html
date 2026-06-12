@@ -1887,6 +1887,7 @@ let depRouteLines={}  // {techId: L.GeoJSON layer} pour mise à jour sans recalc
 let _dragId=null,_dragTechId=null
 // Map state
 let mapObj=null,rGroup=null,gcache={},building=false
+try{const g=localStorage.getItem('optiq_gcache');if(g){const p=JSON.parse(g);if(p&&typeof p==='object')gcache=p}}catch(e){}
 const TODAY=new Date().toISOString().split("T")[0]
 const WEEK=(()=>{
   const d=new Date();d.setHours(12,0,0,0)
@@ -4916,7 +4917,10 @@ async function geocode(addr){
   let c=await _geocodeAddok(addr)
   if(!c) c=await _geocodePhoton(addr)   // 2. Photon (entreprises)
   if(!c) c=await _geocodeNominatim(addr) // 3. Nominatim (dernier recours)
-  if(c) gcache[addr]=c
+  if(c){
+    gcache[addr]=c
+    try{localStorage.setItem('optiq_gcache',JSON.stringify(gcache))}catch(e){}
+  }
   return c||null
 }
 
