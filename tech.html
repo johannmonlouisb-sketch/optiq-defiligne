@@ -642,10 +642,13 @@ function saveTourProgress(status){
     const key=`${curTech}_${date}`
     if(status==='idle'){ delete stored[key] }
     else{
+      const existingEntry=stored[key]||{}
       stored[key]={
         techId:curTech, techName:tc.name, date, status,
         startTime:startTimeStr,
-        startIso:tourStartTime?tourStartTime.toISOString():null, // timestamp complet pour restauration cross-device
+        startIso:tourStartTime?tourStartTime.toISOString():null,
+        depotAddr: existingEntry.depotAddr || tc?.depotAddr || DEPOT,
+        arrivalAddr: existingEntry.arrivalAddr || tc?.arrivalAddr || '',
         total:dayIvs.length,
         done:dayIvs.filter(i=>validated[i.id]).length,
         failed:dayIvs.filter(i=>failed[i.id]).length,

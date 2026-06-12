@@ -2025,6 +2025,7 @@ function renderTourTracker(){
           ${isRunning?`<span style="width:9px;height:9px;background:#16a34a;border-radius:50%;display:inline-block;animation:pulse 1.5s infinite;flex-shrink:0"></span>`:'<span style="width:9px;height:9px;background:#9ca3af;border-radius:50%;display:inline-block;flex-shrink:0"></span>'}
           <span style="font-weight:700;font-size:14px;color:${isRunning?col:'#6b7280'}">${t.techName}</span>
           <span style="font-size:12px;color:var(--gray)">${isRunning?'· En cours':'· Terminée'} · Départ ${t.startTime}</span>
+          ${t.depotAddr?`<span style="font-size:11px;color:var(--gray);background:var(--bg);padding:2px 7px;border-radius:6px">🏠 ${t.depotAddr}</span>`:''}
           <span style="margin-left:auto;font-size:18px;font-weight:800;color:${isRunning?col:'#6b7280'}">${pct}%</span>
         </div>
         <div style="height:10px;background:var(--bg);border-radius:5px;overflow:hidden;margin-bottom:8px">
