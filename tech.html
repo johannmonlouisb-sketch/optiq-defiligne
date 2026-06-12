@@ -2717,62 +2717,47 @@ if ('serviceWorker' in navigator) {
   })
 }
 
-// Supabase Realtime — écouter les changements en temps réel
+// Supabase Realtime — sync avec l'app dispatch (même source app_state)
 document.addEventListener('DOMContentLoaded', async () => {
-  // Attendre que Supabase soit initialisé
   let attempts = 0
-  while (!supabase && attempts < 10) {
-    await new Promise(r => setTimeout(r, 500))
+  while (!supabase && attempts < 20) {
+    await new Promise(r => setTimeout(r, 300))
     attempts++
   }
+  if (!supabase) { console.warn('Supabase offline'); return }
 
-  if (!supabase) {
-    console.warn('⚠️ Supabase non disponible — fonctionnement mode offline')
-    return
-  }
-
-  console.log('🔄 Initialisation Supabase Realtime...')
-
-  // Écouter les mises à jour d'interventions
-  subscribeToInterventions(({ type, data, oldData }) => {
-    if (type === 'INSERT') {
-      console.log('➕ Nouvelle intervention:', data)
-      // Ajouter à ivs et re-render
-      if (!ivs.find(i => i.id === data.id)) {
-        ivs.push({
-          id: data.id,
-          client: data.client,
-          addr: data.addr,
-          date: data.date,
-          techId: data.tech_id,
-          type: data.type,
-          status: data.status,
-          notes: data.notes,
-          contact: data.contact,
-          cphone: data.contact_phone,
-          cemail: data.contact_email,
-          notionId: data.notion_id,
-          kizeoId: data.kizeo_id
-        })
-        if (curTab === 'depart') renderDepart()
-        updateBadges()
-      }
-    } else if (type === 'UPDATE') {
-      console.log('🔄 Intervention mise à jour:', data)
-      const idx = ivs.findIndex(i => i.id === data.id)
-      if (idx >= 0) {
-        ivs[idx] = { ...ivs[idx], ...data }
-        if (curTab === 'depart') renderDepart()
-      }
-    } else if (type === 'DELETE') {
-      console.log('❌ Intervention supprimée:', data.id)
-      ivs = ivs.filter(i => i.id !== data.id)
-      if (curTab === 'depart') renderDepart()
+  // Charger les dernières données depuis Supabase au démarrage
+  try {
+    const { data } = await supabase
+      .from('app_state')
+      .select('value, updated_at')
+      .eq('key', 'optiq_ivs_data')
+      .single()
+    if (data?.value && Array.isArray(data.value) && data.value.length) {
+      ivs = data.value
+      saveIvs()
+      if (typeof renderDepart === 'function') renderDepart()
+      if (typeof updateBadges === 'function') updateBadges()
     }
-    saveIvs()
-  })
+  } catch(e) { console.warn('Supabase load:', e.message) }
 
-  console.log('✓ Realtime listeners actifs')
+  // Écouter les modifications du dispatch en temps réel
+  supabase.channel('tech-app-sync')
+    .on('postgres_changes', {
+      event: '*', schema: 'public', table: 'app_state',
+      filter: 'key=eq.optiq_ivs_data'
+    }, payload => {
+      const newVal = payload.new?.value
+      if (!Array.isArray(newVal)) return
+      ivs = newVal
+      saveIvs()
+      if (typeof renderDepart === 'function') renderDepart()
+      if (typeof updateBadges === 'function') updateBadges()
+      console.log('🔄 Sync dispatch →', ivs.length, 'interventions')
+    })
+    .subscribe()
+
+  console.log('✓ Supabase Realtime actif — sync dispatch/tech')
 })
 </script>
 
