@@ -7408,7 +7408,9 @@ function initCloud(){
 
       }catch(e){ console.warn('Realtime init:', e.message) }
 
-      // Fallback : rechargement au retour d'onglet (si WebSocket coupé)
+      // Poll toutes les 5s — fiable même si Realtime coupe
+      setInterval(()=>{ if(!document.hidden) cloudPoll() }, 5000)
+      // Forcer un poll immédiat au retour d'onglet
       document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) cloudPoll() })
     })
   }

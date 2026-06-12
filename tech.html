@@ -2823,7 +2823,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   } catch(e) { _setSbDot('#ef4444', 'Erreur chargement : ' + e.message) }
 
-  // Écouter les modifications du dispatch en temps réel
+  // Écouter les modifications du dispatch en temps réel (WebSocket)
   _sbClient.channel('tech-app-sync')
     .on('postgres_changes', {
       event: '*', schema: 'public', table: 'app_state',
@@ -2831,20 +2831,39 @@ document.addEventListener('DOMContentLoaded', async () => {
     }, payload => {
       const newVal = payload.new?.value
       if (!Array.isArray(newVal)) return
-      // Ignorer si c'est notre propre save (en cours de debounce)
-      if (_saveIvsTimer) return
-      ivs = newVal
-      try{localStorage.setItem("optiq_ivs_data",JSON.stringify(ivs))}catch(e){}
-      if (typeof renderDepart === 'function') renderDepart()
-      if (typeof updateBadges === 'function') updateBadges()
-      _sbLastSync = new Date().toLocaleTimeString('fr-FR')
-      _setSbDot('#22c55e', `Reçu ${_sbLastSync} · ${ivs.length} interv.`)
+      if (_saveIvsTimer) return // ignorer notre propre save en cours
+      _applyRemoteIvs(newVal, 'WS')
     })
     .subscribe(status => {
       if (status === 'SUBSCRIBED') _setSbDot('#22c55e', `Connecté · ${ivs.length} interventions`)
-      if (status === 'CHANNEL_ERROR') _setSbDot('#ef4444', 'Erreur WebSocket')
+      if (status === 'CHANNEL_ERROR') _setSbDot('#f59e0b', 'Realtime coupé — poll actif')
     })
+
+  // Poll fallback toutes les 5s — fiable même si Realtime coupe (mobile background)
+  let _sbPollTs = null
+  async function _sbPoll(){
+    if(document.hidden || !_sbClient) return
+    try{
+      const {data} = await _sbClient.from('app_state').select('updated_at').eq('key','optiq_ivs_data').single()
+      const ts = data?.updated_at
+      if(!ts || ts === _sbPollTs) return
+      _sbPollTs = ts
+      if(_saveIvsTimer) return // notre propre save vient de se terminer
+      const {data:d2} = await _sbClient.from('app_state').select('value').eq('key','optiq_ivs_data').single()
+      if(Array.isArray(d2?.value) && d2.value.length) _applyRemoteIvs(d2.value, 'poll')
+    }catch(e){}
+  }
+  setInterval(_sbPoll, 5000)
 })
+
+function _applyRemoteIvs(newVal, src){
+  ivs = newVal
+  try{localStorage.setItem("optiq_ivs_data",JSON.stringify(ivs))}catch(e){}
+  if(typeof renderDepart==='function') renderDepart()
+  if(typeof updateBadges==='function') updateBadges()
+  _sbLastSync = new Date().toLocaleTimeString('fr-FR')
+  _setSbDot('#22c55e', `${src==='WS'?'⚡':'🔄'} ${_sbLastSync} · ${ivs.length} interv.`)
+}
 </script>
 
 </body>
