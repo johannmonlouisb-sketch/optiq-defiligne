@@ -717,19 +717,31 @@ function showNextClientPopup(currentId){
   const order=techRouteOrder[date]||myIvs(date).map(i=>i.id)
   const currentIdx=order.indexOf(currentId)
   const nextId=order.slice(currentIdx+1).find(id=>!validated[id]&&!failed[id])
-  if(!nextId) return
-  const nextIv=ivs.find(i=>i.id===nextId)
-  if(!nextIv) return
-  _nextDestAddr=nextIv.addr||''
-  document.getElementById('next-dest-name').textContent=nextIv.client||'Client'
-  document.getElementById('next-dest-addr').textContent=_nextDestAddr
-  const eta=techETAs[nextId]?.eta||''
-  document.getElementById('next-dest-eta').textContent=eta?`Arrivée estimée : ${eta}`:''
+
   const ov=document.getElementById('next-dest-overlay')
   const sh=document.getElementById('next-dest-sheet')
-  ov.style.display='block'
-  sh.style.display='block'
-  setTimeout(()=>sh.style.transform='translateY(0)',10)
+  function _showSheet(name,addr,etaTxt){
+    _nextDestAddr=addr
+    document.getElementById('next-dest-name').textContent=name
+    document.getElementById('next-dest-addr').textContent=addr
+    document.getElementById('next-dest-eta').textContent=etaTxt||''
+    ov.style.display='block'; sh.style.display='block'
+    setTimeout(()=>sh.style.transform='translateY(0)',10)
+  }
+
+  if(!nextId){
+    // Plus de clients → retour au point d'arrivée ou dépôt
+    const tc=TB(curTech)
+    const returnAddr=(tc?.arrivalAddr||'').trim()||(tc?.depotAddr||'').trim()
+    if(!returnAddr) return
+    _showSheet('🏁 Fin de tournée — Retour', returnAddr, 'Toutes les interventions sont terminées')
+    return
+  }
+
+  const nextIv=ivs.find(i=>i.id===nextId)
+  if(!nextIv) return
+  const eta=techETAs[nextId]?.eta||''
+  _showSheet(nextIv.client||'Client', nextIv.addr||'', eta?`Arrivée estimée : ${eta}`:'')
 }
 function closeNextClientPopup(){
   const sh=document.getElementById('next-dest-sheet')
@@ -2865,6 +2877,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 function _applyRemoteIvs(newVal, src){
   ivs = newVal
   try{localStorage.setItem("optiq_ivs_data",JSON.stringify(ivs))}catch(e){}
+  if(typeof syncVFFromIvs==='function') syncVFFromIvs() // sync validated/failed avec les statuts réels
   if(typeof renderDepart==='function') renderDepart()
   if(typeof updateBadges==='function') updateBadges()
   _sbLastSync = new Date().toLocaleTimeString('fr-FR')
