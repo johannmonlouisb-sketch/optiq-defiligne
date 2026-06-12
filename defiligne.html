@@ -252,7 +252,8 @@ tr:hover td{background:var(--bg)}
     <div style="padding:10px 16px;display:flex;flex-direction:column;gap:7px;flex-shrink:0;border-bottom:1px solid var(--border);background:#fff">
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <input type="date" id="dep-date" style="width:auto;font-size:13px;padding:6px 10px" oninput="rDepart();_schedDepMap()"/>
-        <input type="time" id="dep-time" value="08:00" title="Heure de départ" style="width:auto;font-size:13px;padding:6px 10px"/>
+        <input type="time" id="dep-time" value="08:00" title="Heure de départ" style="width:auto;font-size:13px;padding:6px 10px" oninput="_schedDepMap()"/>
+        <button onclick="depNow()" title="Utiliser l'heure actuelle (Paris)" style="padding:6px 10px;font-size:12px;border-radius:8px;border:1.5px solid var(--blue);background:#E3F2FD;color:#1565C0;cursor:pointer;font-family:inherit;font-weight:600;white-space:nowrap">🕐 Maintenant</button>
         <div style="position:relative;display:inline-block">
           <button id="dep-tech-btn" onclick="toggleDepTechDropdown(event)" style="padding:6px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;font-size:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:8px;min-width:160px;white-space:nowrap">
             <span id="dep-tech-label" style="flex:1;text-align:left">Tous les techniciens</span>
@@ -1896,6 +1897,22 @@ function _schedDepMap(){clearTimeout(_depMapAutoTimer);_depMapAutoTimer=setTimeo
 let _calcRouteTimer=null
 function _schedCalcRoute(){clearTimeout(_calcRouteTimer);_calcRouteTimer=setTimeout(()=>calcRoute(),700)}
 
+// Retourne l'heure actuelle en HH:MM fuseau Europe/Paris
+function _nowParis(){
+  return new Date().toLocaleTimeString('fr-FR',{timeZone:'Europe/Paris',hour:'2-digit',minute:'2-digit',hour12:false})
+}
+// Auto-met dep-time à l'heure de Paris si la date sélectionnée est aujourd'hui
+function _autoDepTime(){
+  if(selDate!==TODAY) return
+  const dtEl=document.getElementById('dep-time')
+  if(dtEl) dtEl.value=_nowParis()
+}
+// Bouton "Maintenant" : positionne dep-time sur l'heure courante et relance le calcul
+function depNow(){
+  _autoDepTime()
+  _schedDepMap()
+}
+
 function togDepTech2(id,e){
   if(e)e.stopPropagation()
   const i=depSelectedTechs.indexOf(id)
@@ -1948,6 +1965,7 @@ function SV(v){
   _saveUIState()
   if(v==="dashboard")rDash()
   else if(v==="depart"){
+    _autoDepTime()
     rDepart()
     if(depMapObj)setTimeout(()=>depMapObj.invalidateSize(),200)
     _schedDepMap()
@@ -2279,7 +2297,7 @@ function dropDepCard(targetId){
 function rDepart(){
   const di=document.getElementById("dep-date")
   di.value=selDate
-  di.onchange=()=>{selDate=di.value;depRouteOrder={};loadRouteOrder(selDate);_saveUIState();rDepart()}
+  di.onchange=()=>{selDate=di.value;depRouteOrder={};loadRouteOrder(selDate);_saveUIState();_autoDepTime();rDepart();_schedDepMap()}
   const date=selDate
   // Badge "Jour en cours" si on affiche aujourd'hui
   const dayBadgeEl=document.getElementById("dep-day-badge")
