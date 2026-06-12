@@ -2829,12 +2829,19 @@ document.addEventListener('DOMContentLoaded', async () => {
       const {data:tp} = await _sbClient.from('app_state').select('value').eq('key','optiq_tour_progress').maybeSingle()
       const date=depDate()
       const entry=tp?.value?.[`${curTech}_${date}`]
-      if(entry?.status==='running'&&entry?.startIso){
-        const restored=new Date(entry.startIso)
-        if(!isNaN(restored.getTime())&&!tourRunning){
+      if(entry?.status==='running'&&!tourRunning){
+        let restored=null
+        if(entry.startIso){
+          restored=new Date(entry.startIso)
+        } else if(entry.startTime&&/^\d{2}:\d{2}$/.test(entry.startTime)){
+          // Fallback HH:MM : reconstruire avec la date du jour
+          const [h,m]=entry.startTime.split(':')
+          restored=new Date(); restored.setHours(parseInt(h),parseInt(m),0,0)
+        }
+        if(restored&&!isNaN(restored.getTime())){
           tourStartTime=restored
           tourRunning=true
-          try{localStorage.setItem('optiq_tour_start_'+curTech, entry.startIso)}catch(e){}
+          try{localStorage.setItem('optiq_tour_start_'+curTech, restored.toISOString())}catch(e){}
           _startTourInterval()
           if(typeof renderDepart==='function') renderDepart()
         }
