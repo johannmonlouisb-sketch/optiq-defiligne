@@ -245,14 +245,14 @@ tr:hover td{background:var(--bg)}
     <div id="d-dash"></div>
   </div>
 
-  <!-- DÉPART & ITINÉRAIRE DÉTAILLÉ (vue unifiée) -->
+  <!-- DÉPART DU JOUR -->
   <div id="p-depart" class="vp" style="flex-direction:column">
 
-    <!-- CONTRÔLES PARTAGÉS -->
+    <!-- CONTRÔLES -->
     <div style="padding:10px 16px;display:flex;flex-direction:column;gap:7px;flex-shrink:0;border-bottom:1px solid var(--border);background:#fff">
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        <input type="date" id="dep-date" style="width:auto;font-size:13px;padding:6px 10px" oninput="rDepart();_schedDepMap();_syncMapDate()"/>
-        <input type="time" id="dep-time" value="08:00" title="Heure de départ" style="width:auto;font-size:13px;padding:6px 10px" oninput="const _mt=document.getElementById('map-time');if(_mt)_mt.value=this.value;_schedCalcRoute()"/>
+        <input type="date" id="dep-date" style="width:auto;font-size:13px;padding:6px 10px" oninput="rDepart();_schedDepMap()"/>
+        <input type="time" id="dep-time" value="08:00" title="Heure de départ" style="width:auto;font-size:13px;padding:6px 10px"/>
         <div style="position:relative;display:inline-block">
           <button id="dep-tech-btn" onclick="toggleDepTechDropdown(event)" style="padding:6px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;font-size:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:8px;min-width:160px;white-space:nowrap">
             <span id="dep-tech-label" style="flex:1;text-align:left">Tous les techniciens</span>
@@ -264,80 +264,32 @@ tr:hover td{background:var(--bg)}
         </div>
         <div id="dep-techs-chips" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"></div>
         <div id="dep-day-badge" style="display:flex;align-items:center"></div>
-        <span style="color:var(--border);font-size:18px;margin:0 1px">|</span>
-        <select id="map-tech" style="width:auto;padding:6px 10px;font-size:13px" onchange="calcRoute()"></select>
-        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:var(--gray)"><input type="checkbox" id="opt-return" checked style="width:auto"/> Retour</label>
-        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:var(--gray)"><input type="checkbox" id="opt-optim" checked style="width:auto"/> Optimiser</label>
-        <span id="map-lc"></span>
         <button class="bg bsm" onclick="openGoogleMaps()">📍 GPS</button>
-        <button class="bb bsm" onclick="calcRoute()">🧭 Itinéraire</button>
-        <button class="bg bsm" onclick="calcRouteNow()" title="Recalculer depuis l'heure actuelle">🕐 Maintenant</button>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <span>🏠</span>
-        <div id="depot-disp" style="display:flex;align-items:center;gap:8px">
-          <span id="depot-txt" style="font-size:13px;font-weight:500;color:var(--gray)"></span>
-          <button onclick="editDepot()" class="bicon bsm">✏️</button>
-        </div>
-        <div id="depot-ed" style="display:none;gap:8px;align-items:center">
-          <input id="depot-in" style="font-size:13px;flex:1"/>
-          <button onclick="saveDepot()" class="bb bsm">✓</button>
-          <button onclick="cancelDepot()" class="bg bsm">✕</button>
-        </div>
       </div>
       <div id="dep-depots" style="display:none;gap:8px;flex-wrap:wrap"></div>
       <div id="dep-stats" style="font-size:12px;color:var(--gray)"></div>
     </div>
 
-    <!-- CORPS EN DEUX COLONNES -->
-    <div style="display:flex;flex:1;min-height:0">
-
-      <!-- GAUCHE : Carte dispatch + liste interventions -->
-      <div style="flex:1.2;display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--border)">
-        <div id="dep-rte-stats" style="display:none;grid-template-columns:repeat(4,1fr);gap:8px;padding:10px 16px 0">
-          <div class="surf" style="border-left:3px solid var(--blue);display:flex;align-items:center;gap:8px;padding:8px 12px"><span>🛣️</span><div><div class="lbl">Distance</div><div id="dsk" style="font-size:16px;font-weight:700;color:var(--blue)">—</div></div></div>
-          <div class="surf" style="border-left:3px solid var(--purple);display:flex;align-items:center;gap:8px;padding:8px 12px"><span>🚗</span><div><div class="lbl">Trajet</div><div id="dst" style="font-size:16px;font-weight:700;color:var(--purple)">—</div></div></div>
-          <div class="surf" style="border-left:3px solid var(--orange);display:flex;align-items:center;gap:8px;padding:8px 12px"><span>🔧</span><div><div class="lbl">Travail</div><div id="dsw" style="font-size:16px;font-weight:700;color:var(--orange)">—</div></div></div>
-          <div class="surf" style="border-left:3px solid var(--green);display:flex;align-items:center;gap:8px;padding:8px 12px"><span>📍</span><div><div class="lbl">Validés</div><div id="dsv" style="font-size:16px;font-weight:700;color:var(--green)">—</div></div></div>
-        </div>
-        <div id="dep-layout" style="flex:1;min-height:0">
-          <div id="dep-map-frame">
-            <div id="dep-mapid" style="width:100%;height:100%;min-height:300px"></div>
-            <div id="dep-map-pb" style="display:none;padding:10px 14px;background:var(--blueLight)">
-              <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span id="dep-pm">Chargement...</span><span id="dep-pp">0%</span></div>
-              <div class="prog-t"><div id="dep-pf" style="height:100%;background:var(--blue);border-radius:4px;width:0%;transition:width .3s"></div></div>
-            </div>
-            <div id="dep-map-msg" style="padding:10px 14px;background:var(--blueLight);font-size:12px;color:var(--blue);text-align:center">
-              Sélectionnez une date et des techniciens
-            </div>
-          </div>
-          <div id="dep-list"></div>
-        </div>
-      </div>
-
-      <!-- DROITE : Itinéraire détaillé -->
-      <div style="flex:1;display:flex;flex-direction:column;overflow-y:auto;padding:14px;gap:10px;min-width:0">
-        <div id="rte-stats" style="display:none;grid-template-columns:repeat(5,1fr);gap:10px">
-          <div class="surf" style="border-left:3px solid var(--blue);display:flex;align-items:center;gap:8px"><span style="font-size:18px">🛣️</span><div><div class="lbl">Distance</div><div id="sk" style="font-size:18px;font-weight:700;color:var(--blue)">—</div></div></div>
-          <div class="surf" style="border-left:3px solid var(--purple);display:flex;align-items:center;gap:8px"><span style="font-size:18px">🚗</span><div><div class="lbl">Trajet</div><div id="st" style="font-size:18px;font-weight:700;color:var(--purple)">—</div><div id="st-sub" style="font-size:10px;color:var(--gray);margin-top:1px"></div></div></div>
-          <div class="surf" style="border-left:3px solid var(--orange);display:flex;align-items:center;gap:8px"><span style="font-size:18px">🔧</span><div><div class="lbl">Travail</div><div id="sw" style="font-size:18px;font-weight:700;color:var(--orange)">—</div></div></div>
-          <div class="surf" style="border-left:3px solid #C62828;display:flex;align-items:center;gap:8px"><span style="font-size:18px">⏰</span><div><div class="lbl">Journée totale</div><div id="stot" style="font-size:18px;font-weight:700;color:#C62828">—</div></div></div>
-          <div class="surf" style="border-left:3px solid var(--green);display:flex;align-items:center;gap:8px"><span style="font-size:18px">📍</span><div><div class="lbl">Arrêts</div><div id="ss" style="font-size:18px;font-weight:700;color:var(--green)">—</div></div></div>
-        </div>
-        <div id="pb" style="display:none" class="card">
-          <div style="display:flex;justify-content:space-between;margin-bottom:5px"><span id="pm" style="font-size:13px;color:var(--gray)">...</span><span id="pp" style="font-size:13px;font-weight:600;color:var(--blue)">0%</span></div>
-          <div class="prog-t"><div id="pf" style="height:100%;background:var(--blue);border-radius:4px;width:0%;transition:width .4s"></div></div>
-        </div>
-        <div id="map-labor" style="display:none;padding:8px 14px"></div>
-        <div id="ms" class="card" style="text-align:center;color:var(--gray);padding:18px">Sélectionnez un technicien pour voir l'itinéraire détaillé</div>
-        <div id="map-con" style="border-radius:10px;overflow:hidden;border:1px solid var(--border);flex-shrink:0;min-height:380px"><div id="mapid" style="width:100%;height:100%;min-height:380px"></div></div>
-        <div id="map-ivl"></div>
-      </div>
+    <!-- CARTE + LISTE -->
+    <div id="dep-rte-stats" style="display:none;grid-template-columns:repeat(4,1fr);gap:8px;padding:10px 16px 0">
+      <div class="surf" style="border-left:3px solid var(--blue);display:flex;align-items:center;gap:8px;padding:8px 12px"><span>🛣️</span><div><div class="lbl">Distance</div><div id="dsk" style="font-size:16px;font-weight:700;color:var(--blue)">—</div></div></div>
+      <div class="surf" style="border-left:3px solid var(--purple);display:flex;align-items:center;gap:8px;padding:8px 12px"><span>🚗</span><div><div class="lbl">Trajet</div><div id="dst" style="font-size:16px;font-weight:700;color:var(--purple)">—</div></div></div>
+      <div class="surf" style="border-left:3px solid var(--orange);display:flex;align-items:center;gap:8px;padding:8px 12px"><span>🔧</span><div><div class="lbl">Travail</div><div id="dsw" style="font-size:16px;font-weight:700;color:var(--orange)">—</div></div></div>
+      <div class="surf" style="border-left:3px solid var(--green);display:flex;align-items:center;gap:8px;padding:8px 12px"><span>📍</span><div><div class="lbl">Validés</div><div id="dsv" style="font-size:16px;font-weight:700;color:var(--green)">—</div></div></div>
     </div>
-
-    <!-- Inputs cachés pour compat JS (map-di synced depuis dep-date) -->
-    <input type="hidden" id="map-di"/>
-    <input type="hidden" id="map-time" value="08:00"/>
+    <div id="dep-layout" style="flex:1;min-height:0">
+      <div id="dep-map-frame">
+        <div id="dep-mapid" style="width:100%;height:100%;min-height:300px"></div>
+        <div id="dep-map-pb" style="display:none;padding:10px 14px;background:var(--blueLight)">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span id="dep-pm">Chargement...</span><span id="dep-pp">0%</span></div>
+          <div class="prog-t"><div id="dep-pf" style="height:100%;background:var(--blue);border-radius:4px;width:0%;transition:width .3s"></div></div>
+        </div>
+        <div id="dep-map-msg" style="padding:10px 14px;background:var(--blueLight);font-size:12px;color:var(--blue);text-align:center">
+          Sélectionnez une date et des techniciens
+        </div>
+      </div>
+      <div id="dep-list"></div>
+    </div>
   </div>
 
   <!-- PLANNING -->
@@ -1996,16 +1948,8 @@ function SV(v){
   _saveUIState()
   if(v==="dashboard")rDash()
   else if(v==="depart"){
-    _syncMapDate()
-    document.getElementById("depot-txt").textContent=depot
-    refreshMapTechSel()
     rDepart()
-    if(!mapObj)setTimeout(initMap,100)
-    setTimeout(()=>{
-      if(depMapObj)depMapObj.invalidateSize()
-      if(mapObj)mapObj.invalidateSize()
-      if(!building)calcRoute()
-    },300)
+    if(depMapObj)setTimeout(()=>depMapObj.invalidateSize(),200)
   }
   else if(v==="planning")rPlan()
   else if(v==="interventions")rIv()
@@ -7346,10 +7290,6 @@ function initCloud(){
 
   // Sidebar count
   updateSbCount()
-
-  _syncMapDate()
-  document.getElementById("depot-txt").textContent=depot
-  refreshMapTechSel()
 
   const el = document.getElementById('cloud-status')
   if(el) el.innerHTML = `💾 <span style="color:#1B5E20">${ivs.length} interventions</span>`
