@@ -643,6 +643,7 @@ function saveTourProgress(status){
       stored[key]={
         techId:curTech, techName:tc.name, date, status,
         startTime:startTimeStr,
+        startIso:tourStartTime?tourStartTime.toISOString():null, // timestamp complet pour restauration cross-device
         total:dayIvs.length,
         done:dayIvs.filter(i=>validated[i.id]).length,
         failed:dayIvs.filter(i=>failed[i.id]).length,
@@ -668,15 +669,18 @@ function saveTourProgress(status){
 // Lance l'intervalle du timer (factorisé pour init + startTournee)
 function _startTourInterval(){
   clearInterval(tourTimer)
-  tourTimer=setInterval(()=>{
+  function _tick(){
     const elapsed=Math.floor((new Date()-tourStartTime)/60000)
     const el=document.getElementById('tour-timer')
     if(el) el.textContent=fmtDuration(elapsed)
-  },10000) // toutes les 10s suffit pour l'affichage minutes
-  // Mise à jour immédiate
-  const elapsed=Math.floor((new Date()-tourStartTime)/60000)
-  const el=document.getElementById('tour-timer')
-  if(el) el.textContent=fmtDuration(elapsed)
+    // Garder le bloc visible si tourRunning (au cas où renderDepart l'aurait caché)
+    const bloc=document.getElementById('dep-tour-timer')
+    if(bloc&&tourRunning) bloc.style.display='flex'
+    const btnStart=document.getElementById('btn-start-tour')
+    if(btnStart&&tourRunning) btnStart.style.display='none'
+  }
+  _tick() // mise à jour immédiate
+  tourTimer=setInterval(_tick, 30000) // toutes les 30s
 }
 
 function startTournee(){
@@ -2818,6 +2822,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     return
   }
   _sbClient = window.supabase.createClient(_SB_URL, _SB_KEY)
+
+  // Restaurer le timer depuis Supabase si localStorage manque (autre appareil / cache vidé)
+  if(!localStorage.getItem('optiq_tour_start_'+curTech)){
+    try{
+      const {data:tp} = await _sbClient.from('app_state').select('value').eq('key','optiq_tour_progress').maybeSingle()
+      const date=depDate()
+      const entry=tp?.value?.[`${curTech}_${date}`]
+      if(entry?.status==='running'&&entry?.startIso){
+        const restored=new Date(entry.startIso)
+        if(!isNaN(restored.getTime())&&!tourRunning){
+          tourStartTime=restored
+          tourRunning=true
+          try{localStorage.setItem('optiq_tour_start_'+curTech, entry.startIso)}catch(e){}
+          _startTourInterval()
+          if(typeof renderDepart==='function') renderDepart()
+        }
+      }
+    }catch(e){}
+  }
 
   // Charger les dernières données depuis Supabase
   try {
