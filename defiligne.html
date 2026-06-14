@@ -122,8 +122,9 @@ input,select,textarea{font-family:inherit;border:1px solid var(--border);border-
 input:focus,select:focus,textarea:focus{outline:2px solid var(--blue);border-color:var(--blue);outline-offset:0}
 .lbl{font-size:12px;color:var(--gray);font-weight:500;display:block;margin-bottom:3px}
 /* DEPART TAB */
-#dep-layout{display:flex;flex-direction:column;gap:14px;padding:12px 16px 16px;overflow-y:auto}
-#dep-mapid{height:320px;border-radius:10px;overflow:hidden;border:1px solid var(--border);background:#f0f0f0;flex-shrink:0}
+#dep-layout{display:grid;grid-template-columns:1fr 340px;gap:14px;padding:12px 16px 16px;min-height:0;flex:1}
+#dep-mapid{border-radius:10px;overflow:hidden;border:1px solid var(--border);background:#f0f0f0}
+#dep-right{display:flex;flex-direction:column;gap:8px;overflow-y:auto;min-height:0}
 #dep-list{display:flex;flex-direction:column;gap:8px}
 .dep-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px;cursor:pointer;transition:all 0.15s;border-left:4px solid var(--blue)}
 .dep-card.done{border-left-color:#4CAF50;opacity:0.65}
@@ -160,8 +161,8 @@ tr:hover td{background:var(--bg)}
   #logo-z img{height:24px}
   #logo-z p{display:none}
   #gsearch-wrap{max-width:180px}
-  #dep-layout{padding:8px 8px 16px}
-  #dep-mapid{height:240px}
+  #dep-layout{grid-template-columns:1fr;padding:8px 8px 16px}
+  #dep-mapid{height:260px}
   .kpig{grid-template-columns:repeat(2,1fr)}
   .g2{grid-template-columns:1fr}
 }
@@ -281,14 +282,16 @@ tr:hover td{background:var(--bg)}
     </div>
     <div id="dep-layout">
       <div id="dep-mapid"></div>
-      <div id="dep-map-pb" style="display:none;padding:10px 14px;background:var(--blueLight);border-radius:8px">
-        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span id="dep-pm">Chargement...</span><span id="dep-pp">0%</span></div>
-        <div class="prog-t"><div id="dep-pf" style="height:100%;background:var(--blue);border-radius:4px;width:0%;transition:width .3s"></div></div>
+      <div id="dep-right">
+        <div id="dep-map-pb" style="display:none;padding:10px 14px;background:var(--blueLight);border-radius:8px">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span id="dep-pm">Chargement...</span><span id="dep-pp">0%</span></div>
+          <div class="prog-t"><div id="dep-pf" style="height:100%;background:var(--blue);border-radius:4px;width:0%;transition:width .3s"></div></div>
+        </div>
+        <div id="dep-map-msg" style="padding:10px 14px;background:var(--blueLight);border-radius:8px;font-size:12px;color:var(--blue);text-align:center">
+          Sélectionnez une date et des techniciens
+        </div>
+        <div id="dep-list"></div>
       </div>
-      <div id="dep-map-msg" style="padding:10px 14px;background:var(--blueLight);border-radius:8px;font-size:12px;color:var(--blue);text-align:center">
-        Sélectionnez une date et des techniciens
-      </div>
-      <div id="dep-list"></div>
     </div>
   </div>
 
