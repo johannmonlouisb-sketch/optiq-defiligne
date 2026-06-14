@@ -122,14 +122,9 @@ input,select,textarea{font-family:inherit;border:1px solid var(--border);border-
 input:focus,select:focus,textarea:focus{outline:2px solid var(--blue);border-color:var(--blue);outline-offset:0}
 .lbl{font-size:12px;color:var(--gray);font-weight:500;display:block;margin-bottom:3px}
 /* DEPART TAB */
-#dep-layout{display:flex;flex-direction:column;flex:1;min-height:0;padding:12px 16px 0}
-#dep-map-frame{flex:1;min-height:200px;border-radius:10px;overflow:hidden;border:1px solid var(--border);background:#f0f0f0;display:flex;flex-direction:column}
-#dep-sheet{flex-shrink:0;background:#fff;border-top:2px solid var(--border);border-radius:12px 12px 0 0;box-shadow:0 -4px 18px rgba(0,0,0,.09);max-height:420px;overflow:hidden;transition:max-height .35s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column}
-#dep-sheet.closed{max-height:44px}
-#dep-sheet-handle{display:flex;align-items:center;gap:10px;padding:11px 16px;cursor:pointer;flex-shrink:0;user-select:none;background:#fff;border-radius:12px 12px 0 0}
-#dep-list{overflow-y:auto;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:4px 16px 16px}
-#dep-list .dep-grp-hdr{grid-column:1 / -1}
-#dep-list>.card{grid-column:1 / -1}
+#dep-layout{display:flex;flex-direction:column;gap:14px;padding:12px 16px 16px;overflow-y:auto}
+#dep-mapid{height:320px;border-radius:10px;overflow:hidden;border:1px solid var(--border);background:#f0f0f0;flex-shrink:0}
+#dep-list{display:flex;flex-direction:column;gap:8px}
 .dep-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px;cursor:pointer;transition:all 0.15s;border-left:4px solid var(--blue)}
 .dep-card.done{border-left-color:#4CAF50;opacity:0.65}
 .dep-card:hover:not(.done){box-shadow:0 2px 12px rgba(0,0,0,0.1)}
@@ -165,9 +160,8 @@ tr:hover td{background:var(--bg)}
   #logo-z img{height:24px}
   #logo-z p{display:none}
   #gsearch-wrap{max-width:180px}
-  #dep-layout{padding:8px 8px 0}
-  #dep-sheet{max-height:55%}
-  #dep-list{grid-template-columns:1fr}
+  #dep-layout{padding:8px 8px 16px}
+  #dep-mapid{height:240px}
   .kpig{grid-template-columns:repeat(2,1fr)}
   .g2{grid-template-columns:1fr}
 }
@@ -286,24 +280,15 @@ tr:hover td{background:var(--bg)}
       <div class="surf" style="border-left:3px solid var(--green);display:flex;align-items:center;gap:8px;padding:8px 12px"><span>📍</span><div><div class="lbl">Validés</div><div id="dsv" style="font-size:16px;font-weight:700;color:var(--green)">—</div></div></div>
     </div>
     <div id="dep-layout">
-      <div id="dep-map-frame">
-        <div id="dep-mapid" style="width:100%;height:100%;min-height:300px"></div>
-        <div id="dep-map-pb" style="display:none;padding:10px 14px;background:var(--blueLight)">
-          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span id="dep-pm">Chargement...</span><span id="dep-pp">0%</span></div>
-          <div class="prog-t"><div id="dep-pf" style="height:100%;background:var(--blue);border-radius:4px;width:0%;transition:width .3s"></div></div>
-        </div>
-        <div id="dep-map-msg" style="padding:10px 14px;background:var(--blueLight);font-size:12px;color:var(--blue);text-align:center">
-          Sélectionnez une date et des techniciens
-        </div>
+      <div id="dep-mapid"></div>
+      <div id="dep-map-pb" style="display:none;padding:10px 14px;background:var(--blueLight);border-radius:8px">
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span id="dep-pm">Chargement...</span><span id="dep-pp">0%</span></div>
+        <div class="prog-t"><div id="dep-pf" style="height:100%;background:var(--blue);border-radius:4px;width:0%;transition:width .3s"></div></div>
       </div>
-      <div id="dep-sheet">
-        <div id="dep-sheet-handle" onclick="toggleDepSheet()">
-          <div style="width:36px;height:4px;background:var(--border);border-radius:2px;flex-shrink:0"></div>
-          <span id="dep-sheet-lbl" style="font-size:13px;font-weight:600;flex:1">Interventions</span>
-          <span id="dep-sheet-arrow" style="font-size:11px;color:var(--gray);font-weight:700">▼</span>
-        </div>
-        <div id="dep-list"></div>
+      <div id="dep-map-msg" style="padding:10px 14px;background:var(--blueLight);border-radius:8px;font-size:12px;color:var(--blue);text-align:center">
+        Sélectionnez une date et des techniciens
       </div>
+      <div id="dep-list"></div>
     </div>
   </div>
 
@@ -1926,14 +1911,6 @@ function depNow(){
   _autoDepTime()
   _schedDepMap()
 }
-let _depSheetOpen=true
-function toggleDepSheet(){
-  _depSheetOpen=!_depSheetOpen
-  const sh=document.getElementById('dep-sheet')
-  const arr=document.getElementById('dep-sheet-arrow')
-  if(sh) sh.classList.toggle('closed',!_depSheetOpen)
-  if(arr) arr.textContent=_depSheetOpen?'▼':'▲'
-}
 
 function togDepTech2(id,e){
   if(e)e.stopPropagation()
@@ -2417,8 +2394,6 @@ function rDepart(){
   const failCount=dayIvs.filter(i=>depFailed[i.id]).length
   document.getElementById("dep-stats").innerHTML=
     `✅ <strong style="color:var(--green)">${doneCount}</strong> validées · ❌ <strong style="color:#C62828">${failCount}</strong> échecs · ${dayIvs.length} total`
-  const _shlbl=document.getElementById('dep-sheet-lbl')
-  if(_shlbl) _shlbl.textContent=`${dayIvs.length} intervention${dayIvs.length>1?'s':''}${doneCount?' · ✅ '+doneCount:''}`
   const el=document.getElementById("dsv")
   if(el)el.textContent=`${doneCount}/${dayIvs.length}`
 
@@ -4666,6 +4641,7 @@ function saveEdit(){
     if(obj.type==="installation"&&obj.status==="completed"){
       autoMaintFromInstall(newIv)
     }
+    pushIvToNotion(newIv)
   }
   closeEdit()
   if(curView==="dashboard")rDash()
@@ -8285,34 +8261,77 @@ async function pushStatusToNotion(ivId, newStatus){
 // ══════════════════════════════════════════════════════════════
 // PULL NOTION RAPIDE — Juste demain ou une date donnée
 // ══════════════════════════════════════════════════════════════
+function _parisToday(){
+  return new Date().toLocaleDateString('fr-CA',{timeZone:'Europe/Paris'})
+}
+function _parisDatePlus(days){
+  const d=new Date(); d.setDate(d.getDate()+days)
+  return d.toLocaleDateString('fr-CA',{timeZone:'Europe/Paris'})
+}
+
 async function pullNotionForDate(dateStr){
   return pullFromNotion(dateStr, dateStr)
 }
 
+async function pullNotionToday(){
+  const today=_parisToday()
+  const result=await pullFromNotion(today,today)
+  if(!result.error){ selDate=today; rDash() }
+}
+
 async function pullNotionTomorrow(){
-  const d = new Date(); d.setDate(d.getDate()+1)
-  const tomorrow = d.toISOString().split('T')[0]
-  const result = await pullFromNotion(tomorrow, tomorrow)
-  if(!result.error){
-    selDate = tomorrow
-    rDash()
-  }
+  const tomorrow=_parisDatePlus(1)
+  const result=await pullFromNotion(tomorrow,tomorrow)
+  if(!result.error){ selDate=tomorrow; rDash() }
 }
 
 async function pullNotionWeek(){
-  const d = new Date()
-  const from = d.toISOString().split('T')[0]
-  const to = new Date(d.setDate(d.getDate()+7)).toISOString().split('T')[0]
-  return pullFromNotion(from, to)
+  return pullFromNotion(_parisToday(), _parisDatePlus(7))
 }
 
 async function pullNotionLastMonth(){
-  const now = new Date()
-  const firstDay = new Date(now.getFullYear(), now.getMonth()-1, 1)
-  const lastDay  = new Date(now.getFullYear(), now.getMonth(), 0)
-  const from = firstDay.toISOString().split('T')[0]
-  const to   = lastDay.toISOString().split('T')[0]
-  return pullFromNotion(from, to)
+  const now=new Date()
+  const firstDay=new Date(now.getFullYear(),now.getMonth()-1,1)
+  const lastDay =new Date(now.getFullYear(),now.getMonth(),0)
+  return pullFromNotion(firstDay.toLocaleDateString('fr-CA',{timeZone:'Europe/Paris'}),lastDay.toLocaleDateString('fr-CA',{timeZone:'Europe/Paris'}))
+}
+
+// ══════════════════════════════════════════════════════════════
+// PUSH NOTION — Créer une intervention depuis l'app dans Notion
+// ══════════════════════════════════════════════════════════════
+async function pushIvToNotion(iv){
+  if(!isDeployedApp) return
+  const tech=TECHS.find(t=>t.id===iv.techId)
+  const typeMap={
+    maintenance_simple:'Annuel',
+    maintenance_complex:'PAD PAK',
+    installation:'Installation',
+    tele_maintenance:'Télémaintenance'
+  }
+  const props={
+    'Société':           {title:     [{text:{content:(iv.client||'').substring(0,2000)}}]},
+    'Date intervention': {date:      {start:iv.date}},
+    'Adresse Site':      {rich_text: [{text:{content:(iv.addr||'').substring(0,2000)}}]},
+    'Technicien':        {rich_text: [{text:{content:tech?tech.name:''}}]},
+    'INTERVENTION':      {multi_select:[{name:typeMap[iv.type]||'Annuel'}]},
+    'Terminer':          {checkbox:iv.status==='completed'},
+    'Echec':             {checkbox:iv.status==='not_responded'},
+  }
+  if(iv.notes)   props['INFO ']          ={rich_text:[{text:{content:iv.notes.substring(0,2000)}}]}
+  if(iv.siege)   props['Adresse Siéges'] ={rich_text:[{text:{content:iv.siege.substring(0,2000)}}]}
+  if(iv.contact) props['Contact site']   ={rich_text:[{text:{content:iv.contact.substring(0,2000)}}]}
+  if(iv.cphone)  props['Téléphone']      ={phone_number:iv.cphone}
+  try{
+    const data=await notionCall('create_page',{properties:props})
+    if(data.id){
+      ivs=ivs.map(i=>i.id===iv.id?{...i,notionId:data.id}:i)
+      cloudSave()
+      showToast('✅ Intervention créée dans Notion','#1B5E20')
+    }
+  }catch(e){
+    console.warn('Notion create error:',e.message)
+    showToast('⚠️ Notion : '+e.message,'#E65100')
+  }
 }
 
 // Hook updSt pour aussi mettre à jour Notion
@@ -8323,13 +8342,11 @@ function updSt(id, s){
 }
 
 function showNotionPanel(){
-  // Pré-remplir dates avec demain
-  const d=new Date();d.setDate(d.getDate()+1)
-  const tomorrow=d.toISOString().split("T")[0]
+  const today=_parisToday()
   const el=document.getElementById("notion-date-from")
   const el2=document.getElementById("notion-date-to")
-  if(el)el.value=tomorrow
-  if(el2)el2.value=tomorrow
+  if(el)el.value=today
+  if(el2)el2.value=today
   document.getElementById("notion-modal").style.display="flex"
 }
 </script>
@@ -8345,7 +8362,12 @@ function showNotionPanel(){
     <div id="notion-status" style="padding:8px 12px;background:#F5F5F5;border-radius:8px;font-size:13px;margin-bottom:16px;color:#616161">
       Prêt à synchroniser
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+      <button class="bb" onclick="pullNotionToday()" style="flex-direction:column;gap:4px;padding:14px;height:auto;background:#00695C">
+        <span style="font-size:22px">⚡</span>
+        <span style="font-size:13px">Aujourd'hui</span>
+        <span style="font-size:11px;opacity:.75">Interventions du jour</span>
+      </button>
       <button class="bb" onclick="pullNotionTomorrow()" style="flex-direction:column;gap:4px;padding:14px;height:auto">
         <span style="font-size:22px">📅</span>
         <span style="font-size:13px">Demain</span>
@@ -8392,11 +8414,8 @@ async function silentPollNotionAdmin(){
   const now = Date.now()
   if(now - _adminLastPollTs < 55000) return
   _adminLastPollTs = now
-  const today = new Date().toISOString().split('T')[0]
-  const d2 = new Date(); d2.setDate(d2.getDate()+30)
-  const to = d2.toISOString().split('T')[0]
   try{
-    const result = await pullFromNotion(today, to, 'merge')
+    const result = await pullFromNotion(_parisToday(), _parisDatePlus(30), 'merge')
     const el = document.getElementById('cloud-status')
     if(el && !result?.error){
       const hm = new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})
@@ -8417,10 +8436,8 @@ function startAdminNotionPolling(){
   if(location.protocol==='file:'||location.hostname==='localhost') return
   const el=document.getElementById('cloud-status')
   if(el) el.innerHTML='🔄 <span style="color:#1565C0">Synchronisation Notion...</span>'
-  const today=new Date()
-  const from=today.toISOString().split('T')[0]
-  const d2=new Date(); d2.setDate(d2.getDate()+30)
-  const to=d2.toISOString().split('T')[0]
+  const from=_parisToday()
+  const to=_parisDatePlus(30)
   const result=await pullFromNotion(from, to)
   if(el){
     if(result?.error) el.innerHTML='⚠️ <span style="color:#E65100">Notion indisponible — données locales</span>'
