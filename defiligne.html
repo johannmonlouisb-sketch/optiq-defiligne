@@ -2481,21 +2481,14 @@ function rDepart(){
                   :isFirst&&!done&&!fail?`<span style="font-size:11px;font-weight:700;color:#f59e0b;flex-shrink:0">⭐ 1er</span>`:''}
               </div>
               <div style="font-size:12px;color:var(--gray);margin-bottom:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📍 ${iv.addr}</div>
-              ${hasTime?`<div style="font-size:12px;padding:3px 8px;border-radius:6px;margin-bottom:5px;display:inline-flex;gap:8px;align-items:center;background:${late?"#FFEBEE":"#E3F2FD"};color:${late?"#C62828":"#1565C0"}">
-                ${late?"⚠️ Dépassé":"🕐"}
-                ${iv.timeStart?`<span>Dès ${iv.timeStart}</span>`:""}
-                ${iv.timeEnd?`<span>Au plus tard ${iv.timeEnd}</span>`:""}
-              </div>`:""}
               <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:5px">
                 ${tBdg(iv.type)}${sBdg(iv.status)}
                 ${iv.padPak?bdg("⚡ Pad Pak","#E65100","#FFF3E0"):""}
                 <span style="font-size:11px;color:var(--gray)">⏱ ${fmtMin(dur(iv.type,iv.form))}</span>
               </div>
-              ${(depETAs[iv.id]||iv.timeStart||iv.timeEnd)?`<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:5px">
+              ${depETAs[iv.id]?`<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:5px">
                 ${depETAs[iv.id]?.travelMin?`<span style="font-size:11px;padding:2px 7px;border-radius:100px;background:#E3F2FD;color:#1565C0">🚗 ${fmtMin(depETAs[iv.id].travelMin)}</span>`:''}
                 ${depETAs[iv.id]?`<span style="font-size:11px;font-weight:600;padding:2px 7px;border-radius:100px;background:#E8F5E9;color:#2E7D32">🕐 ${depETAs[iv.id].eta} → ${depETAs[iv.id].leave}</span>`:''}
-                ${iv.timeStart?`<span style="font-size:11px;padding:2px 7px;border-radius:100px;background:#FFF3E0;color:#E65100">Dès ${iv.timeStart}</span>`:''}
-                ${iv.timeEnd?`<span style="font-size:11px;padding:2px 7px;border-radius:100px;background:#FFEBEE;color:#C62828">⏰ Limite ${iv.timeEnd}</span>`:''}
               </div>`:''}
               ${iv.notes?`<div style="font-size:12px;color:var(--orange);background:#FFF3E0;padding:5px 9px;border-radius:6px;margin-bottom:5px">📝 ${iv.notes}</div>`:""}
               ${(iv.contact||iv.cphone||iv.cemail)?`<div style="font-size:12px;background:#F3E5F5;padding:5px 9px;border-radius:6px;margin-bottom:5px">
