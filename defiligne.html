@@ -2675,13 +2675,6 @@ async function initDepMap(){
     }
     // ── Faisabilité ──
     const {feasible:feasibleIvs,skipped:skippedIvs,reason:feasReason}=filterFeasibleIvs(tech.id,date,techIvs)
-    if(skippedIvs.length>0&&warnEl){
-      warnEl.style.display="block"
-      warnEl.innerHTML=(warnEl.innerHTML||"")+`<div style="background:#FFF3E0;border:1px solid ${techCol};border-radius:8px;padding:10px 14px;font-size:13px;color:#E65100;margin-bottom:6px">
-        <strong style="color:${techCol}">${tech.name}</strong> — ${feasReason}<br>
-        <strong>Retirées :</strong> ${skippedIvs.map(i=>`<span style="background:#fff;border-radius:4px;padding:2px 6px;margin:2px;display:inline-block;font-size:12px">${i.client}</span>`).join("")}
-      </div>`
-    }
     const feasibleIds=new Set(feasibleIvs.map(i=>i.id))
     const ivcFiltered=ivcRaw.filter(x=>feasibleIds.has(x.iv.id))
 
@@ -2699,10 +2692,6 @@ async function initDepMap(){
     // Point de départ pour l'optimisation = dernier stop terminé (ou dépôt si aucun)
     const lastDoneCoords=ivcDone.length ? ivcDone[ivcDone.length-1].coords : dc
 
-    if(ivcDone.length&&warnEl){
-      warnEl.style.display="block"
-      warnEl.innerHTML+=`<div style="background:#f0fdf4;border:1px solid #16a34a;border-radius:8px;padding:8px 12px;font-size:12px;color:#2E7D32;margin-bottom:4px">✅ <strong>${tech.name}</strong> — ${ivcDone.length} stop${ivcDone.length>1?'s':''} terminé${ivcDone.length>1?'s':''} conservé${ivcDone.length>1?'s':''}, recalcul depuis le dernier point</div>`
-    }
 
     let ivcOptimized
     // ── Si ordre verrouillé : respecter l'ordre sauvegardé pour les restants ──
@@ -2713,7 +2702,6 @@ async function initDepMap(){
       const lockedIds=new Set(lockedPending.map(x=>x.iv.id))
       const newOnes=ivcPending.filter(x=>!lockedIds.has(x.iv.id))
       ivcOptimized=[...lockedPending,...newOnes]
-      if(warnEl){warnEl.style.display="block";warnEl.innerHTML+=`<div style="background:#f0fdf4;border:1px solid #16a34a;border-radius:8px;padding:8px 12px;font-size:12px;color:#16a34a;margin-bottom:4px">🔒 <strong>${tech.name}</strong> — Ordre verrouillé, tournée inchangée</div>`}
     }
     // ── Appel Netlify Function optimize-route sur les stops RESTANTS seulement ──
     if(!ivcOptimized&&ivcPending.length){
@@ -2749,9 +2737,6 @@ async function initDepMap(){
               }
             })
             const conflicts=r.conflicts||[]
-            conflicts.forEach(c=>{
-              if(warnEl){warnEl.style.display="block";warnEl.innerHTML+='<div style="background:#FFEBEE;border:1px solid #C62828;border-radius:8px;padding:8px 12px;font-size:12px;color:#C62828;margin-bottom:4px">⏰ <strong>'+c.label+'</strong> — créneau '+c.créneau+', arrivée estimée '+c.arrivée_est+'</div>'}
-            })
           }
         }
       }catch(e){}
