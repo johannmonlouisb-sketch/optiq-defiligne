@@ -8164,24 +8164,11 @@ async function pullFromNotion(dateFrom, dateTo, mode='merge'){
       const existIdx = ivs.findIndex(i=>i.notionId===page.id)
       if(existIdx>=0){
         const prev = ivs[existIdx]
+        // Les données locales sont prioritaires — seul "form" (fichier joint Notion) est mis à jour
         ivs[existIdx] = {
-          ...prev, ...iv,
-          id: prev.id,
-          // Préserver les données matériel locales (overrides admin + enrichissement Kizeo précédent)
-          arm:              prev.arm  || 0,
-          dea:              prev.dea  && prev.dea !== 0 ? prev.dea : (iv.dea || ''),
-          bat:              prev.bat  || 0,
-          padPak:           prev.padPak  || false,
-          padPakDate:       prev.padPakDate  || '',
-          batChange:        prev.batChange   || false,
-          nSerie:           prev.nSerie      || '',
-          batDate:          prev.batDate     || '',
-          electrodeDate:    prev.electrodeDate || '',
-          urgencePadPak:    prev.urgencePadPak  || '',
-          urgenceElectrodes: prev.urgenceElectrodes || '',
-          urgenceAnnuelle:  prev.urgenceAnnuelle || '',
-          pma:              prev.pma || '',
-          kizeoSiteId:      prev.kizeoSiteId || '',
+          ...prev,
+          notionId: page.id,
+          form: iv.form || prev.form,
         }
         updated++
       } else {
@@ -8281,14 +8268,9 @@ async function pullNotionLastMonth(){
 // ══════════════════════════════════════════════════════════════
 // PUSH NOTION — Créer une intervention depuis l'app dans Notion
 // ══════════════════════════════════════════════════════════════
-function _buildNotionProps(iv){
+function _buildNotionPropsCreate(iv){
   const tech=TECHS.find(t=>t.id===iv.techId)
-  const typeMap={
-    maintenance_simple:'Annuel',
-    maintenance_complex:'PAD PAK',
-    installation:'Installation',
-    tele_maintenance:'Télémaintenance'
-  }
+  const typeMap={maintenance_simple:'Annuel',maintenance_complex:'PAD PAK',installation:'Installation',tele_maintenance:'Télémaintenance'}
   const props={
     'Société':           {title:     [{text:{content:(iv.client||'').substring(0,2000)}}]},
     'Date intervention': {date:      {start:iv.date}},
@@ -8305,18 +8287,31 @@ function _buildNotionProps(iv){
   return props
 }
 
+function _buildNotionPropsUpdate(iv){
+  // Seulement les champs dont on connaît le type avec certitude
+  // (évite les erreurs 400 Notion qui feraient échouer tout l'update)
+  const tech=TECHS.find(t=>t.id===iv.techId)
+  const props={
+    'Date intervention': {date:  {start:iv.date}},
+    'Technicien':        {rich_text:[{text:{content:tech?tech.name:''}}]},
+    'Terminer':          {checkbox:iv.status==='completed'},
+    'Echec':             {checkbox:iv.status==='not_responded'},
+  }
+  if(iv.notes!==undefined) props['INFO ']={rich_text:[{text:{content:(iv.notes||'').substring(0,2000)}}]}
+  return props
+}
+
 async function pushIvToNotion(iv){
   if(!isDeployedApp) return
-  const props=_buildNotionProps(iv)
   if(iv.notionId){
-    // Mise à jour — empêche l'écrasement par le poll Notion
+    // Mise à jour avec champs sûrs uniquement
     try{
-      await notionCall('update_page',{pageId:iv.notionId,properties:props})
+      await notionCall('update_page',{pageId:iv.notionId,properties:_buildNotionPropsUpdate(iv)})
     }catch(e){ console.warn('Notion update error:',e.message) }
   } else {
-    // Création
+    // Création avec tous les champs
     try{
-      const data=await notionCall('create_page',{properties:props})
+      const data=await notionCall('create_page',{properties:_buildNotionPropsCreate(iv)})
       if(data.id){
         ivs=ivs.map(i=>i.id===iv.id?{...i,notionId:data.id}:i)
         cloudSave()
