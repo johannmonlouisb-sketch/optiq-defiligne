@@ -8287,27 +8287,24 @@ function _buildNotionPropsCreate(iv){
   return props
 }
 
-function _buildNotionPropsUpdate(iv){
-  // Seulement les champs dont on connaît le type avec certitude
-  // (évite les erreurs 400 Notion qui feraient échouer tout l'update)
-  const tech=TECHS.find(t=>t.id===iv.techId)
-  const props={
-    'Date intervention': {date:  {start:iv.date}},
-    'Technicien':        {rich_text:[{text:{content:tech?tech.name:''}}]},
-    'Terminer':          {checkbox:iv.status==='completed'},
-    'Echec':             {checkbox:iv.status==='not_responded'},
-  }
-  if(iv.notes!==undefined) props['INFO ']={rich_text:[{text:{content:(iv.notes||'').substring(0,2000)}}]}
-  return props
-}
-
 async function pushIvToNotion(iv){
   if(!isDeployedApp) return
   if(iv.notionId){
-    // Mise à jour avec champs sûrs uniquement
+    // Update : uniquement les champs confirmés (date + statuts + notes)
+    // Notion retourne 400 si un seul champ a le mauvais type → tout l'update échoue
+    const props={
+      'Date intervention': {date:{start:iv.date}},
+      'Terminer':          {checkbox:iv.status==='completed'},
+      'Echec':             {checkbox:iv.status==='not_responded'},
+    }
+    if(iv.notes!==undefined) props['INFO ']={rich_text:[{text:{content:(iv.notes||'').substring(0,2000)}}]}
     try{
-      await notionCall('update_page',{pageId:iv.notionId,properties:_buildNotionPropsUpdate(iv)})
-    }catch(e){ console.warn('Notion update error:',e.message) }
+      await notionCall('update_page',{pageId:iv.notionId,properties:props})
+      showToast('☁️ Notion mis à jour','#1B5E20')
+    }catch(e){
+      console.warn('Notion update error:',e.message)
+      showToast('⚠️ Notion : '+e.message,'#E65100')
+    }
   } else {
     // Création avec tous les champs
     try{
