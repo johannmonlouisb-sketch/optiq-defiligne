@@ -4613,6 +4613,9 @@ function saveEdit(){
     if(prev&&prev.type==="installation"&&obj.status==="completed"&&prev.status!=="completed"){
       autoMaintFromInstall({...prev,...obj})
     }
+    // Pousser les modifications vers Notion pour éviter l'écrasement par le poll
+    const updated=ivs.find(i=>i.id===id)
+    if(updated) pushIvToNotion(updated)
   } else {
     const newIv={...obj,id:nextId++}
     ivs.push(newIv)
@@ -8278,8 +8281,7 @@ async function pullNotionLastMonth(){
 // ══════════════════════════════════════════════════════════════
 // PUSH NOTION — Créer une intervention depuis l'app dans Notion
 // ══════════════════════════════════════════════════════════════
-async function pushIvToNotion(iv){
-  if(!isDeployedApp) return
+function _buildNotionProps(iv){
   const tech=TECHS.find(t=>t.id===iv.techId)
   const typeMap={
     maintenance_simple:'Annuel',
@@ -8300,16 +8302,30 @@ async function pushIvToNotion(iv){
   if(iv.siege)   props['Adresse Siéges'] ={rich_text:[{text:{content:iv.siege.substring(0,2000)}}]}
   if(iv.contact) props['Contact site']   ={rich_text:[{text:{content:iv.contact.substring(0,2000)}}]}
   if(iv.cphone)  props['Téléphone']      ={phone_number:iv.cphone}
-  try{
-    const data=await notionCall('create_page',{properties:props})
-    if(data.id){
-      ivs=ivs.map(i=>i.id===iv.id?{...i,notionId:data.id}:i)
-      cloudSave()
-      showToast('✅ Intervention créée dans Notion','#1B5E20')
+  return props
+}
+
+async function pushIvToNotion(iv){
+  if(!isDeployedApp) return
+  const props=_buildNotionProps(iv)
+  if(iv.notionId){
+    // Mise à jour — empêche l'écrasement par le poll Notion
+    try{
+      await notionCall('update_page',{pageId:iv.notionId,properties:props})
+    }catch(e){ console.warn('Notion update error:',e.message) }
+  } else {
+    // Création
+    try{
+      const data=await notionCall('create_page',{properties:props})
+      if(data.id){
+        ivs=ivs.map(i=>i.id===iv.id?{...i,notionId:data.id}:i)
+        cloudSave()
+        showToast('✅ Intervention créée dans Notion','#1B5E20')
+      }
+    }catch(e){
+      console.warn('Notion create error:',e.message)
+      showToast('⚠️ Notion : '+e.message,'#E65100')
     }
-  }catch(e){
-    console.warn('Notion create error:',e.message)
-    showToast('⚠️ Notion : '+e.message,'#E65100')
   }
 }
 
