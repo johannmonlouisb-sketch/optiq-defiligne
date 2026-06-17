@@ -8275,7 +8275,7 @@ function _buildNotionPropsCreate(iv){
     'Société':           {title:     [{text:{content:(iv.client||'').substring(0,2000)}}]},
     'Date intervention': {date:      {start:iv.date}},
     'Adresse Site':      {rich_text: [{text:{content:(iv.addr||'').substring(0,2000)}}]},
-    'Technicien':        {rich_text: [{text:{content:tech?tech.name:''}}]},
+    'Technicien':        {select:{name:tech?tech.name:''}},
     'INTERVENTION':      {multi_select:[{name:typeMap[iv.type]||'Annuel'}]},
     'Terminer':          {checkbox:iv.status==='completed'},
     'Echec':             {checkbox:iv.status==='not_responded'},
@@ -8292,8 +8292,10 @@ async function pushIvToNotion(iv){
   if(iv.notionId){
     // Update : uniquement les champs confirmés (date + statuts + notes)
     // Notion retourne 400 si un seul champ a le mauvais type → tout l'update échoue
+    const tech=TECHS.find(t=>t.id===iv.techId)
     const props={
       'Date intervention': {date:{start:iv.date}},
+      'Technicien':        {select:{name:tech?tech.name:''}},
       'Terminer':          {checkbox:iv.status==='completed'},
       'Echec':             {checkbox:iv.status==='not_responded'},
     }
