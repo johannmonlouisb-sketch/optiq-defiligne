@@ -7478,6 +7478,7 @@ const isDeployed = location.protocol !== 'file:' // localhost inclus — Supabas
 let cloudSyncing = false
 let cloudSaveTimer = null
 let _cloudUpdatedAt = null
+let _pullInProgress = false   // verrou : empêche cloudPoll d'écraser ivs pendant un pull Notion
 
 async function cloudLoad(){
   if(!isDeployed) return false
@@ -7499,6 +7500,7 @@ async function cloudLoad(){
 
 async function cloudPoll(){
   if(!isDeployed) return
+  if(_pullInProgress) return   // pull Notion en cours — ne pas écraser
   try{
     const rows = await sbGet('app_state?key=eq.optiq_ivs_data&select=updated_at')
     const ts = rows[0]?.updated_at
@@ -8283,6 +8285,7 @@ async function pullFromNotion(dateFrom, dateTo, mode='merge'){
     return {added:0, updated:0, total:0}
   }
 
+  _pullInProgress = true
   try {
     const data = await notionCall('query_range', {dateFrom, dateTo})
     const pages = data.results || []
@@ -8336,6 +8339,8 @@ async function pullFromNotion(dateFrom, dateTo, mode='merge'){
     if(statusEl) statusEl.innerHTML = msg
     showToast(msg, '#C62828')
     return {error: e.message}
+  } finally {
+    _pullInProgress = false
   }
 }
 

@@ -3024,7 +3024,10 @@ function _applyRemoteIvs(newVal, src){
   try{localStorage.setItem("optiq_ivs_data",JSON.stringify(ivs))}catch(e){}
   if(typeof syncVFFromIvs==='function') syncVFFromIvs()
   if(typeof updateAllMapMarkers==='function') updateAllMapMarkers()
-  if(typeof renderDepart==='function') renderDepart()
+  // Re-render l'onglet actif pour que la mise à jour admin soit immédiate sur tous les onglets
+  if(curTab==='materiel'&&typeof renderMateriel==='function') renderMateriel()
+  else if(curTab==='planning'&&typeof renderPlanning==='function') renderPlanning()
+  else if(typeof renderDepart==='function') renderDepart()
   if(typeof updateBadges==='function') updateBadges()
   _sbLastSync = new Date().toLocaleTimeString('fr-FR')
   _setSbDot('#22c55e', `${src==='WS'?'⚡':'🔄'} ${_sbLastSync} · ${ivs.length} interv.`)
