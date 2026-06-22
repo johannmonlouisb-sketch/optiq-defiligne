@@ -343,9 +343,21 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
       <div id="mat-alert" style="display:none;margin:6px 12px;padding:10px 14px;background:#FFF3E0;border-left:4px solid var(--orange);border-radius:10px;font-size:14px;color:var(--orange);font-weight:600"></div>
       <div style="flex:1;overflow-y:auto">
         <div id="mat-totaux"></div>
-        <div style="padding:10px 14px 2px;font-size:12px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px">Détail par client</div>
+        <div style="padding:10px 14px 2px;font-size:12px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px">Détail par client — appuyer pour voir la fiche</div>
         <div id="mat-detail"></div>
         <div style="height:16px"></div>
+      </div>
+    </div>
+
+    <!-- ═══ FICHE MATÉRIEL (overlay lecture seule) ═══ -->
+    <div id="mat-fiche-overlay" onclick="if(event.target===this)closeMatFiche()"
+      style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:999;overflow-y:auto;-webkit-overflow-scrolling:touch">
+      <div style="background:#fff;margin:16px auto 32px;max-width:480px;border-radius:16px;overflow:hidden;position:relative">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #F0F0F0;background:#FAFAFA">
+          <span style="font-size:13px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px">📋 Fiche matériel</span>
+          <button onclick="closeMatFiche()" style="border:none;background:#EBEBEB;border-radius:50%;width:30px;height:30px;font-size:18px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center">×</button>
+        </div>
+        <div id="mat-fiche-content" style="padding:16px"></div>
       </div>
     </div>
 
@@ -1006,8 +1018,8 @@ function getEquip(iv){
   if(arm) items.push({icon:"🗄️",text:arm,col:"#1565C0",bg:"#E3F2FD"})
   else if(inst) items.push({icon:"🗄️",text:"Support à confirmer",col:"#1565C0",bg:"#E3F2FD"})
 
-  // Pad Pak adulte
-  if(iv.padPak){
+  // Pad Pak adulte — explicite OU maintenance+ (toujours avec pad pak)
+  if(iv.padPak||iv.type==='maintenance_complex'){
     const urg=urgCol(iv.urgencePadPak)
     const exp=iv.padPakDate?` (exp. ${fd(iv.padPakDate)})`:""
     const label=iv.urgencePadPak==="expired"?"PAD PAK PÉRIMÉ":"Pad Pak adulte"+exp
@@ -1026,6 +1038,13 @@ function getEquip(iv){
     const urg=urgCol(iv.urgenceElectrodes)
     const exp=iv.electrodeDate?` (exp. ${fd(iv.electrodeDate)})`:""
     items.push({icon:"🔌",text:`Électrodes${iv.urgenceElectrodes==="expired"?" PÉRIMÉES":exp}`,...urg})
+  }
+
+  // Prochaine expiration globale (Kizeo)
+  if(iv.prochaineExpiration){
+    const dL=Math.round((new Date(iv.prochaineExpiration+"T12:00:00")-new Date())/86400000)
+    const urg=dL<0?{col:"#C62828",bg:"#FFEBEE"}:dL<30?{col:"#E65100",bg:"#FFF3E0"}:dL<90?{col:"#F57F17",bg:"#FFFDE7"}:{col:"#1565C0",bg:"#E3F2FD"}
+    items.push({icon:"⏰",text:`Prochaine exp. ${fd(iv.prochaineExpiration)}`,...urg})
   }
 
   // Batterie
@@ -1182,6 +1201,7 @@ function renderDepart(){
           ?`<span class="tag" style="background:${travelStatus.bg};color:${travelStatus.col};font-weight:700">${travelStatus.icon} ${travelStatus.label}</span>`
           :`<span class="tag" style="background:#E3F2FD;color:#1565C0;font-weight:600">🚗 ${fmin(travelMin)} de trajet</span>`
         :""}
+        ${iv.notionTime&&iv.timeStart?`<span class="tag" style="background:#FFFBEB;color:#92400E;font-weight:700;border:1px solid #F59E0B">🔔 ${iv.timeStart} — heure imposée</span>`:""}
         ${waitMin?`<span class="tag" style="background:#FFF3E0;color:#E65100;font-weight:600">⏰ Attente ${fmin(waitMin)} — créneau ${iv.timeStart}</span>`:""}
         ${etaLate?`<span class="tag" style="background:#FFEBEE;color:#C62828;font-weight:700">⚠️ Créneau serré (−30min)</span>`:""}
         <span class="tag tag-info">🔧 ${fmin(workMin)} · ${TYPES[iv.type].label}</span>
@@ -1209,6 +1229,11 @@ function renderDepart(){
           <button onclick="openContactModal(${iv.id})" class="btn btn-gray" style="padding:5px 10px;font-size:11px">✏️ Modifier contact</button>
         </div>
         ${iv.padPak&&iv.padPakDate?`<div style="margin-top:6px;font-size:12px;color:var(--orange)">⚡ Péremption Pad Pak : ${fd(iv.padPakDate)}</div>`:""}
+        ${(iv.commercial||iv.nSerie||iv.kizeoVille)?`<div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;font-size:11px;color:#555;background:#F8F9FA;border-radius:6px;padding:5px 8px">
+          ${iv.commercial?`<span>💼 <strong>${iv.commercial}</strong></span>`:""}
+          ${iv.nSerie?`<span>🔢 S/N <strong>${iv.nSerie}</strong></span>`:""}
+          ${iv.kizeoVille?`<span>📮 ${iv.kizeoCodePostal?iv.kizeoCodePostal+' ':''}<strong>${iv.kizeoVille}</strong></span>`:""}
+        </div>`:""}
       </div>
     </div>`
   }).join("")
@@ -1687,7 +1712,7 @@ async function calcMap(){
           const a=Math.sin(dLat/2)**2+Math.cos(prev.lat*Math.PI/180)*Math.cos(p.c.lat*Math.PI/180)*Math.sin(dLng/2)**2
           curMin+=Math.round(6371*2*Math.asin(Math.sqrt(a))*1.3/50*60)
           if(p.iv.timeStart){const[th,tm]=p.iv.timeStart.split(':').map(Number);if(curMin<th*60+tm)curMin=th*60+tm}
-          if(curMin<nowMin&&!validated[p.iv.id]&&!failed[p.iv.id]) curMin=nowMin
+          if(tourRunning&&curMin<nowMin&&!validated[p.iv.id]&&!failed[p.iv.id]) curMin=nowMin
           const eta=toHHMM(curMin)
           const workMin=dur(p.iv.type,p.iv.form)
           const late=p.iv.timeEnd&&curMin>p.iv.timeEnd.split(':').map((v,i)=>parseInt(v)*(i?1:60)).reduce((a,b)=>a+b)-30
@@ -1775,7 +1800,7 @@ async function calcMap(){
               curMin+=Math.round(6371*2*Math.asin(Math.sqrt(a))*1.3/50*60)
             }
             if(p.iv.timeStart){const[th,tm]=p.iv.timeStart.split(':').map(Number);if(curMin<th*60+tm)curMin=th*60+tm}
-            if(curMin<nowMin&&!validated[p.iv.id]&&!failed[p.iv.id]) curMin=nowMin
+            if(tourRunning&&curMin<nowMin&&!validated[p.iv.id]&&!failed[p.iv.id]) curMin=nowMin
             techETAs[p.iv.id]={eta:toHHMM(curMin),leave:toHHMM(curMin+dur(p.iv.type,p.iv.form))}
             curMin+=dur(p.iv.type,p.iv.form)
           })
@@ -2067,18 +2092,82 @@ function renderMateriel(){
     </div>`).join("")
   document.getElementById("mat-detail").innerHTML=dayIvs.map(iv=>{
     const eq=getEquip(iv)
-    return `<div class="dc" style="margin:5px 12px;border-radius:10px">
+    return `<div class="dc" style="margin:5px 12px;border-radius:10px;cursor:pointer" onclick="showMatFiche(${iv.id})">
       <div class="dc-top">
-        <div style="font-size:18px">${iv.type==="installation"?"🏥":iv.padPak?"⚡":"🔧"}</div>
+        <div style="font-size:18px">${iv.type==="installation"?"🏥":iv.padPak||iv.type==="maintenance_complex"?"⚡":"🔧"}</div>
         <div class="dc-info">
           <div class="dc-client">${iv.client}</div>
           <div class="dc-addr" style="font-size:11px">${TYPES[iv.type].label}${iv.addr?" · "+iv.addr.split(",")[0]:""}</div>
         </div>
+        <div style="font-size:11px;color:#aaa;flex-shrink:0">›</div>
       </div>
       ${eq.length?`<div style="padding:4px 10px 10px;display:flex;gap:5px;flex-wrap:wrap">
         ${eq.map(e=>`<span style="background:${e.bg};color:${e.col};padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600">${e.icon} ${e.text}</span>`).join("")}
-      </div>`:`<div style="padding:2px 10px 8px;font-size:12px;color:var(--gray)">Maintenance standard</div>`}
+      </div>`:`<div style="padding:2px 10px 8px;font-size:12px;color:var(--gray)">Maintenance standard · appuyer pour la fiche</div>`}
     </div>`}).join("")
+}
+
+// ════════════════════════════════════════════
+// FICHE MATÉRIEL — lecture seule
+// ════════════════════════════════════════════
+function showMatFiche(ivId){
+  const iv=ivs.find(i=>i.id===ivId)
+  if(!iv) return
+  const inst=iv.type==="installation"
+  const dea=iv.dea&&iv.dea!=="0"&&iv.dea!==0?iv.dea:""
+  const arm=iv.arm&&iv.arm!=="0"&&iv.arm!==0?iv.arm:""
+  const urgLbl={expired:"PÉRIMÉ",critical:"Critique",urgent:"Urgent",soon:"Bientôt",ok:"OK","":""}
+  const urgCol2={expired:"#C62828",critical:"#E65100",urgent:"#F57F17",soon:"#1565C0",ok:"#2E7D32","":"#555"}
+
+  const row=(icon,label,val,col)=>val?`<div style="display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid #F5F5F5">
+    <span style="font-size:19px;width:26px;flex-shrink:0;text-align:center">${icon}</span>
+    <div style="min-width:0">
+      <div style="font-size:10px;color:#999;font-weight:700;text-transform:uppercase;letter-spacing:.5px">${label}</div>
+      <div style="font-size:14px;font-weight:600;color:${col||"#1a1a1a"};word-break:break-word">${val}</div>
+    </div></div>`:""
+
+  const exRow=(icon,label,date,urgLevel)=>{
+    if(!date&&!urgLevel) return ""
+    const dL=date?Math.round((new Date(date+"T12:00:00")-new Date())/86400000):null
+    const col=urgLevel?(urgCol2[urgLevel]||"#555"):(dL<0?"#C62828":dL<30?"#E65100":dL<90?"#F57F17":"#2E7D32")
+    const urgStr=urgLevel&&urgLevel!=="ok"?` · <strong>${urgLbl[urgLevel]||urgLevel}</strong>`:""
+    return row(icon,label,date?`${fd(date)}${urgStr}`:(urgLbl[urgLevel]||urgLevel),col)
+  }
+
+  const sect=(title)=>`<div style="font-size:11px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.6px;padding:12px 0 4px">${title}</div>`
+
+  const typeCol=TYPES[iv.type].color
+  const html=`
+    <div style="display:flex;align-items:center;gap:12px;padding-bottom:14px;border-bottom:2px solid #F0F0F0;margin-bottom:4px">
+      <div style="width:48px;height:48px;border-radius:12px;background:${typeCol}22;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0">${inst?"🏥":iv.padPak||iv.type==="maintenance_complex"?"⚡":"🔧"}</div>
+      <div style="min-width:0">
+        <div style="font-size:16px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${iv.client}</div>
+        <div style="font-size:12px;color:${typeCol};font-weight:600">${TYPES[iv.type].label}</div>
+        <div style="font-size:11px;color:#999;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📍 ${iv.addr||"—"}</div>
+      </div>
+    </div>
+    ${dea||arm?sect("Équipement"):""}
+    ${dea?row("🫀","Modèle DAE",inst?"DAE neuf · "+dea:dea):""}
+    ${iv.nSerie?row("🔢","N° Série DAE",iv.nSerie):""}
+    ${arm?row("🗄️","Armoire / Support",arm):(inst?row("🗄️","Armoire / Support","À confirmer","#999"):"" )}
+    ${sect("Péremptions")}
+    ${exRow("⚡","Pad Pak adulte",iv.padPakDate,iv.urgencePadPak)}
+    ${iv.padPakDatePed?exRow("⚡","Pad Pak pédiatrique",iv.padPakDatePed,""):""}
+    ${exRow("🔋","Batterie",iv.batDate,"")}
+    ${exRow("🔌","Électrodes",iv.electrodeDate,iv.urgenceElectrodes)}
+    ${iv.prochaineExpiration?exRow("⏰","Prochaine expiration globale",iv.prochaineExpiration,""):""}
+    ${iv.pma?row("📅","Prochaine maintenance annuelle",fd(iv.pma)):""}
+    ${iv.commercial||iv.kizeoVille?sect("Informations"):""}
+    ${iv.commercial?row("💼","Commercial",iv.commercial):""}
+    ${iv.kizeoAddr||iv.kizeoVille?row("📮","Adresse site (Kizeo)",[iv.kizeoAddr,iv.kizeoCodePostal,iv.kizeoVille].filter(Boolean).join(", ")):""}
+  `
+  document.getElementById("mat-fiche-content").innerHTML=html
+  document.getElementById("mat-fiche-overlay").style.display="block"
+  document.body.style.overflow="hidden"
+}
+function closeMatFiche(){
+  document.getElementById("mat-fiche-overlay").style.display="none"
+  document.body.style.overflow=""
 }
 
 // ════════════════════════════════════════════

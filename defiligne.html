@@ -2294,6 +2294,7 @@ function reverseDepRoute(techId){
   setRouteLock(techId,date,true)
   saveRouteOrder(date)
   rDepart()
+  _schedDepMap()
   if(depMapObj){
     ;(depRouteOrder[techId]||[]).filter(iv=>iv.date===date).forEach((iv,idx)=>{
       if(depMarkers[iv.id]){depMarkers[iv.id]._num=idx+1;updateDepMarker(iv.id)}
@@ -2315,6 +2316,7 @@ function setFirstDepIv(ivId,techId){
   setRouteLock(techId,date,true)
   saveRouteOrder(date)
   rDepart()
+  _schedDepMap()
   if(depMapObj){
     ord.forEach((iv,i)=>{
       if(depMarkers[iv.id]){depMarkers[iv.id]._num=i+1;updateDepMarker(iv.id)}
@@ -2341,6 +2343,7 @@ function dropDepCard(targetId){
   saveRouteOrder(date)
   _dragId=null
   rDepart()
+  _schedDepMap()
   if(depMapObj){
     orderedIvs.forEach((iv,idx)=>{
       if(depMarkers[iv.id]){depMarkers[iv.id]._num=idx+1;updateDepMarker(iv.id)}
@@ -2350,6 +2353,62 @@ function dropDepCard(targetId){
 }
 
 // ═══════════════════════════════════════════════════════
+// ── Matériel à prendre — couleur urgence ────────────────
+function urgCol(level){
+  if(level==="expired")  return {col:"#C62828",bg:"#FFEBEE"}
+  if(level==="critical") return {col:"#E65100",bg:"#FFF3E0"}
+  if(level==="urgent")   return {col:"#F57F17",bg:"#FFFDE7"}
+  if(level==="soon")     return {col:"#1565C0",bg:"#E3F2FD"}
+  return {col:"#2E7D32",bg:"#E8F5E9"}
+}
+function getEquip(iv){
+  const items=[],inst=iv.type==="installation"
+  const arm=iv.arm&&iv.arm!=="0"&&iv.arm!==0?iv.arm:"",dea=iv.dea&&iv.dea!=="0"&&iv.dea!==0?iv.dea:""
+  if(inst) items.push({icon:"🫀",text:dea?`DAE neuf · ${dea}`:"DAE neuf (modèle à confirmer)",col:"#1B5E20",bg:"#E8F5E9"})
+  else if(dea) items.push({icon:"🫀",text:`DAE · ${dea}${iv.nSerie?` #${iv.nSerie}`:""}`,col:"#1B5E20",bg:"#E8F5E9"})
+  if(arm) items.push({icon:"🗄️",text:arm,col:"#1565C0",bg:"#E3F2FD"})
+  else if(inst) items.push({icon:"🗄️",text:"Support à confirmer",col:"#1565C0",bg:"#E3F2FD"})
+  if(iv.padPak||iv.type==='maintenance_complex'){
+    const urg=urgCol(iv.urgencePadPak)
+    const label=iv.urgencePadPak==="expired"?"PAD PAK PÉRIMÉ":"Pad Pak adulte"+(iv.padPakDate?` (exp. ${fd(iv.padPakDate)})`:""  )
+    items.push({icon:"⚡",text:label,...urg})
+  }
+  if(iv.padPakDatePed){
+    const dL=Math.round((new Date(iv.padPakDatePed+"T12:00:00")-new Date())/86400000)
+    if(dL<180) items.push({icon:"⚡",text:`Pad Pak péd. exp. ${fd(iv.padPakDatePed)}`,col:dL<0?"#C62828":"#E65100",bg:dL<0?"#FFEBEE":"#FFF3E0"})
+  }
+  if(iv.electrodeDate){
+    const dL=Math.round((new Date(iv.electrodeDate+"T12:00:00")-new Date())/86400000)
+    if(dL<90) items.push({icon:"⚡",text:`Électrodes exp. ${fd(iv.electrodeDate)}`,col:dL<0?"#C62828":"#E65100",bg:dL<0?"#FFEBEE":"#FFF3E0"})
+  }
+  if(iv.prochaineExpiration){
+    const dL=Math.round((new Date(iv.prochaineExpiration+"T12:00:00")-new Date())/86400000)
+    const urg=dL<0?{col:"#C62828",bg:"#FFEBEE"}:dL<30?{col:"#E65100",bg:"#FFF3E0"}:dL<90?{col:"#F57F17",bg:"#FFFDE7"}:{col:"#1565C0",bg:"#E3F2FD"}
+    items.push({icon:"⏰",text:`Prochaine exp. ${fd(iv.prochaineExpiration)}`,  ...urg})
+  }
+  if(iv.batChange) items.push({icon:"🔋",text:"Batterie"+(iv.batDate?` (exp. ${fd(iv.batDate)})`:""),col:"#1B5E20",bg:"#F1F8E9"})
+  if(inst&&!iv.padPak) items.push({icon:"⚡",text:"Pad Pak neuf (fourni)",col:"#2E7D32",bg:"#E8F5E9"})
+  if(inst&&!iv.batChange) items.push({icon:"🔋",text:"Batterie neuve (fournie)",col:"#2E7D32",bg:"#E8F5E9"})
+  return items
+}
+function equipHTML_dep(iv){
+  const eq=getEquip(iv)
+  if(!eq.length) return ""
+  const chips=eq.map(e=>`<span style="background:${e.bg};color:${e.col};padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;white-space:nowrap">${e.icon} ${e.text}</span>`).join("")
+  if(iv.type==="installation") return `<div style="background:#E8F5E9;border-left:3px solid #2E7D32;border-radius:0 6px 6px 0;padding:5px 8px;margin-bottom:5px;display:flex;gap:5px;flex-wrap:wrap;align-items:center"><span style="font-size:10px;font-weight:700;color:#1B5E20;text-transform:uppercase;letter-spacing:.5px;flex-shrink:0">📦 À prendre</span>${chips}</div>`
+  return `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:5px">${chips}</div>`
+}
+function matSummaryHTML(techIvs, techName){
+  const allMat=techIvs.flatMap(iv=>getEquip(iv))
+  if(!allMat.length) return ""
+  const seen=new Set(), unique=allMat.filter(e=>{const k=e.icon+e.text;if(seen.has(k))return false;seen.add(k);return true})
+  const chips=unique.map(e=>`<span style="background:${e.bg};color:${e.col};padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap">${e.icon} ${e.text}</span>`).join("")
+  return `<div style="background:#FFFBEB;border:1.5px solid #F59E0B;border-radius:8px;padding:8px 12px;margin-bottom:4px">
+    <div style="font-size:11px;font-weight:700;color:#92400E;margin-bottom:5px">📦 Matériel à charger — ${techName}</div>
+    <div style="display:flex;gap:5px;flex-wrap:wrap">${chips}</div>
+  </div>`
+}
+
 // DÉPART DU JOUR — TABLET OPTIMIZED
 // ═══════════════════════════════════════════════════════
 function rDepart(){
@@ -2455,6 +2514,8 @@ function rDepart(){
           </button>
         </div>
       </div>`
+      // ── Résumé matériel du technicien ──
+      html+=matSummaryHTML(techIvs,tc.name)
       // ── Cartes interventions du technicien ──
       techIvs.forEach((iv,techIdx)=>{
         const done=depValidated[iv.id],fail=depFailed[iv.id]
@@ -2483,14 +2544,19 @@ function rDepart(){
               <div style="font-size:12px;color:var(--gray);margin-bottom:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📍 ${iv.addr}</div>
               <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:5px">
                 ${tBdg(iv.type)}${sBdg(iv.status)}
-                ${iv.padPak?bdg("⚡ Pad Pak","#E65100","#FFF3E0"):""}
                 <span style="font-size:11px;color:var(--gray)">⏱ ${fmtMin(dur(iv.type,iv.form))}</span>
               </div>
+              ${equipHTML_dep(iv)}
+              ${iv.notionTime&&iv.timeStart?`<div style="font-size:11px;font-weight:700;color:#92400E;background:#FFFBEB;padding:4px 9px;border-radius:6px;border:1px solid #F59E0B;margin-bottom:5px">🔔 Heure Notion imposée : <strong>${iv.timeStart}</strong></div>`:""}
               ${depETAs[iv.id]?`<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:5px">
                 ${depETAs[iv.id]?.travelMin?`<span style="font-size:11px;padding:2px 7px;border-radius:100px;background:#E3F2FD;color:#1565C0">🚗 ${fmtMin(depETAs[iv.id].travelMin)}</span>`:''}
                 ${depETAs[iv.id]?`<span style="font-size:11px;font-weight:600;padding:2px 7px;border-radius:100px;background:#E8F5E9;color:#2E7D32">🕐 ${depETAs[iv.id].eta} → ${depETAs[iv.id].leave}</span>`:''}
               </div>`:''}
               ${iv.notes?`<div style="font-size:12px;color:var(--orange);background:#FFF3E0;padding:5px 9px;border-radius:6px;margin-bottom:5px">📝 ${iv.notes}</div>`:""}
+              ${(iv.commercial||iv.nSerie)?`<div style="font-size:11px;background:#F8F9FA;border:1px solid #E9ECEF;padding:5px 9px;border-radius:6px;margin-bottom:5px;display:flex;gap:10px;flex-wrap:wrap">
+                ${iv.commercial?`<span>💼 <strong>${iv.commercial}</strong></span>`:""}
+                ${iv.nSerie?`<span style="color:var(--gray)">🔢 S/N : <strong>${iv.nSerie}</strong></span>`:""}
+              </div>`:""}
               ${(iv.contact||iv.cphone||iv.cemail)?`<div style="font-size:12px;background:#F3E5F5;padding:5px 9px;border-radius:6px;margin-bottom:5px">
                 ${iv.contact?`👤 <strong>${iv.contact}</strong> `:""}${iv.cphone?`📞 <a href="tel:${iv.cphone}" style="color:var(--blue)">${iv.cphone}</a>`:""}
                 ${iv.cemail?`<br>✉️ <a href="mailto:${iv.cemail}" style="color:var(--blue)">${iv.cemail}</a>`:""}
@@ -2703,10 +2769,22 @@ async function initDepMap(){
       const newOnes=ivcPending.filter(x=>!lockedIds.has(x.iv.id))
       ivcOptimized=[...lockedPending,...newOnes]
     }
+    // ── Heure effective de départ pour les stops RESTANTS ────────────────────
+    // Si des stops sont déjà validés, l'heure de départ pour le recalcul
+    // doit être l'heure actuelle (Paris) et non l'heure initiale de la journée,
+    // sinon les ETAs restants s'affichent dans le passé (ex. "08:45" à 12h00).
+    const _effStartMin=(()=>{
+      const base=depSH*60+depSM
+      if(!ivcDone.length||selDate!==TODAY) return base
+      const[nh,nm]=_nowParis().split(':').map(Number)
+      return Math.max(base,nh*60+nm)
+    })()
+    const _effSH=Math.floor(_effStartMin/60),_effSM=_effStartMin%60
+
     // ── Appel Netlify Function optimize-route sur les stops RESTANTS seulement ──
     if(!ivcOptimized&&ivcPending.length){
       try{
-        const payload={techs:[{id:tech.id,depot:lastDoneCoords,startH:depSH,startMin:depSM,stops:ivcPending.map(x=>({
+        const payload={techs:[{id:tech.id,depot:lastDoneCoords,startH:_effSH,startMin:_effSM,stops:ivcPending.map(x=>({
           id:x.iv.id, lat:x.coords.lat, lng:x.coords.lng, label:x.iv.client,
           duration:dur(x.iv.type,x.iv.form),
           timeWindow:(x.iv.timeStart||x.iv.timeEnd)?{start:x.iv.timeStart||"00:00",end:x.iv.timeEnd||"23:59"}:null
@@ -2720,7 +2798,7 @@ async function initDepMap(){
             const byIdP=Object.fromEntries(ivcPending.map(x=>[x.iv.id,x]))
             ivcOptimized=orderedIds.map(id=>byIdP[id]).filter(Boolean)
             const arrs=r.estimatedArrivals||{}
-            let prevLeaveMin=depSH*60+depSM
+            let prevLeaveMin=_effStartMin
             ivcOptimized.forEach(({iv})=>{
               const eta=arrs[iv.id]
               if(eta){
@@ -3072,6 +3150,9 @@ function getWeekDates(ref){
 }
 function rPlanWeek(el){
   const week=getWeekDates(selDate)
+  // Auto-charge les mois passés visibles dans la semaine
+  const _weekPastYMs=new Set(week.filter(d=>d<TODAY).map(d=>d.substring(0,7)))
+  _weekPastYMs.forEach(ym=>{if(!_notionFetchedMonths.has(ym))_fetchNotionMonth(ym).then(()=>rPlan())})
   const nav=`<button onclick="shiftWeek(-7)" class="bg bsm">◀ Préc.</button>
     <span style="font-size:13px;font-weight:600;padding:0 6px">${fd(week[0])} — ${fd(week[6])}</span>
     <button onclick="shiftWeek(7)" class="bg bsm">Suiv. ▶</button>
@@ -3080,16 +3161,21 @@ function rPlanWeek(el){
   el.innerHTML=planHdr(nav)+`
   <div class="wkg" style="margin-bottom:16px">
     ${week.map((d,i)=>{
-      const cnt=ivs.filter(iv=>iv.date===d).length
-      const done=ivs.filter(iv=>iv.date===d&&(depValidated[iv.id]||iv.status==="completed")).length
-      const techCount=new Set(ivs.filter(iv=>iv.date===d).map(iv=>iv.techId)).size
+      const isPastD=d<TODAY
+      const _wymD=d.substring(0,7)
+      const _afD=isPastD&&_notionFetchedMonths.has(_wymD)
+      const _aiD=_afD?(_notionArchiveCache[d]||[]):null
+      const cnt=_aiD!==null?_aiD.length:ivs.filter(iv=>iv.date===d).length
+      const done=_aiD!==null?_aiD.filter(iv=>iv.status==='completed').length:ivs.filter(iv=>iv.date===d&&(depValidated[iv.id]||iv.status==="completed")).length
+      const techCount=_aiD!==null?new Set(_aiD.map(iv=>iv.tech).filter(Boolean)).size:new Set(ivs.filter(iv=>iv.date===d).map(iv=>iv.techId)).size
       const isSel=d===selDate,isT=d===TODAY
-      return `<div class="db ${isSel?"on":isT?"td":""}" onclick="selDate='${d}';rPlan()">
-        <div class="dl">${DNAMES[i]}</div>
-        <div class="dn">${d.split("-")[2]}</div>
-        ${cnt?`<span class="dc">${cnt}</span>`:""}
-        ${techCount>0&&!isSel?`<div style="font-size:9px;color:var(--blue);margin-top:1px">👷${techCount}</div>`:""}
+      return `<div class="db ${isSel?"on":isT?"td":""}" onclick="selDate='${d}';rPlan()" style="${isPastD&&!isSel?"background:#F2F2F2;":""}">
+        <div class="dl" style="${isPastD&&!isSel?"color:#BDBDBD":""}">${DNAMES[i]}</div>
+        <div class="dn" style="${isPastD&&!isSel?"color:#9E9E9E":""}">${d.split("-")[2]}</div>
+        ${cnt?`<span class="dc" style="${isPastD&&!isSel?"background:#ECEFF1;color:#78909C":""}">${cnt}</span>`:""}
+        ${techCount>0&&!isSel?`<div style="font-size:9px;color:${isPastD?"#607D8B":"var(--blue)"};margin-top:1px">👷${techCount}</div>`:""}
         ${done&&!isSel?`<div style="font-size:9px;color:#2E7D32;margin-top:1px">✓${done}</div>`:""}
+        ${!cnt&&isPastD&&!isSel?`<div style="font-size:9px;color:#D0D0D0;margin-top:2px">${_afD?"—":"⏳"}</div>`:""}
       </div>`}).join("")}
   </div>
   <h3 style="font-size:14px;font-weight:600;margin-bottom:10px">${fdl(selDate)}${selDate<TODAY?' <span style="font-size:12px;font-weight:400;color:var(--gray)">· Archive</span>':''}</h3>
@@ -3118,23 +3204,33 @@ function rPlanMonth(el){
     <button onclick="shiftMonth(1)" class="bg bsm">Suiv. ▶</button>
     <button onclick="selDate=TODAY;rPlan()" class="bg bsm">Aujourd'hui</button>`
 
+  // Auto-charge le mois affiché si passé (une seule fois) puis re-render
+  const _displayYM=`${y}-${String(m).padStart(2,"0")}`
+  if(_displayYM<=TODAY.substring(0,7)&&!_notionFetchedMonths.has(_displayYM)){
+    _fetchNotionMonth(_displayYM).then(()=>rPlan())
+  }
+
   el.innerHTML=planHdr(nav)+`
   <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:12px">
     ${DNAMES_FULL.map(d=>`<div style="text-align:center;font-size:11px;font-weight:600;color:var(--gray);padding:5px 0">${d}</div>`).join("")}
     ${cells.map(date=>{
       if(!date) return`<div></div>`
-      const cnt=ivs.filter(i=>i.date===date).length
-      const done=ivs.filter(i=>i.date===date&&(depValidated[i.id]||i.status==="completed")).length
-      const techCount=new Set(ivs.filter(i=>i.date===date).map(i=>i.techId)).size
+      const isPast=date<TODAY
+      const _ym=date.substring(0,7)
+      const _archFetched=isPast&&_notionFetchedMonths.has(_ym)
+      const _archIvs=_archFetched?(_notionArchiveCache[date]||[]):null
+      const cnt=_archIvs!==null?_archIvs.length:ivs.filter(i=>i.date===date).length
+      const done=_archIvs!==null?_archIvs.filter(iv=>iv.status==='completed').length:ivs.filter(i=>i.date===date&&(depValidated[i.id]||i.status==="completed")).length
+      const techCount=_archIvs!==null?new Set(_archIvs.map(iv=>iv.tech).filter(Boolean)).size:new Set(ivs.filter(i=>i.date===date).map(i=>i.techId)).size
       const isSel=date===selDate,isT=date===TODAY
       const dayNum=date.split("-")[2]
-      return `<div onclick="selDate='${date}';rPlan()" style="min-height:56px;background:${isSel?"var(--blue)":isT?"#DBEAFE":"var(--bg)"};border-radius:8px;padding:5px 6px;cursor:pointer;border:1.5px solid ${isSel?"var(--blue)":isT?"var(--blue)":"transparent"};transition:all .1s" onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.1)'" onmouseout="this.style.boxShadow='none'">
-          <div style="font-size:13px;font-weight:${isT||isSel?700:400};color:${isSel?"#fff":isT?"var(--blue)":"var(--dark)"}">${dayNum}</div>
+      return `<div onclick="selDate='${date}';rPlan()" style="min-height:56px;background:${isSel?"var(--blue)":isT?"#DBEAFE":isPast?"#F2F2F2":"var(--bg)"};border-radius:8px;padding:5px 6px;cursor:pointer;border:1.5px solid ${isSel?"var(--blue)":isT?"var(--blue)":"transparent"};transition:all .1s" onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.1)'" onmouseout="this.style.boxShadow='none'">
+          <div style="font-size:13px;font-weight:${isT||isSel?700:400};color:${isSel?"#fff":isT?"var(--blue)":isPast?"#9E9E9E":"var(--dark)"}">${dayNum}</div>
           ${cnt?`<div style="display:flex;flex-direction:column;gap:2px;margin-top:2px">
-            <span style="font-size:10px;font-weight:600;background:${isSel?"rgba(255,255,255,.25)":"var(--blue)"};color:#fff;border-radius:3px;padding:1px 5px;display:inline-block">${cnt} interv.</span>
-            ${techCount>0?`<span style="font-size:10px;color:${isSel?"rgba(255,255,255,.7)":"var(--blue)"}">👷 ${techCount} tech${techCount>1?"s":""}</span>`:""}
+            <span style="font-size:10px;font-weight:600;background:${isSel?"rgba(255,255,255,.25)":isPast?"#78909C":"var(--blue)"};color:#fff;border-radius:3px;padding:1px 5px;display:inline-block">${cnt} interv.</span>
+            ${techCount>0?`<span style="font-size:10px;color:${isSel?"rgba(255,255,255,.7)":isPast?"#607D8B":"var(--blue)"}">👷 ${techCount} tech${techCount>1?"s":""}</span>`:""}
             ${done>0?`<span style="font-size:10px;color:${isSel?"rgba(255,255,255,.8)":"#2E7D32"}">✓ ${done} faite${done>1?"s":""}</span>`:""}
-          </div>`:""}
+          </div>`:isPast?`<span style="font-size:9px;color:${_archFetched?"#D0D0D0":"#BDBDBD"};margin-top:3px;display:block">${_archFetched?"—":"⏳"}</span>`:""}
         </div>`}).join("")}
   </div>
   <div style="border-top:1px solid var(--border);padding-top:14px">
@@ -3155,30 +3251,64 @@ function rPlanYear(el){
     <button onclick="shiftYear(1)" class="bg bsm">${y+1} ▶</button>
     <button onclick="selDate=TODAY;rPlan()" class="bg bsm">Aujourd'hui</button>`
 
+  // Auto-charge les mois passés de l'année affichée
+  const _todayYN=parseInt(TODAY.split("-")[0]),_todayMN=parseInt(TODAY.split("-")[1])
+  for(let _mi=1;_mi<=12;_mi++){
+    const _isPMN=(y<_todayYN)||(y===_todayYN&&_mi<=_todayMN)
+    if(_isPMN){const _ymN=`${y}-${String(_mi).padStart(2,"0")}`;if(!_notionFetchedMonths.has(_ymN))_fetchNotionMonth(_ymN).then(()=>rPlan())}
+  }
+
   el.innerHTML=planHdr(nav)+`
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
     ${MNAMES.map((mn,mi)=>{
       const m=mi+1
-      const prefix=`${y}-${String(m).padStart(2,"0")}-`
-      const mIvs=ivs.filter(i=>i.date.startsWith(prefix))
-      const done=mIvs.filter(i=>i.status==="completed"||depValidated[i.id]).length
-      const pending=mIvs.filter(i=>i.status==="pending").length
-      const fail=mIvs.filter(i=>i.status==="not_responded"||depFailed[i.id]).length
+      const ym=`${y}-${String(m).padStart(2,"0")}`
+      const prefix=ym+"-"
+      const archFetched=_notionFetchedMonths.has(ym)
+      // Pour les mois passés : compter depuis le cache archive ; sinon depuis ivs
       const curM=parseInt(selDate.split("-")[1]),curY=parseInt(selDate.split("-")[0])
+      const todayM=parseInt(TODAY.split("-")[1]),todayY=parseInt(TODAY.split("-")[0])
+      const isPastM=(y<todayY)||(y===todayY&&m<todayM)
+      const isThisM=y===todayY&&m===todayM
+      let mCnt,done,pending,fail
+      if(archFetched&&isPastM){
+        // Compter depuis le cache archive pour tout le mois
+        const archDates=Object.keys(_notionArchiveCache).filter(k=>k.startsWith(prefix))
+        const archAll=archDates.flatMap(k=>_notionArchiveCache[k]||[])
+        mCnt=archAll.length
+        done=archAll.filter(iv=>iv.status==='completed').length
+        pending=archAll.filter(iv=>iv.status==='pending').length
+        fail=archAll.filter(iv=>iv.status==='not_responded').length
+      } else if(archFetched&&isThisM){
+        // Mois courant : ivs pour les futurs, archive pour passés
+        const archDates=Object.keys(_notionArchiveCache).filter(k=>k.startsWith(prefix)&&k<TODAY)
+        const archAll=archDates.flatMap(k=>_notionArchiveCache[k]||[])
+        const mIvsFut=ivs.filter(i=>i.date.startsWith(prefix)&&i.date>=TODAY)
+        mCnt=archAll.length+mIvsFut.length
+        done=archAll.filter(iv=>iv.status==='completed').length+mIvsFut.filter(i=>i.status==="completed"||depValidated[i.id]).length
+        pending=archAll.filter(iv=>iv.status==='pending').length+mIvsFut.filter(i=>i.status==="pending").length
+        fail=archAll.filter(iv=>iv.status==='not_responded').length+mIvsFut.filter(i=>i.status==="not_responded"||depFailed[i.id]).length
+      } else {
+        const mIvs=ivs.filter(i=>i.date.startsWith(prefix))
+        mCnt=mIvs.length
+        done=mIvs.filter(i=>i.status==="completed"||depValidated[i.id]).length
+        pending=mIvs.filter(i=>i.status==="pending").length
+        fail=mIvs.filter(i=>i.status==="not_responded"||depFailed[i.id]).length
+      }
       const isCur=m===curM&&y===curY
-      const isTodayM=m===parseInt(TODAY.split("-")[1])&&y===parseInt(TODAY.split("-")[0])
-      return `<div onclick="selDate='${y}-${String(m).padStart(2,"0")}-01';planView='mois';rPlan()" class="card" style="cursor:pointer;border-left:3px solid ${isCur?"var(--blue)":isTodayM?"var(--orange)":"var(--border)"};background:${isCur?"var(--blueLight)":"#fff"};transition:all .12s" onmouseover="this.style.boxShadow='0 2px 10px rgba(0,0,0,.1)'" onmouseout="this.style.boxShadow='none'">
+      const isTodayM=m===todayM&&y===todayY
+      return `<div onclick="selDate='${ym}-01';planView='mois';rPlan()" class="card" style="cursor:pointer;border-left:3px solid ${isCur?"var(--blue)":isTodayM?"var(--orange)":"var(--border)"};background:${isCur?"var(--blueLight)":isPastM&&!mCnt?"#F5F5F5":"#fff"};transition:all .12s" onmouseover="this.style.boxShadow='0 2px 10px rgba(0,0,0,.1)'" onmouseout="this.style.boxShadow='none'">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-            <span style="font-weight:700;font-size:14px;color:${isCur?"var(--blue)":isTodayM?"var(--orange)":"var(--dark)"}">${mn}</span>
-            ${mIvs.length?`<span class="bdg" style="background:var(--blueLight);color:var(--blue)">${mIvs.length}</span>`:`<span style="font-size:11px;color:var(--gray)">—</span>`}
+            <span style="font-weight:700;font-size:14px;color:${isCur?"var(--blue)":isTodayM?"var(--orange)":isPastM&&!mCnt?"#BDBDBD":"var(--dark)"}">${mn}</span>
+            ${mCnt?`<span class="bdg" style="background:${isPastM?"#ECEFF1":"var(--blueLight)"};color:${isPastM?"#78909C":"var(--blue)"}">${mCnt}</span>`:isPastM?`<span style="font-size:11px;color:${archFetched?"#D0D0D0":"#BDBDBD"}">${archFetched?"—":"⏳"}</span>`:`<span style="font-size:11px;color:var(--gray)">—</span>`}
           </div>
-          ${mIvs.length?`
-          <div class="prog-t" style="margin-bottom:5px"><div class="prog-f" style="width:${Math.round(done/mIvs.length*100)}%;background:#2E7D32"></div></div>
+          ${mCnt?`
+          <div class="prog-t" style="margin-bottom:5px"><div class="prog-f" style="width:${Math.round(done/mCnt*100)}%;background:#2E7D32"></div></div>
           <div style="display:flex;gap:8px;font-size:11px">
             ${done?`<span style="color:#2E7D32">✓ ${done}</span>`:""}
             ${pending?`<span style="color:var(--orange)">⏳ ${pending}</span>`:""}
             ${fail?`<span style="color:#C62828">✗ ${fail}</span>`:""}
-          </div>`:`<div style="font-size:11px;color:var(--gray)">Aucune intervention</div>`}
+          </div>`:`<div style="font-size:11px;color:${isPastM?"#D0D0D0":"var(--gray)"}">Aucune intervention</div>`}
         </div>`}).join("")}
   </div>`
 }
@@ -7979,6 +8109,11 @@ function enrichIvWithKizeo(iv, site){
     urgenceElectrodes: site.urgenceElectrodes || '',
     urgenceAnnuelle:  site.urgenceAnnuelle || '',
     pma:              site.pma || '',
+    prochaineExpiration: site.prochaineExpiration || '',
+    commercial:       iv.commercial || site.commercial || '',
+    kizeoAddr:        site.adresse || '',
+    kizeoCodePostal:  site.codePostal || '',
+    kizeoVille:       site.ville || '',
     kizeoSiteId:      site.id,
   }
 }
@@ -8057,9 +8192,9 @@ function notionPageToIv(page, existingIds){
     date: dateStr.substring(0, 10),
     type, status, techId,
     form,
-    // Matériel : dea extrait du champ INTERVENTION Notion, enrichIvsWithKizeo() complètera
+    // Matériel : dea + padPak extraits du champ INTERVENTION Notion, enrichIvsWithKizeo() complètera
     arm: 0, dea: deaNotion, bat: 0,
-    padPak: false, padPakDate: '', batChange: false,
+    padPak: /pad pak/i.test(typeStr), padPakDate: '', batChange: false,
     nSerie: '', batDate: '', electrodeDate: '',
     urgencePadPak: '', urgenceElectrodes: '', urgenceAnnuelle: '', pma: '',
     timeStart: plannedStart,
@@ -8164,16 +8299,18 @@ async function pullFromNotion(dateFrom, dateTo, mode='merge'){
       const existIdx = ivs.findIndex(i=>i.notionId===page.id)
       if(existIdx>=0){
         const prev = ivs[existIdx]
-        // Les données locales sont prioritaires — seul "form" (fichier joint Notion) est mis à jour
+        // Les données locales sont prioritaires — seul "form", heure Notion et padPak Notion mis à jour
         ivs[existIdx] = {
           ...prev,
           notionId: page.id,
           form: iv.form || prev.form,
+          padPak: prev.padPak || iv.padPak,
+          ...(iv.timeStart ? {timeStart: iv.timeStart, notionTime: true} : {notionTime: false}),
         }
         updated++
       } else {
         nextId = Math.max(nextId, iv.id+1)
-        ivs.push(iv)
+        ivs.push({...iv, notionTime: !!iv.timeStart})
         added++
       }
     })
@@ -8273,7 +8410,7 @@ function _buildNotionPropsCreate(iv){
   const typeMap={maintenance_simple:'Annuel',maintenance_complex:'PAD PAK',installation:'Installation',tele_maintenance:'Télémaintenance'}
   const props={
     'Société':           {title:     [{text:{content:(iv.client||'').substring(0,2000)}}]},
-    'Date intervention': {date:      {start:iv.date}},
+    'Date intervention': {date:      {start:iv.timeStart?iv.date+'T'+iv.timeStart+':00':iv.date}},
     'Adresse Site':      {rich_text: [{text:{content:(iv.addr||'').substring(0,2000)}}]},
     'Technicien':        {select:{name:tech?tech.name:''}},
     'INTERVENTION':      {multi_select:[{name:typeMap[iv.type]||'Annuel'}]},
@@ -8294,7 +8431,7 @@ async function pushIvToNotion(iv){
     // Notion retourne 400 si un seul champ a le mauvais type → tout l'update échoue
     const tech=TECHS.find(t=>t.id===iv.techId)
     const props={
-      'Date intervention': {date:{start:iv.date}},
+      'Date intervention': {date:{start:iv.timeStart?iv.date+'T'+iv.timeStart+':00':iv.date}},
       'Technicien':        {select:{name:tech?tech.name:''}},
       'Terminer':          {checkbox:iv.status==='completed'},
       'Echec':             {checkbox:iv.status==='not_responded'},
