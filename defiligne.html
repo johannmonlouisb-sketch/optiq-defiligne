@@ -297,7 +297,7 @@ tr:hover td{background:var(--bg)}
     <!-- CONTRÔLES -->
     <div style="padding:10px 16px;display:flex;flex-direction:column;gap:7px;flex-shrink:0;border-bottom:1px solid var(--border);background:#fff">
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        <input type="date" id="dep-date" style="width:auto;font-size:13px;padding:6px 10px" oninput="rDepart();_schedDepMap()"/>
+        <input type="date" id="dep-date" style="width:auto;font-size:13px;padding:6px 10px" onchange="setSelDate(this.value)"/>
         <input type="time" id="dep-time" value="08:00" title="Heure de départ" style="width:auto;font-size:13px;padding:6px 10px" oninput="_schedDepMap()"/>
         <button onclick="depNow()" title="Utiliser l'heure actuelle (Paris)" style="padding:6px 10px;font-size:12px;border-radius:8px;border:1.5px solid var(--blue);background:#E3F2FD;color:#1565C0;cursor:pointer;font-family:inherit;font-weight:600;white-space:nowrap">🕐 Maintenant</button>
         <div style="position:relative;display:inline-block">
@@ -2024,6 +2024,33 @@ function _syncMapDate(){
 function _saveUIState(){
   try{localStorage.setItem('optiq_ui_state',JSON.stringify({view:curView,subTab:_depSubTab,selDate}))}catch(e){}
 }
+
+// Point d'entrée unique pour changer la date sélectionnée — synchronise tous les éléments
+function setSelDate(d){
+  if(!d||d===selDate) return
+  selDate=d; mapDate=d
+  depRouteOrder={}
+  loadRouteOrder(d)
+  _saveUIState()
+  _autoDepTime()
+  // Synchroniser les deux inputs de date
+  ;['dep-date','map-di'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=d})
+  // Mettre à jour le topbar
+  const topDate=document.getElementById('topbar-date')
+  if(topDate){
+    const dt=new Date(d+'T12:00:00')
+    const isToday=d===TODAY
+    topDate.textContent = isToday
+      ? dt.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})
+      : '📅 '+dt.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})
+  }
+  // Re-rendre la vue courante avec la nouvelle date
+  if(curView==='depart'){ rDepart(); _schedDepMap() }
+  else if(curView==='dashboard') rDash()
+  else if(curView==='planning') rPlan()
+  else if(curView==='interventions') rIv()
+  else if(curView==='materiel'){matFilter.date=d;rMat()}
+}
 function SV(v){
   if(v==="carte"){SV("depart");return}
   curView=v
@@ -2227,8 +2254,8 @@ function rDash(){
     <div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <h2 style="font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap">Interventions du
-          <input type="date" value="${selDate}" onchange="selDate=this.value;_saveUIState();rDash()" style="width:auto;padding:4px 8px;font-size:13px"/>
-          ${selDate!==TODAY?`<button onclick="selDate=TODAY;rDash()" class="bg bsm" style="font-size:11px">Aujourd'hui</button>`:""}
+          <input type="date" value="${selDate}" onchange="setSelDate(this.value)" style="width:auto;padding:4px 8px;font-size:13px"/>
+          ${selDate!==TODAY?`<button onclick="setSelDate(TODAY)" class="bg bsm" style="font-size:11px">Aujourd'hui</button>`:""}
         </h2>
       </div>
       ${!day.length?`<div class="card" style="text-align:center;color:var(--gray);padding:36px">Aucune intervention</div>`:""}
@@ -2529,7 +2556,6 @@ function matSummaryCompact(techIvs){
 function rDepart(){
   const di=document.getElementById("dep-date")
   di.value=selDate
-  di.onchange=()=>{selDate=di.value;depRouteOrder={};loadRouteOrder(selDate);_saveUIState();_autoDepTime();rDepart();_schedDepMap()}
   const date=selDate
   // Badge "Jour en cours" si on affiche aujourd'hui
   const dayBadgeEl=document.getElementById("dep-day-badge")
@@ -3246,16 +3272,16 @@ function dayArchive(date){
 function rPlanDay(el){
   const isPast=selDate<TODAY
   const nav=`<button onclick="shiftDay(-1)" class="bg bsm">◀</button>
-    <input type="date" value="${selDate}" onchange="selDate=this.value;rPlan()" style="width:auto;padding:5px 10px;font-size:13px"/>
+    <input type="date" value="${selDate}" onchange="setSelDate(this.value)" style="width:auto;padding:5px 10px;font-size:13px"/>
     <button onclick="shiftDay(1)" class="bg bsm">▶</button>
-    <button onclick="selDate=TODAY;rPlan()" class="bg bsm">Aujourd'hui</button>`
+    <button onclick="setSelDate(TODAY)" class="bg bsm">Aujourd'hui</button>`
   el.innerHTML=planHdr(nav)+
     `<h2 style="font-size:15px;font-weight:600;margin-bottom:12px">${fdl(selDate)}${isPast?' <span style="font-size:12px;font-weight:400;color:var(--gray)">· Archive</span>':''}</h2>`+
     (isPast?dayArchive(selDate):daySection(selDate))
 }
 function shiftDay(n){
-  const d=new Date(selDate+"T12:00:00");d.setDate(d.getDate()+n)
-  selDate=d.toISOString().split("T")[0];rPlan()
+  const d=new Date(selDate+"T12:00:00");d.setDate(d.getDate()+n);
+  setSelDate(d.toISOString().split("T")[0])
 }
 
 // ── VUE SEMAINE ───────────────────────────────────────
@@ -3272,7 +3298,7 @@ function rPlanWeek(el){
   const nav=`<button onclick="shiftWeek(-7)" class="bg bsm">◀ Préc.</button>
     <span style="font-size:13px;font-weight:600;padding:0 6px">${fd(week[0])} — ${fd(week[6])}</span>
     <button onclick="shiftWeek(7)" class="bg bsm">Suiv. ▶</button>
-    <button onclick="selDate=TODAY;rPlan()" class="bg bsm">Aujourd'hui</button>`
+    <button onclick="setSelDate(TODAY)" class="bg bsm">Aujourd'hui</button>`
   const DNAMES=["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"]
   el.innerHTML=planHdr(nav)+`
   <div class="wkg" style="margin-bottom:16px">
@@ -3299,7 +3325,7 @@ function rPlanWeek(el){
 }
 function shiftWeek(n){
   const d=new Date(selDate+"T12:00:00");d.setDate(d.getDate()+n)
-  selDate=d.toISOString().split("T")[0];rPlan()
+  setSelDate(d.toISOString().split("T")[0])
 }
 
 // ── VUE MOIS ──────────────────────────────────────────
@@ -3318,7 +3344,7 @@ function rPlanMonth(el){
   const nav=`<button onclick="shiftMonth(-1)" class="bg bsm">◀ Préc.</button>
     <span style="font-size:14px;font-weight:600;padding:0 6px">${MNAMES[m-1]} ${y}</span>
     <button onclick="shiftMonth(1)" class="bg bsm">Suiv. ▶</button>
-    <button onclick="selDate=TODAY;rPlan()" class="bg bsm">Aujourd'hui</button>`
+    <button onclick="setSelDate(TODAY)" class="bg bsm">Aujourd'hui</button>`
 
   // Auto-charge le mois affiché si passé (une seule fois) puis re-render
   const _displayYM=`${y}-${String(m).padStart(2,"0")}`
@@ -3356,7 +3382,7 @@ function rPlanMonth(el){
 }
 function shiftMonth(n){
   const d=new Date(selDate+"T12:00:00");d.setMonth(d.getMonth()+n)
-  selDate=d.toISOString().split("T")[0];rPlan()
+  setSelDate(d.toISOString().split("T")[0])
 }
 
 // ── VUE ANNÉE ─────────────────────────────────────────
@@ -3365,7 +3391,7 @@ function rPlanYear(el){
   const nav=`<button onclick="shiftYear(-1)" class="bg bsm">◀ ${y-1}</button>
     <span style="font-size:15px;font-weight:700;padding:0 8px">${y}</span>
     <button onclick="shiftYear(1)" class="bg bsm">${y+1} ▶</button>
-    <button onclick="selDate=TODAY;rPlan()" class="bg bsm">Aujourd'hui</button>`
+    <button onclick="setSelDate(TODAY)" class="bg bsm">Aujourd'hui</button>`
 
   // Auto-charge les mois passés de l'année affichée
   const _todayYN=parseInt(TODAY.split("-")[0]),_todayMN=parseInt(TODAY.split("-")[1])
