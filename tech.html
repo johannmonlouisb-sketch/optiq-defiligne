@@ -1054,6 +1054,13 @@ function depDate(){return document.getElementById("dep-date")?.value||TODAY()}
 function onDepDateChange(){
   try{localStorage.setItem('optiq_tech_date',document.getElementById('dep-date').value)}catch(e){}
   renderDepart();updateBadges()
+  _schedCalcMap(400)
+}
+
+let _calcMapTimer=null
+function _schedCalcMap(delay=1200){
+  clearTimeout(_calcMapTimer)
+  _calcMapTimer=setTimeout(()=>{ if(curTab==='depart'&&!building) calcMap() },delay)
 }
 
 // ════════════════════════════════════════════
@@ -2872,6 +2879,8 @@ function _submitPin(){
     hideLogin()
     _restoreTourState()
     updateTopbar();updateBadges();goTab(curTab)
+    // Calcul de carte automatique après connexion
+    _schedCalcMap(1800)
   } else {
     document.getElementById('pin-error').textContent='Code incorrect, réessayez'
     _pinVal=''
@@ -2952,6 +2961,8 @@ if(!_authValid()){
   updateTopbar()
   goTab(curTab)
   updateBadges()
+  // Lancer le calcul de carte automatiquement au démarrage
+  _schedCalcMap(1800)
 }
 
 // ── Auto-chargement Notion au démarrage (année passée + en cours) ─────────────
@@ -3223,6 +3234,8 @@ function _applyRemoteIvs(newVal, src){
   else if(curTab==='planning'&&typeof renderPlanning==='function') renderPlanning()
   else if(typeof renderDepart==='function') renderDepart()
   if(typeof updateBadges==='function') updateBadges()
+  // Recalcul carte si des données ont changé
+  if(typeof _schedCalcMap==='function') _schedCalcMap(1200)
   _sbLastSync = new Date().toLocaleTimeString('fr-FR')
   _setSbDot('#22c55e', `${src==='WS'?'⚡':'🔄'} ${_sbLastSync} · ${ivs.length} interv.`)
 }
