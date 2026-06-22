@@ -405,6 +405,7 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
     <!-- ═══ MATÉRIEL ═══ -->
     <div id="v-materiel" class="view">
       <div style="padding:12px 14px 4px;font-size:13px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px" id="mat-title"></div>
+      <div style="padding:6px 12px 2px" id="mat-prep-btn"></div>
       <div id="mat-alert" style="display:none;margin:6px 12px;padding:10px 14px;background:#FFF3E0;border-left:4px solid var(--orange);border-radius:10px;font-size:14px;color:var(--orange);font-weight:600"></div>
       <div style="flex:1;overflow-y:auto">
         <div id="mat-totaux"></div>
@@ -2139,10 +2140,39 @@ function renderPlanning(){
 // ════════════════════════════════════════════
 // MATÉRIEL
 // ════════════════════════════════════════════
+let _matPrepCache={}  // {techId_date: bool}
+try{const s=localStorage.getItem('optiq_mat_prep');if(s)_matPrepCache=JSON.parse(s)}catch(e){}
+
+function isMatPrep(techId,date){ return !!_matPrepCache[`${techId}_${date}`] }
+async function toggleMatPrep(){
+  const date=depDate()
+  const key=`${curTech}_${date}`
+  _matPrepCache[key]=!_matPrepCache[key]
+  try{localStorage.setItem('optiq_mat_prep',JSON.stringify(_matPrepCache))}catch(e){}
+  // Sync Supabase
+  if(_sbClient){
+    try{
+      const {data}=await _sbClient.from('app_state').select('value').eq('key','optiq_mat_prep').maybeSingle()
+      const sbVal=(data?.value&&typeof data.value==='object')?data.value:{}
+      sbVal[key]=_matPrepCache[key]
+      await _sbClient.from('app_state').upsert({key:'optiq_mat_prep',value:sbVal},{onConflict:'key'})
+    }catch(e){}
+  }
+  renderMateriel()
+}
+
 function renderMateriel(){
   const date=depDate()
   const dayIvs=myIvs(date)
   document.getElementById("mat-title").textContent=`Matériel — ${fdl(date)}`
+  // Bouton de validation préparation matériel
+  const prep=isMatPrep(curTech,date)
+  const matHead=document.getElementById("mat-prep-btn")
+  if(matHead){
+    matHead.innerHTML=prep
+      ?`<button onclick="toggleMatPrep()" style="width:100%;padding:12px;background:#E8F5E9;color:#2E7D32;border:2px solid #2E7D32;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer">✅ Matériel prêt — appuyer pour annuler</button>`
+      :`<button onclick="toggleMatPrep()" style="width:100%;padding:12px;background:#fff;color:#1565C0;border:2px solid #1565C0;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer">📦 Confirmer matériel préparé</button>`
+  }
   // Totaux à partir de getEquip()
   const allEquip=dayIvs.flatMap(i=>getEquip(i).map(e=>e.text.split(" ")[0]+" "+e.text.split(" ")[1]))
   const installs=dayIvs.filter(i=>i.type==="installation")

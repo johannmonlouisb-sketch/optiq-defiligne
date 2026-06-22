@@ -2046,6 +2046,7 @@ function closeSearch(){document.getElementById("gsearch-res").classList.remove("
 // TRACKER TOURNÉES EN DIRECT
 // ═══════════════════════════════════════════════════════
 let _tourProgressData = {}
+let _matPrepData = {}  // {techId_date: true/false} — confirmé par le tech
 
 // ── Cache Notion pour l'archive historique ───────────
 const _notionArchiveCache = {}   // { "2026-01-15": [{iv...}] }
@@ -2244,18 +2245,25 @@ ${iv.contact?`<div style="font-size:11px;color:#6A1B9A;margin-top:2px">👤 ${iv
         </div>
       </div>
       <div class="card">
-        <h3 style="font-size:13px;font-weight:600;margin-bottom:12px">📦 Matériel à emporter</h3>
+        <h3 style="font-size:13px;font-weight:600;margin-bottom:12px">📦 Matériel — confirmation techs</h3>
         ${(()=>{
-          const techsWithIvs=TECHS.filter(t=>t.avail).map(t=>({t,ivs:day.filter(i=>i.techId===t.id)})).filter(({ivs})=>ivs.length)
-          if(!techsWithIvs.length) return `<div style="font-size:12px;color:var(--gray)">Aucune intervention</div>`
-          return techsWithIvs.map(({t,ivs:tIvs})=>{
-            const sumHtml=matSummaryHTML(tIvs,t.name)
-            if(!sumHtml) return ''
-            return `<div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--bg)">
-              <div style="display:flex;align-items:center;gap:7px;margin-bottom:6px">${ava(t.init,20,t.color||'#1565C0')}<span style="font-size:12px;font-weight:700;color:var(--dark)">${t.name}</span></div>
-              ${sumHtml}
+          const techsWithIvs=TECHS.filter(t=>t.avail).map(t=>({t,tIvs:day.filter(i=>i.techId===t.id)})).filter(({tIvs})=>tIvs.length)
+          if(!techsWithIvs.length) return `<div style="font-size:12px;color:var(--gray)">Aucune intervention aujourd'hui</div>`
+          return techsWithIvs.map(({t,tIvs})=>{
+            const prep=!!_matPrepData[`${t.id}_${selDate}`]
+            const hasMat=tIvs.some(iv=>getEquip(iv).length>0)
+            return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bg)">
+              <div style="display:flex;align-items:center;gap:8px">${ava(t.init,24,t.color||'#1565C0')}
+                <div>
+                  <div style="font-size:12px;font-weight:700">${t.name}</div>
+                  <div style="font-size:11px;color:var(--gray)">${tIvs.length} intervention${tIvs.length>1?'s':''}</div>
+                </div>
+              </div>
+              <div style="font-size:13px;font-weight:700;${prep?"color:#2E7D32":"color:"+(hasMat?"#E65100":"var(--gray))")}">
+                ${prep?"✅ Prêt":"⏳ En attente"}
+              </div>
             </div>`
-          }).join('') || `<div style="font-size:12px;color:var(--gray)">Rien de spécial à préparer</div>`
+          }).join('')
         })()}
       </div>
     </div>
@@ -7811,10 +7819,28 @@ function initCloud(){
           })
           .subscribe()
 
+        // Canal matériel préparé — bouton validé côté tech
+        sbClient.channel('mat-prep-sync')
+          .on('postgres_changes',{
+            event:'*', schema:'public', table:'app_state',
+            filter:'key=eq.optiq_mat_prep'
+          }, payload => {
+            const val = payload.new?.value
+            if(!val || typeof val !== 'object') return
+            _matPrepData = val
+            if(curView==='dashboard') rDash()
+          })
+          .subscribe()
+
         // Chargement initial de la progression des tournées
         sbGet('app_state?key=eq.optiq_tour_progress&select=value')
           .then(rows=>{ if(rows[0]?.value){ _tourProgressData=rows[0].value; renderTourTracker() } })
           .catch(e=>console.warn('Tour load:', e.message))
+
+        // Chargement initial du statut matériel
+        sbGet('app_state?key=eq.optiq_mat_prep&select=value')
+          .then(rows=>{ if(rows[0]?.value){ _matPrepData=rows[0].value; if(curView==='dashboard') rDash() } })
+          .catch(e=>console.warn('Mat prep load:', e.message))
 
       }catch(e){ console.warn('Realtime init:', e.message) }
 
