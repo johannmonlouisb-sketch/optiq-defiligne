@@ -4507,11 +4507,14 @@ function kmBetween(lat1,lng1,lat2,lng2){
   return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))
 }
 
-// Coords estimées d'une adresse via son département
+// Coords d'une adresse : gcache en priorité (GPS précis), sinon département
 function addrCoords(addr){
+  const cached=gcache[addr]
+  if(cached?.lat&&cached?.lng) return [cached.lat,cached.lng]
   const dept=extractDept(addr)
-  return DEPT_COORDS[dept]||[48.8,2.35]  // défaut Paris si inconnu
+  return DEPT_COORDS[dept]||[48.8,2.35]
 }
+function _addrPrecise(addr){ return !!(gcache[addr]?.lat) }
 
 // Distance estimée dépôt → adresse (km)
 function kmFromDepot(addr){
@@ -4552,17 +4555,64 @@ function dayKm(date,addedLoad){
 }
 
 function isCoherentWithDay(date,addr,addedLoad){
-  // Vérifier que cette adresse est géographiquement cohérente avec la journée
   const dayIvs=ivs.filter(i=>i.date===date)
   const [iLat,iLng]=addrCoords(addr)
   const newKmDepot=kmFromDepot(addr)
-  // Si la journée est vide : vérifier juste le km max
   if(!dayIvs.length) return newKmDepot*2<=window.dispatchCfg.maxDayKm
-  // Sinon : vérifier que la nouvelle adresse ne s'éloigne pas trop du centroïde du jour
   const centLat=dayIvs.reduce((a,i)=>a+addrCoords(i.addr)[0],0)/dayIvs.length
   const centLng=dayIvs.reduce((a,i)=>a+addrCoords(i.addr)[1],0)/dayIvs.length
   const distFromCent=kmBetween(centLat,centLng,iLat,iLng)
-  return distFromCent<=120  // max 120km du centroïde du groupe
+  return distFromCent<=120
+}
+
+// Calcule le meilleur détour (km) pour insérer une adresse dans la tournée d'un tech
+// Utilise l'ordre planifié si dispo, sinon l'ordre des ivs
+function _bestInsertDetour(techId, date, newAddr){
+  const depotLat=window.dispatchCfg.depotLat, depotLng=window.dispatchCfg.depotLng
+  const [nLat,nLng]=addrCoords(newAddr)
+  const techIvs=ivs.filter(i=>i.date===date&&i.techId===techId)
+  if(!techIvs.length) return kmBetween(depotLat,depotLng,nLat,nLng)*2 // aller-retour seul
+
+  // Reconstituer l'ordre planifié
+  const stored=(() => {
+    try{
+      const s=JSON.parse(localStorage.getItem("optiq_route_order")||"{}")
+      return s[`${techId}_${date}`]
+    }catch(e){return null}
+  })()
+  const ordered = stored?.length
+    ? stored.map(id=>techIvs.find(i=>i.id===id)).filter(Boolean)
+    : techIvs
+
+  // Points : [depot, stop0, stop1, ..., depot]
+  const pts=[{lat:depotLat,lng:depotLng}, ...ordered.map(i=>{ const[la,lo]=addrCoords(i.addr);return{lat:la,lng:lo} }), {lat:depotLat,lng:depotLng}]
+
+  // Tester chaque position d'insertion, garder le min detour
+  let minDetour=Infinity
+  for(let i=0;i<pts.length-1;i++){
+    const prev=pts[i], next=pts[i+1]
+    const detour=kmBetween(prev.lat,prev.lng,nLat,nLng)+kmBetween(nLat,nLng,next.lat,next.lng)-kmBetween(prev.lat,prev.lng,next.lat,next.lng)
+    if(detour<minDetour) minDetour=detour
+  }
+  return Math.max(0,minDetour)
+}
+
+// Score complet pour un (date, tech) — plus bas = meilleur
+// Retourne null si le tech n'a pas la capacité
+function _scoreTechDate(techId, date, newAddr, ivMin){
+  const buf=1-(window.dispatchCfg.bufferPct||30)/100
+  const perTechMax=Math.min(window.dispatchCfg.maxDayHours,window.dispatchCfg.maxLegalHours)*60*buf
+  const techLoad=ivs.filter(i=>i.date===date&&i.techId===techId).reduce((a,i)=>a+dur(i.type,i.form),0)
+  if(techLoad+ivMin>perTechMax) return null  // pas de place
+
+  const detour=_bestInsertDetour(techId, date, newAddr)
+  const loadPct=Math.round(techLoad/perTechMax*100)
+  // Pénalité charge : éviter les techs déjà à >80%
+  const loadPenalty=loadPct>80?200:loadPct>60?50:0
+  // Bonus : coordonnées GPS précises = score plus fiable, on leur fait confiance
+  const preciseBonus=_addrPrecise(newAddr)?0:30
+
+  return detour*10 + loadPenalty + preciseBonus
 }
 
 function effectiveCap(date){
@@ -6987,7 +7037,7 @@ function suggestDates(){
   const suggestions = []
   const kmDep = kmFromDepot(addr)
   const overnight = needsOvernight(addr)
-  const [iLat, iLng] = addrCoords(addr)
+  const precise = _addrPrecise(addr)
 
   for(const slot of slots){
     if(suggestions.length >= 5) break
@@ -6995,33 +7045,32 @@ function suggestDates(){
     const avail = getAvailTechs(date)
     if(!avail.length) continue
     const dayIvs = ivs.filter(i=>i.date===date)
-    const coherent = isCoherentWithDay(date, addr, {})
-    const hasCap = dayHasCap(date, ivMin, addr, {}, filterTechId||null)
-    if(!hasCap) continue
 
-    // Charge selon le filtre
-    let loadPct
-    if(filterTechId){
-      const techLoad=ivs.filter(i=>i.date===date&&i.techId===filterTechId).reduce((a,i)=>a+dur(i.type,i.form),0)
-      loadPct=Math.min(100,Math.round(techLoad/(window.dispatchCfg.maxDayHours*60)*100))
-    } else {
-      const load=dayLoad(date,{})
-      loadPct=avail.length?Math.min(100,Math.round(load.totalMin/(window.dispatchCfg.maxDayHours*60*avail.length)*100)):0
+    // Évaluer chaque tech disponible ce jour
+    const targets = filterTechId ? avail.filter(t=>t.id===filterTechId) : avail
+    if(!targets.length) continue
+
+    let bestScore=Infinity, bestTech=null, bestDetour=0
+    for(const tech of targets){
+      const s=_scoreTechDate(tech.id, date, addr, ivMin)
+      if(s===null) continue   // pas de capacité
+      if(s<bestScore){ bestScore=s; bestTech=tech; bestDetour=Math.max(0,_bestInsertDetour(tech.id,date,addr)) }
     }
-    const load = dayLoad(date, {})
-    const extraKm = coherent ? Math.round(kmBetween(
-      dayIvs.length?addrCoords(dayIvs[dayIvs.length-1].addr)[0]:window.dispatchCfg.depotLat,
-      dayIvs.length?addrCoords(dayIvs[dayIvs.length-1].addr)[1]:window.dispatchCfg.depotLng,
-      iLat, iLng
-    )) : Math.round(kmDep * 2)
+    if(bestTech===null) continue   // aucun tech n'a la place
 
-    const score = (coherent?0:500) + extraKm + (dayIvs.length>0?-20:0)
+    const coherent = isCoherentWithDay(date, addr, {})
+    const extraKm = Math.round(bestDetour)
+    const buf=1-(window.dispatchCfg.bufferPct||30)/100
+    const perTechMax=Math.min(window.dispatchCfg.maxDayHours,window.dispatchCfg.maxLegalHours)*60*buf
+    const techLoad=ivs.filter(i=>i.date===date&&i.techId===bestTech.id).reduce((a,i)=>a+dur(i.type,i.form),0)
+    const loadPct=Math.min(100,Math.round(techLoad/perTechMax*100))
     const dept = extractDept(addr)
     const sameDeptIvs = dayIvs.filter(i=>extractDept(i.addr)===dept)
-    // Techs absents ce jour
     const absentNames = TECHS.filter(t=>t.avail&&isTechAbsent(t.id,date)).map(t=>t.name)
 
-    suggestions.push({date, coherent, extraKm, dayIvs:dayIvs.length, load, loadPct, overnight, score, sameDeptIvs:sameDeptIvs.length, avail:avail.length, absentNames})
+    suggestions.push({date, coherent, extraKm, dayIvs:dayIvs.length, loadPct, overnight,
+      score:bestScore, sameDeptIvs:sameDeptIvs.length, avail:avail.length, absentNames,
+      bestTech, precise})
   }
   suggestions.sort((a,b)=>a.score-b.score)
 
@@ -7032,9 +7081,12 @@ function suggestDates(){
   }
 
   const best = suggestions[0]
-  // Auto-remplir la date avec le meilleur créneau
+  // Auto-remplir date + tech avec le meilleur créneau
   const dateInput = document.getElementById("m-date")
-  if(dateInput && !dateInput.value) dateInput.value = best.date
+  if(dateInput && !dateInput.value){
+    dateInput.value = best.date
+    if(best.bestTech){ const ts=document.getElementById("m-tech"); if(ts) ts.value=best.bestTech.id }
+  }
 
   box.style.display = "block"
   unplanWrap.style.display = "flex"  // montrer checkbox détour
@@ -7051,7 +7103,7 @@ function suggestDates(){
     const dm = d.getDate()+" "+MOIS[d.getMonth()]
     const loadPct = s.loadPct ?? Math.round(s.load.totalMin/(window.dispatchCfg.maxDayHours*60)*100)
     const isSelected = document.getElementById("m-date")?.value===s.date
-    return `<div onclick="selectDate('${s.date}',${s.dayIvs>0})"
+    return `<div onclick="selectDate('${s.date}',${s.dayIvs>0},${s.bestTech?.id||'null'})"
       style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:7px;cursor:pointer;
       background:${isSelected?"white":"rgba(255,255,255,.6)"};
       border:${isSelected?"2px solid #1565C0":"1px solid rgba(21,101,192,.2)"};
@@ -7063,17 +7115,18 @@ function suggestDates(){
       </div>
       <div style="flex:1">
         <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:3px">
-          ${s.coherent?`<span style="font-size:10px;background:#E8F5E9;color:#2E7D32;padding:1px 6px;border-radius:3px">✓ Même zone</span>`:`<span style="font-size:10px;background:#FFF3E0;color:#E65100;padding:1px 6px;border-radius:3px">⚠ Zone différente</span>`}
+          ${i===0?`<span style="font-size:10px;background:#1565C0;color:#fff;padding:1px 6px;border-radius:3px">⭐ Recommandé</span>`:""}
+          ${s.bestTech?`<span style="font-size:10px;background:${s.bestTech.color||'#1565C0'}20;color:${s.bestTech.color||'#1565C0'};padding:1px 6px;border-radius:3px;border:1px solid ${s.bestTech.color||'#1565C0'}40">👤 ${s.bestTech.name}</span>`:""}
+          ${s.coherent?`<span style="font-size:10px;background:#E8F5E9;color:#2E7D32;padding:1px 6px;border-radius:3px">✓ Même zone</span>`:`<span style="font-size:10px;background:#FFF3E0;color:#E65100;padding:1px 6px;border-radius:3px">⚠ Zone éloignée</span>`}
           ${s.sameDeptIvs>0?`<span style="font-size:10px;background:#E3F2FD;color:#1565C0;padding:1px 6px;border-radius:3px">${s.sameDeptIvs} interv. même dépt.</span>`:""}
           ${s.overnight?`<span style="font-size:10px;background:#FFEBEE;color:#C62828;padding:1px 6px;border-radius:3px">🏨 Découchage</span>`:""}
           ${s.absentNames?.length?`<span style="font-size:10px;background:#FFF3E0;color:#E65100;padding:1px 6px;border-radius:3px">🚫 ${s.absentNames.join(', ')} absent${s.absentNames.length>1?'s':''}</span>`:""}
-          <span style="font-size:10px;background:#F3E5F5;color:#6A1B9A;padding:1px 6px;border-radius:3px">${s.avail||1} tech${(s.avail||1)>1?'s':''} dispo</span>
-          ${i===0?`<span style="font-size:10px;background:#1565C0;color:#fff;padding:1px 6px;border-radius:3px">⭐ Recommandé</span>`:""}
+          ${!s.precise?`<span style="font-size:10px;background:#F5F5F5;color:#9E9E9E;padding:1px 6px;border-radius:3px">~estimation dept.</span>`:""}
         </div>
         <div style="height:4px;background:rgba(21,101,192,.15);border-radius:2px;overflow:hidden">
-          <div style="height:100%;width:${loadPct}%;background:${loadPct>80?"#C62828":loadPct>60?"#E65100":"#1565C0"};border-radius:2px"></div>
+          <div style="height:100%;width:${s.loadPct}%;background:${s.loadPct>80?"#C62828":s.loadPct>60?"#E65100":"#1565C0"};border-radius:2px"></div>
         </div>
-        <div style="font-size:10px;color:var(--gray);margin-top:2px">${s.dayIvs} interv. · charge ${loadPct}% · ~+${s.extraKm}km</div>
+        <div style="font-size:10px;color:var(--gray);margin-top:2px">${s.dayIvs} interv. · charge ${s.loadPct}% · ~+${s.extraKm}km détour</div>
       </div>
       ${isSelected?`<div style="color:#1565C0;font-size:16px">✓</div>`:""}
     </div>`
@@ -7089,10 +7142,15 @@ function suggestDates(){
   }
 }
 
-function selectDate(date, hasExisting){
+function selectDate(date, hasExisting, bestTechId){
   const di = document.getElementById("m-date")
   if(di) di.value = date
   if(hasExisting) document.getElementById("m-unplanned").checked = true
+  // Pré-sélectionner le tech recommandé
+  if(bestTechId){
+    const ts=document.getElementById("m-tech")
+    if(ts) ts.value=bestTechId
+  }
   _lastSuggestAddr = ""  // force refresh affichage
   suggestDates()
 }
