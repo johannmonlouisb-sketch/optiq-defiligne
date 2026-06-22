@@ -176,6 +176,49 @@ tr:hover td{background:var(--bg)}
 </style>
 </head>
 <body>
+
+<!-- ═══ ADMIN LOGIN OVERLAY ═══ -->
+<div id="adm-login" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.75);backdrop-filter:blur(6px);z-index:9999;display:flex;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:20px;padding:40px 36px;width:100%;max-width:400px;box-shadow:0 24px 64px rgba(0,0,0,.28);margin:16px">
+    <!-- Logo -->
+    <div style="text-align:center;margin-bottom:28px">
+      <svg width="48" height="48" viewBox="0 0 36 36" fill="none" style="margin-bottom:10px">
+        <circle cx="15.5" cy="15.5" r="10.5" stroke="#1565C0" stroke-width="3" fill="none"/>
+        <line x1="22" y1="22" x2="33" y2="33" stroke="#1565C0" stroke-width="3" stroke-linecap="round"/>
+        <circle cx="15.5" cy="15.5" r="3" fill="#1565C020"/>
+        <line x1="15.5" y1="9" x2="15.5" y2="11" stroke="#1565C0" stroke-width="2" stroke-linecap="round"/>
+        <line x1="15.5" y1="20" x2="15.5" y2="22" stroke="#1565C0" stroke-width="2" stroke-linecap="round"/>
+        <line x1="9" y1="15.5" x2="11" y2="15.5" stroke="#1565C0" stroke-width="2" stroke-linecap="round"/>
+        <line x1="20" y1="15.5" x2="22" y2="15.5" stroke="#1565C0" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <div style="font-size:22px;font-weight:800;color:#0F172A;letter-spacing:-.5px">OptiTechX</div>
+      <div style="font-size:13px;color:#64748B;margin-top:4px">Espace administrateur</div>
+    </div>
+    <!-- Champs -->
+    <div style="margin-bottom:14px">
+      <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Identifiant</label>
+      <input id="adm-login-id" type="text" placeholder="admin" autocomplete="username"
+        style="width:100%;padding:11px 14px;border:1.5px solid #D1D5DB;border-radius:10px;font-size:14px;font-family:inherit;outline:none;transition:border .15s"
+        onfocus="this.style.borderColor='#1565C0'" onblur="this.style.borderColor='#D1D5DB'"
+        onkeydown="if(event.key==='Enter')document.getElementById('adm-login-pw').focus()"/>
+    </div>
+    <div style="margin-bottom:20px">
+      <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Mot de passe</label>
+      <div style="position:relative">
+        <input id="adm-login-pw" type="password" placeholder="••••••••" autocomplete="current-password"
+          style="width:100%;padding:11px 44px 11px 14px;border:1.5px solid #D1D5DB;border-radius:10px;font-size:14px;font-family:inherit;outline:none;transition:border .15s"
+          onfocus="this.style.borderColor='#1565C0'" onblur="this.style.borderColor='#D1D5DB'"
+          onkeydown="if(event.key==='Enter')admLogin()"/>
+        <button onclick="admTogglePw()" tabindex="-1" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;color:#9CA3AF;padding:2px" id="adm-pw-eye">👁</button>
+      </div>
+    </div>
+    <button onclick="admLogin()" style="width:100%;padding:13px;background:#1565C0;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;transition:background .15s" onmouseover="this.style.background='#0D47A1'" onmouseout="this.style.background='#1565C0'">
+      Se connecter
+    </button>
+    <div id="adm-login-err" style="margin-top:12px;color:#C62828;font-size:13px;font-weight:600;text-align:center;min-height:18px"></div>
+  </div>
+</div>
+
 <!-- SIDEBAR -->
 <div id="sidebar">
     <div id="logo-z" style="display:flex;align-items:center;gap:10px;padding:4px 0">
@@ -206,6 +249,7 @@ tr:hover td{background:var(--bg)}
   <div class="ni" onclick="SV('import')" id="n-import"><span class="ic">📥</span><span>Import</span></div>
   <div class="ni" onclick="window.open('/report/index.html','_blank')" id="n-rapport-planning" title="Rapport Planning multi-agents" style="margin-top:4px;border-top:1px solid rgba(255,255,255,.1);padding-top:10px"><span class="ic">📊</span><span>Rapport Planning</span></div>
   <div id="sb-foot">
+    <div onclick="admLogout()" style="font-size:12px;color:rgba(255,255,255,.45);cursor:pointer;padding:6px 0;display:flex;align-items:center;gap:6px;margin-bottom:4px" onmouseover="this.style.color='rgba(255,255,255,.8)'" onmouseout="this.style.color='rgba(255,255,255,.45)'">🔒 Déconnexion</div>
     <p>OptiQ · v1.0</p>
     <span id="sb-count">1 209 interventions</span>
   </div>
@@ -4999,6 +5043,26 @@ function rParam(){
     </div>
   </div>
   <div class="ss">
+    <h2>🔐 Sécurité — Accès administrateur</h2>
+    <p style="font-size:12px;color:var(--gray);margin-bottom:14px">Identifiant et mot de passe pour se connecter à cet espace admin.</p>
+    <div class="srow" style="margin-bottom:10px"><label>Identifiant</label>
+      <input id="s-adm-id" value="${_admCreds.id||'admin'}" style="font-size:13px;max-width:200px" placeholder="admin"/>
+    </div>
+    <div class="srow" style="margin-bottom:10px"><label>Nouveau mot de passe</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="password" id="s-adm-pw1" placeholder="Nouveau mot de passe" style="font-size:13px;max-width:220px"/>
+        <input type="password" id="s-adm-pw2" placeholder="Confirmer" style="font-size:13px;max-width:180px"/>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <button class="bb bsm" onclick="saveAdmCreds()">💾 Enregistrer</button>
+      <span id="s-adm-msg" style="font-size:12px;color:#2E7D32"></span>
+    </div>
+    <div style="margin-top:12px;padding:10px 12px;background:#FFF3E0;border-left:3px solid var(--orange);border-radius:6px;font-size:12px;color:#6D4C41">
+      ⚠️ Si vous perdez votre mot de passe, réinitialisez-le via le code source (champ <code>_admCreds</code>).
+    </div>
+  </div>
+  <div class="ss">
     <h2>ℹ️ À propos</h2>
     <p style="font-size:13px;color:var(--gray);line-height:1.8"><strong>OptiQ</strong> — Plateforme de gestion technicien DEA<br>Phase 1 · Développé pour <strong>OptiQ</strong></p>
   </div>`
@@ -5044,7 +5108,8 @@ function buildSettingsPayload(){
     techs: TECHS.map(t=>({ id:t.id, name:t.name, init:t.init, vehicle:t.vehicle,
       conso:t.conso, avail:t.avail, color:t.color||'#1565C0', depotAddr:t.depotAddr||'',
       code: t.code||'' })),
-    types: Object.fromEntries(Object.entries(TYPES).map(([k,v])=>[k,{dur:v.dur}]))
+    types: Object.fromEntries(Object.entries(TYPES).map(([k,v])=>[k,{dur:v.dur}])),
+    adminCreds: { id: _admCreds.id, pw: _admCreds.pw }
   }
 }
 
@@ -5102,10 +5167,15 @@ async function loadSettings(){
         if(TYPES[k] && v.dur) TYPES[k].dur = v.dur
       }
     }
+    // Credentials admin
+    if(s.adminCreds?.id) _admCreds.id=s.adminCreds.id
+    if(s.adminCreds?.pw) _admCreds.pw=s.adminCreds.pw
     loadTechDepots() // merge avec localStorage pour lat/lng géocodés
   }catch(e){
     console.warn('loadSettings error:', e.message)
   }
+  // Vérifier l'auth après chargement des credentials réels
+  if(!_admAuthValid()) _showAdmLogin()
 }
 function deleteTech(id){
   const t=TECHS.find(t=>t.id===id); if(!t)return
@@ -8546,6 +8616,77 @@ function showNotionPanel(){
 
 
 <script>
+// ════════════════════════════════════════════════════════
+// AUTH ADMIN
+// ════════════════════════════════════════════════════════
+const ADM_SESSION_MS = 24 * 60 * 60 * 1000   // session 24h
+let _admCreds = { id: 'admin', pw: 'optitechx' }  // écrasé par /api/settings au boot
+
+function _admAuthValid(){
+  try{
+    const a=JSON.parse(localStorage.getItem('adm_auth')||'null')
+    return a && (Date.now()-a.ts)<ADM_SESSION_MS
+  }catch(e){return false}
+}
+function _showAdmLogin(){
+  const ov=document.getElementById('adm-login')
+  if(ov) ov.style.display='flex'
+  // Masquer l'app derrière l'overlay
+  document.getElementById('sidebar').style.visibility='hidden'
+  document.getElementById('main').style.visibility='hidden'
+  setTimeout(()=>document.getElementById('adm-login-id').focus(),100)
+}
+function _hideAdmLogin(){
+  const ov=document.getElementById('adm-login')
+  if(ov) ov.style.display='none'
+  document.getElementById('sidebar').style.visibility=''
+  document.getElementById('main').style.visibility=''
+}
+function admLogin(){
+  const id=(document.getElementById('adm-login-id').value||'').trim()
+  const pw=(document.getElementById('adm-login-pw').value||'')
+  const errEl=document.getElementById('adm-login-err')
+  if(id===_admCreds.id && pw===_admCreds.pw){
+    localStorage.setItem('adm_auth',JSON.stringify({ts:Date.now()}))
+    errEl.textContent=''
+    _hideAdmLogin()
+  } else {
+    errEl.textContent='Identifiant ou mot de passe incorrect'
+    document.getElementById('adm-login-pw').value=''
+    document.getElementById('adm-login-pw').focus()
+    setTimeout(()=>{ const e=document.getElementById('adm-login-err');if(e)e.textContent='' },3000)
+  }
+}
+function admLogout(){
+  if(!confirm('Se déconnecter de l\'espace admin ?')) return
+  localStorage.removeItem('adm_auth')
+  _showAdmLogin()
+  document.getElementById('adm-login-id').value=''
+  document.getElementById('adm-login-pw').value=''
+}
+function admTogglePw(){
+  const inp=document.getElementById('adm-login-pw')
+  const btn=document.getElementById('adm-pw-eye')
+  if(!inp)return
+  inp.type=inp.type==='password'?'text':'password'
+  if(btn)btn.textContent=inp.type==='password'?'👁':'🙈'
+}
+function saveAdmCreds(){
+  const newId=(document.getElementById('s-adm-id')?.value||'').trim()
+  const pw1=(document.getElementById('s-adm-pw1')?.value||'')
+  const pw2=(document.getElementById('s-adm-pw2')?.value||'')
+  const msg=document.getElementById('s-adm-msg')
+  if(!newId){if(msg){msg.textContent='⚠ Identifiant requis';msg.style.color='#C62828'}return}
+  if(pw1 && pw1!==pw2){if(msg){msg.textContent='⚠ Les mots de passe ne correspondent pas';msg.style.color='#C62828'}return}
+  if(newId) _admCreds.id=newId
+  if(pw1)   _admCreds.pw=pw1
+  autoSaveSettings(true)
+  if(msg){msg.textContent='✓ Sauvegardé';msg.style.color='#2E7D32';setTimeout(()=>{if(msg)msg.textContent=''},3000)}
+  // Effacer les champs mot de passe
+  const p1=document.getElementById('s-adm-pw1');if(p1)p1.value=''
+  const p2=document.getElementById('s-adm-pw2');if(p2)p2.value=''
+}
+
 // ── Init au chargement de la page ────────────────────────────────────────────
 ;(async function boot(){
   await loadSettings()
