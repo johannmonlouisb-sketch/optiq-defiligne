@@ -4575,11 +4575,24 @@ function isCoherentWithDay(date,addr,addedLoad){
 
 // Calcule le meilleur détour (km) pour insérer une adresse dans la tournée d'un tech
 // Utilise l'ordre planifié si dispo, sinon l'ordre des ivs
+// Résout les coords du dépôt propre à un tech (geocache ou champ depotLat/Lng, sinon dépôt global)
+function _techDepotCoords(techId){
+  const t=TB(techId)
+  if(t?.depotLat&&t?.depotLng) return {lat:t.depotLat,lng:t.depotLng}
+  if(t?.depotAddr){
+    const gc=gcache[t.depotAddr]
+    if(gc?.lat&&gc?.lng) return {lat:gc.lat,lng:gc.lng}
+  }
+  return {lat:window.dispatchCfg.depotLat||48.96,lng:window.dispatchCfg.depotLng||1.97}
+}
+
+// Calcule le meilleur détour (km) pour insérer une adresse dans la tournée d'un tech
+// Utilise l'ordre planifié si dispo, sinon l'ordre des ivs
 function _bestInsertDetour(techId, date, newAddr){
-  const depotLat=window.dispatchCfg.depotLat, depotLng=window.dispatchCfg.depotLng
+  const dep=_techDepotCoords(techId)
   const [nLat,nLng]=addrCoords(newAddr)
   const techIvs=ivs.filter(i=>i.date===date&&i.techId===techId)
-  if(!techIvs.length) return kmBetween(depotLat,depotLng,nLat,nLng)*2 // aller-retour seul
+  if(!techIvs.length) return kmBetween(dep.lat,dep.lng,nLat,nLng)*2 // aller-retour seul
 
   // Reconstituer l'ordre planifié
   const stored=(() => {
@@ -4592,8 +4605,8 @@ function _bestInsertDetour(techId, date, newAddr){
     ? stored.map(id=>techIvs.find(i=>i.id===id)).filter(Boolean)
     : techIvs
 
-  // Points : [depot, stop0, stop1, ..., depot]
-  const pts=[{lat:depotLat,lng:depotLng}, ...ordered.map(i=>{ const[la,lo]=addrCoords(i.addr);return{lat:la,lng:lo} }), {lat:depotLat,lng:depotLng}]
+  // Points : [depot propre du tech, stops..., depot]
+  const pts=[dep, ...ordered.map(i=>{ const[la,lo]=addrCoords(i.addr);return{lat:la,lng:lo} }), dep]
 
   // Tester chaque position d'insertion, garder le min detour
   let minDetour=Infinity
@@ -5144,11 +5157,13 @@ function saveTech(id){
   if(v)t.vehicle=v
   if(!isNaN(c)&&c>0)t.conso=c
   if(col)t.color=col
+  if(dep !== t.depotAddr){ t.depotLat=null; t.depotLng=null } // adresse changée → recalculer coords
   t.depotAddr=dep
   if(code) t.code=code
   autoSaveSettings()
   refreshTechSels()
   rParam()
+  if(dep && (!t.depotLat||!t.depotLng)) _warmTechDepotCoords()
 }
 function toggleCodeVis(id){
   const inp=document.getElementById("tcode-"+id)
@@ -5172,7 +5187,7 @@ function buildSettingsPayload(){
     depot,
     techs: TECHS.map(t=>({ id:t.id, name:t.name, init:t.init, vehicle:t.vehicle,
       conso:t.conso, avail:t.avail, color:t.color||'#1565C0', depotAddr:t.depotAddr||'',
-      code: t.code||'' })),
+      depotLat:t.depotLat||null, depotLng:t.depotLng||null, code: t.code||'' })),
     types: Object.fromEntries(Object.entries(TYPES).map(([k,v])=>[k,{dur:v.dur}])),
     adminCreds: { id: _admCreds.id, pw: _admCreds.pw }
   }
@@ -8778,10 +8793,31 @@ function saveAdmCreds(){
   const p2=document.getElementById('s-adm-pw2');if(p2)p2.value=''
 }
 
+// Géocode en arrière-plan les adresses dépôt des techs qui n'ont pas encore de coords
+async function _warmTechDepotCoords(){
+  for(const t of TECHS){
+    if(!t.depotAddr) continue
+    if(t.depotLat&&t.depotLng) continue // déjà connu
+    const gc=gcache[t.depotAddr]
+    if(gc?.lat&&gc?.lng){ t.depotLat=gc.lat; t.depotLng=gc.lng; continue }
+    try{
+      const found=(await _geocodeAddok(t.depotAddr))||(await _geocodeNominatim(t.depotAddr))
+      if(found?.lat&&found?.lng){
+        t.depotLat=found.lat; t.depotLng=found.lng
+        gcache[t.depotAddr]=found
+        try{localStorage.setItem('optiq_gcache',JSON.stringify(gcache))}catch(e){}
+        saveTechDepots()
+      }
+    }catch(e){}
+    await new Promise(r=>setTimeout(r,300)) // respecter les rate-limits API
+  }
+}
+
 // ── Init au chargement de la page ────────────────────────────────────────────
 ;(async function boot(){
   await loadSettings()
   initCloud()
+  _warmTechDepotCoords() // sans await — arrière-plan
 })()
 
 // ── Auto-chargement Notion au démarrage ──────────────────────────────────────
