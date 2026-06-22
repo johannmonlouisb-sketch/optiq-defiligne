@@ -4618,17 +4618,21 @@ function _bestInsertDetour(techId, date, newAddr){
   return Math.max(0,minDetour)
 }
 
+const _TRAVEL_PER_IV = 25  // estimation trajet moyen entre clients (min) — cohérent avec dashboard
+
 // Score complet pour un (date, tech) — plus bas = meilleur
 // Retourne null si le tech n'a pas la capacité
 function _scoreTechDate(techId, date, newAddr, ivMin){
-  const buf=1-(window.dispatchCfg.bufferPct||30)/100
-  const perTechMax=Math.min(window.dispatchCfg.maxDayHours,window.dispatchCfg.maxLegalHours)*60*buf
-  const techLoad=ivs.filter(i=>i.date===date&&i.techId===techId).reduce((a,i)=>a+dur(i.type,i.form),0)
-  if(techLoad+ivMin>perTechMax) return null  // pas de place
+  const dayMax = Math.min(window.dispatchCfg.maxDayHours, window.dispatchCfg.maxLegalHours) * 60  // ex: 540 min (9h)
+  const perTechMax = dayMax * 0.90  // seuil à 90% — garder 10% pour imprévus
+  // Charge réelle = travail + trajet pour chaque intervention déjà planifiée
+  const techIvs = ivs.filter(i=>i.date===date&&i.techId===techId)
+  const techLoad = techIvs.reduce((a,i)=>a+dur(i.type,i.form)+_TRAVEL_PER_IV, 0)
+  if(techLoad+ivMin>perTechMax) return null  // journée pleine
 
   const detour=_bestInsertDetour(techId, date, newAddr)
-  const loadPct=Math.round(techLoad/perTechMax*100)
-  // Pénalité charge : éviter les techs déjà à >80%
+  const loadPct=Math.round(techLoad/dayMax*100)  // % sur la vraie journée (pas le seuil buffered)
+  // Pénalité charge : éviter les techs déjà à >80% de leur vraie journée
   const loadPenalty=loadPct>80?200:loadPct>60?50:0
   // Bonus : coordonnées GPS précises = score plus fiable, on leur fait confiance
   const preciseBonus=_addrPrecise(newAddr)?0:30
@@ -7083,10 +7087,10 @@ function suggestDates(){
 
     const coherent = isCoherentWithDay(date, addr, {})
     const extraKm = Math.round(bestDetour)
-    const buf=1-(window.dispatchCfg.bufferPct||30)/100
-    const perTechMax=Math.min(window.dispatchCfg.maxDayHours,window.dispatchCfg.maxLegalHours)*60*buf
-    const techLoad=ivs.filter(i=>i.date===date&&i.techId===bestTech.id).reduce((a,i)=>a+dur(i.type,i.form),0)
-    const loadPct=Math.min(100,Math.round(techLoad/perTechMax*100))
+    const dayMax=Math.min(window.dispatchCfg.maxDayHours,window.dispatchCfg.maxLegalHours)*60
+    const techIvsDay=ivs.filter(i=>i.date===date&&i.techId===bestTech.id)
+    const techLoad=techIvsDay.reduce((a,i)=>a+dur(i.type,i.form)+_TRAVEL_PER_IV,0)
+    const loadPct=Math.min(100,Math.round(techLoad/dayMax*100))
     const dept = extractDept(addr)
     const sameDeptIvs = dayIvs.filter(i=>extractDept(i.addr)===dept)
     const absentNames = TECHS.filter(t=>t.avail&&isTechAbsent(t.id,date)).map(t=>t.name)
