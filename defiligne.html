@@ -4963,6 +4963,12 @@ function rParam(){
         <span style="font-size:12px;color:var(--gray);white-space:nowrap;flex-shrink:0">🏠 Dépôt spécifique</span>
         <input id="tdep-${t.id}" value="${t.depotAddr||''}" placeholder="Laisser vide = dépôt global (${depot})" style="flex:1;font-size:12px;padding:5px 9px" onchange="saveTech(${t.id})"/>
       </div>
+      <div style="display:flex;align-items:center;gap:8px;padding-top:6px;border-top:1px solid var(--border)">
+        <span style="font-size:12px;color:var(--gray);white-space:nowrap;flex-shrink:0">🔑 Code PIN (4 chiffres)</span>
+        <input type="password" id="tcode-${t.id}" value="${t.code||''}" maxlength="4" pattern="[0-9]{4}" placeholder="••••" style="font-size:16px;width:80px;letter-spacing:4px;padding:5px 9px;font-family:monospace" onchange="saveTech(${t.id})" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,4)"/>
+        <button onclick="toggleCodeVis(${t.id})" id="tcode-eye-${t.id}" title="Voir/masquer le code" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--gray);padding:4px">👁</button>
+        ${t.code?`<span style="font-size:11px;color:#2E7D32">✓ défini</span>`:`<span style="font-size:11px;color:#E65100">non défini</span>`}
+      </div>
       ${ivCount?`<div style="font-size:11px;color:var(--gray);margin-top:6px">📋 ${ivCount} intervention${ivCount>1?"s":""} dans la base</div>`:""}
     </div>`}).join("")}
     <button class="bb bsm" onclick="addTech()">➕ Ajouter technicien</button>
@@ -5004,14 +5010,23 @@ function saveTech(id){
   const c=parseFloat(document.getElementById("tc-"+id)?.value)
   const col=document.getElementById("tcol-"+id)?.value
   const dep=(document.getElementById("tdep-"+id)?.value||"").trim()
+  const code=(document.getElementById("tcode-"+id)?.value||"").replace(/[^0-9]/g,'').slice(0,4)
   if(n){t.name=n;t.init=n.substring(0,2).toUpperCase()}
   if(v)t.vehicle=v
   if(!isNaN(c)&&c>0)t.conso=c
   if(col)t.color=col
   t.depotAddr=dep
+  if(code) t.code=code
   autoSaveSettings()
   refreshTechSels()
   rParam()
+}
+function toggleCodeVis(id){
+  const inp=document.getElementById("tcode-"+id)
+  const btn=document.getElementById("tcode-eye-"+id)
+  if(!inp)return
+  inp.type=inp.type==="password"?"text":"password"
+  if(btn)btn.textContent=inp.type==="password"?"👁":"🙈"
 }
 function togTechParam(id){const t=TECHS.find(t=>t.id===id);if(t)t.avail=!t.avail;autoSaveSettings(true);rParam()}
 
@@ -5027,7 +5042,8 @@ function buildSettingsPayload(){
   return {
     depot,
     techs: TECHS.map(t=>({ id:t.id, name:t.name, init:t.init, vehicle:t.vehicle,
-      conso:t.conso, avail:t.avail, color:t.color||'#1565C0', depotAddr:t.depotAddr||'' })),
+      conso:t.conso, avail:t.avail, color:t.color||'#1565C0', depotAddr:t.depotAddr||'',
+      code: t.code||'' })),
     types: Object.fromEntries(Object.entries(TYPES).map(([k,v])=>[k,{dur:v.dur}]))
   }
 }

@@ -991,6 +991,8 @@ function goTab(tab){
 // SÉLECTION TECH
 // ════════════════════════════════════════════
 function openTechSelect(){
+  // Chaque tech ne peut voir que sa propre tournée — le sélecteur est désactivé après login
+  if(_authValid()) return
   document.getElementById("tech-opts").innerHTML=TECHS.filter(t=>t.avail!==false).map(t=>{
     const myCount=ivs.filter(i=>i.techId===t.id&&i.date>=TODAY()&&i.status==="pending").length
     return `<div class="tech-opt ${t.id===curTech?"on":""}" onclick="selectTech(${t.id})">
@@ -2808,6 +2810,9 @@ function hideLogin(){
   const ov=document.getElementById('login-overlay')
   if(ov) ov.style.display='none'
   document.getElementById('app').style.display=''
+  // Masquer le bouton de sélection de tech — chaque tech ne voit que sa tournée
+  const btn=document.getElementById('btn-tech')
+  if(btn) btn.style.display='none'
 }
 function _buildLoginTechs(){
   const list=document.getElementById('login-tech-list')
@@ -2879,6 +2884,8 @@ function _submitPin(){
 function logout(){
   if(!confirm('Se déconnecter ?')) return
   _clearAuth()
+  const btn=document.getElementById('btn-tech')
+  if(btn) btn.style.display=''
   showLogin()
 }
 
@@ -2916,10 +2923,11 @@ if(isDeployedApp){
         if(d.color)   t.color=d.color
         if(d.depotAddr!==undefined) t.depotAddr=d.depotAddr
         if(d.avail!==undefined)     t.avail=d.avail
+        if(d.code)                  t.code=d.code
       } else if(d.id && d.name){
         TECHS.push({id:d.id,name:d.name,init:d.init||d.name.substring(0,2).toUpperCase(),
           vehicle:d.vehicle||'—',conso:d.conso||7.0,avail:d.avail!==false,
-          color:d.color||'#607D8B',depotAddr:d.depotAddr||''})
+          color:d.color||'#607D8B',depotAddr:d.depotAddr||'',code:d.code||''})
       }
     })
     if(s.depot) window._settingsDepot=s.depot
