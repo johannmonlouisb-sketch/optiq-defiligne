@@ -217,6 +217,71 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
 </style>
 </head>
 <body>
+
+<!-- ═══ LOGIN OVERLAY ═══ -->
+<div id="login-overlay" style="display:none;position:fixed;inset:0;background:linear-gradient(160deg,#0D47A1 0%,#1565C0 60%,#1976D2 100%);z-index:9999;overflow-y:auto;-webkit-overflow-scrolling:touch">
+  <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 20px">
+
+    <!-- Branding -->
+    <div style="text-align:center;margin-bottom:36px">
+      <div style="font-size:48px;margin-bottom:10px">🚀</div>
+      <div style="font-size:26px;font-weight:800;color:#fff;letter-spacing:-.5px">OptiTechX</div>
+      <div style="font-size:13px;color:rgba(255,255,255,.65);margin-top:4px">Espace technicien</div>
+    </div>
+
+    <!-- Étape 1 : choix du technicien -->
+    <div id="login-step1" style="width:100%;max-width:340px">
+      <div style="font-size:13px;color:rgba(255,255,255,.75);text-align:center;margin-bottom:16px;font-weight:500">Qui êtes-vous ?</div>
+      <div id="login-tech-list" style="display:flex;flex-direction:column;gap:10px"></div>
+    </div>
+
+    <!-- Étape 2 : saisie du code PIN -->
+    <div id="login-step2" style="display:none;width:100%;max-width:300px;text-align:center">
+      <div id="login-tech-name" style="font-size:20px;font-weight:800;color:#fff;margin-bottom:4px"></div>
+      <div style="font-size:13px;color:rgba(255,255,255,.65);margin-bottom:28px">Entrez votre code à 4 chiffres</div>
+
+      <!-- Points indicateurs -->
+      <div id="pin-dots" style="display:flex;gap:16px;justify-content:center;margin-bottom:28px">
+        <div class="pin-dot" id="pd0"></div>
+        <div class="pin-dot" id="pd1"></div>
+        <div class="pin-dot" id="pd2"></div>
+        <div class="pin-dot" id="pd3"></div>
+      </div>
+
+      <!-- Pavé numérique -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0 auto">
+        <button class="pin-btn" onclick="pinDigit('1')">1</button>
+        <button class="pin-btn" onclick="pinDigit('2')">2</button>
+        <button class="pin-btn" onclick="pinDigit('3')">3</button>
+        <button class="pin-btn" onclick="pinDigit('4')">4</button>
+        <button class="pin-btn" onclick="pinDigit('5')">5</button>
+        <button class="pin-btn" onclick="pinDigit('6')">6</button>
+        <button class="pin-btn" onclick="pinDigit('7')">7</button>
+        <button class="pin-btn" onclick="pinDigit('8')">8</button>
+        <button class="pin-btn" onclick="pinDigit('9')">9</button>
+        <button class="pin-btn pin-btn-back" onclick="loginBack()">←</button>
+        <button class="pin-btn" onclick="pinDigit('0')">0</button>
+        <button class="pin-btn pin-btn-del" onclick="pinDel()">⌫</button>
+      </div>
+
+      <div id="pin-error" style="color:#FF8A80;font-size:13px;font-weight:600;margin-top:16px;min-height:20px"></div>
+    </div>
+
+  </div>
+</div>
+
+<style>
+.pin-dot{width:14px;height:14px;border-radius:50%;background:rgba(255,255,255,.25);border:2px solid rgba(255,255,255,.5);transition:background .15s}
+.pin-dot.filled{background:#fff;border-color:#fff}
+.pin-btn{background:rgba(255,255,255,.15);border:none;color:#fff;font-size:22px;font-weight:600;border-radius:50%;width:72px;height:72px;cursor:pointer;transition:background .1s;-webkit-tap-highlight-color:transparent}
+.pin-btn:active{background:rgba(255,255,255,.35)}
+.pin-btn-back{font-size:14px;color:rgba(255,255,255,.55);background:transparent}
+.pin-btn-del{font-size:18px}
+.login-tech-btn{display:flex;align-items:center;gap:14px;padding:14px 18px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:14px;cursor:pointer;transition:background .15s;width:100%}
+.login-tech-btn:active{background:rgba(255,255,255,.25)}
+.login-av{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;flex-shrink:0}
+</style>
+
 <div id="app">
 
   <!-- TOPBAR -->
@@ -425,9 +490,14 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
         </div>
 
         <!-- Export -->
-        <div class="card" style="margin:0 0 20px">
+        <div class="card" style="margin:0 0 12px">
           <div style="font-size:14px;font-weight:700;margin-bottom:10px">📤 Exporter</div>
           <button class="btn btn-gray btn-sm" style="width:100%" onclick="exportJournee()">Exporter ma journée (.txt)</button>
+        </div>
+
+        <!-- Déconnexion -->
+        <div class="card" style="margin:0 0 20px">
+          <button onclick="logout()" style="width:100%;padding:12px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer">🔒 Se déconnecter</button>
         </div>
       </div>
     </div>
@@ -509,11 +579,11 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
 // DONNÉES — synchronisées avec l'app admin
 // ════════════════════════════════════════════
 const TECHS_DEFAULT=[
-  {id:1,name:"Cindy",     init:"CI",vehicle:"Renault Trafic", conso:7.5,avail:true, color:"#1565C0",depotAddr:"7 rue des entrepreneurs, 78540 Vernouillet"},
-  {id:2,name:"Priscillia",init:"PR",vehicle:"Citroën Jumpy",  conso:7.0,avail:true, color:"#7B1FA2",depotAddr:"7 rue des entrepreneurs, 78540 Vernouillet"},
-  {id:3,name:"Yaniss",    init:"YA",vehicle:"Peugeot Expert", conso:6.8,avail:true, color:"#00695C",depotAddr:"7 rue des entrepreneurs, 78540 Vernouillet"},
-  {id:4,name:"Nathan",    init:"NA",vehicle:"—",              conso:7.0,avail:true, color:"#B71C1C",depotAddr:"7 rue des entrepreneurs, 78540 Vernouillet"},
-  {id:5,name:"Johann",    init:"JO",vehicle:"—",              conso:7.0,avail:true, color:"#E65100",depotAddr:"7 rue des entrepreneurs, 78540 Vernouillet"},
+  {id:1,name:"Cindy",     init:"CI",vehicle:"Renault Trafic", conso:7.5,avail:true, color:"#1565C0",depotAddr:"7 rue des entrepreneurs, 78540 Vernouillet",code:"1111"},
+  {id:2,name:"Priscillia",init:"PR",vehicle:"Citroën Jumpy",  conso:7.0,avail:true, color:"#7B1FA2",depotAddr:"7 rue des entrepreneurs, 78540 Vernouillet",code:"2222"},
+  {id:3,name:"Yaniss",    init:"YA",vehicle:"Peugeot Expert", conso:6.8,avail:true, color:"#00695C",depotAddr:"7 rue des entrepreneurs, 78540 Vernouillet",code:"3333"},
+  {id:4,name:"Nathan",    init:"NA",vehicle:"—",              conso:7.0,avail:true, color:"#B71C1C",depotAddr:"7 rue des entrepreneurs, 78540 Vernouillet",code:"4444"},
+  {id:5,name:"Johann",    init:"JO",vehicle:"—",              conso:7.0,avail:true, color:"#E65100",depotAddr:"7 rue des entrepreneurs, 78540 Vernouillet",code:"5555"},
 ]
 let TECHS=TECHS_DEFAULT
 try{
@@ -2706,6 +2776,113 @@ function startNotionPolling(){
 }
 
 // ════════════════════════════════════════════
+// AUTH / LOGIN
+// ════════════════════════════════════════════
+const AUTH_DURATION_MS = 12 * 60 * 60 * 1000  // session valide 12h
+
+function _getAuth(){
+  try{const a=JSON.parse(localStorage.getItem('tech_auth')||'null');return a}catch(e){return null}
+}
+function _setAuth(id){
+  localStorage.setItem('tech_auth',JSON.stringify({id,ts:Date.now()}))
+}
+function _clearAuth(){
+  localStorage.removeItem('tech_auth')
+}
+function _authValid(){
+  const a=_getAuth()
+  return a && a.id && (Date.now()-a.ts)<AUTH_DURATION_MS
+}
+
+let _loginTechId = null
+let _pinVal = ''
+
+function showLogin(){
+  const ov=document.getElementById('login-overlay')
+  if(ov) ov.style.display='block'
+  document.getElementById('app').style.display='none'
+  _buildLoginTechs()
+  _showStep(1)
+}
+function hideLogin(){
+  const ov=document.getElementById('login-overlay')
+  if(ov) ov.style.display='none'
+  document.getElementById('app').style.display=''
+}
+function _buildLoginTechs(){
+  const list=document.getElementById('login-tech-list')
+  if(!list) return
+  list.innerHTML=TECHS.filter(t=>t.avail!==false).map(t=>`
+    <button class="login-tech-btn" onclick="loginSelectTech(${t.id})">
+      <div class="login-av" style="background:${t.color||'#1565C0'}30;color:${t.color||'#1565C0'}">${t.init}</div>
+      <div style="text-align:left">
+        <div style="font-size:16px;font-weight:700;color:#fff">${t.name}</div>
+        <div style="font-size:12px;color:rgba(255,255,255,.55)">${t.vehicle||'—'}</div>
+      </div>
+      <div style="margin-left:auto;color:rgba(255,255,255,.4);font-size:18px">›</div>
+    </button>`).join('')
+}
+function loginSelectTech(id){
+  _loginTechId=id
+  _pinVal=''
+  const tc=TECHS.find(t=>t.id===id)
+  document.getElementById('login-tech-name').textContent=tc?tc.name:'?'
+  _updatePinDots()
+  document.getElementById('pin-error').textContent=''
+  _showStep(2)
+}
+function loginBack(){
+  _pinVal=''
+  _updatePinDots()
+  document.getElementById('pin-error').textContent=''
+  _showStep(1)
+}
+function _showStep(n){
+  document.getElementById('login-step1').style.display=n===1?'':'none'
+  document.getElementById('login-step2').style.display=n===2?'':'none'
+}
+function pinDigit(d){
+  if(_pinVal.length>=4) return
+  _pinVal+=d
+  _updatePinDots()
+  if(_pinVal.length===4) _submitPin()
+}
+function pinDel(){
+  _pinVal=_pinVal.slice(0,-1)
+  _updatePinDots()
+}
+function _updatePinDots(){
+  for(let i=0;i<4;i++){
+    const el=document.getElementById('pd'+i)
+    if(el) el.classList.toggle('filled',i<_pinVal.length)
+  }
+}
+function _submitPin(){
+  const tc=TECHS.find(t=>t.id===_loginTechId)
+  const expectedCode=tc?.code || TECHS_DEFAULT.find(t=>t.id===_loginTechId)?.code || ''
+  if(_pinVal===expectedCode){
+    _setAuth(_loginTechId)
+    curTech=_loginTechId
+    localStorage.setItem('tech_id',_loginTechId)
+    hideLogin()
+    _restoreTourState()
+    updateTopbar();updateBadges();goTab(curTab)
+  } else {
+    document.getElementById('pin-error').textContent='Code incorrect, réessayez'
+    _pinVal=''
+    setTimeout(()=>{
+      _updatePinDots()
+      document.getElementById('pin-error').textContent=''
+    },800)
+  }
+}
+function logout(){
+  if(!confirm('Se déconnecter ?')) return
+  _clearAuth()
+  showLogin()
+}
+
+// ════════════════════════════════════════════
 // INIT
 // ════════════════════════════════════════════
 try{const s=localStorage.getItem("tech_id");if(s)curTech=parseInt(s)}catch(e){}
@@ -2756,9 +2933,18 @@ try{
   const t=sessionStorage.getItem('optiq_tech_tab')||localStorage.getItem('optiq_tech_tab')
   if(t)curTab=t
 }catch(e){}
-updateTopbar()
-goTab(curTab)
-updateBadges()
+
+// ── Auth : afficher le login si la session a expiré ──────────────────────────
+if(!_authValid()){
+  showLogin()
+} else {
+  // Restaurer le technicien depuis l'auth sauvegardée
+  const _a=_getAuth()
+  if(_a?.id){ curTech=_a.id; localStorage.setItem('tech_id',_a.id) }
+  updateTopbar()
+  goTab(curTab)
+  updateBadges()
+}
 
 // ── Auto-chargement Notion au démarrage (année passée + en cours) ─────────────
 ;(async function autoLoadNotionTech(){
