@@ -725,6 +725,15 @@ let TECHS=[
 ]
 // ── Absences techniciens (persistées localStorage, semaine courante) ──
 let techAbsences = {}
+function _applyAbsences(val){
+  if(!val||typeof val!=='object') return
+  // Fusionner en gardant les dates futures/présentes
+  Object.assign(techAbsences, val)
+  // Nettoyer les dates trop anciennes
+  const cutoff=addDays(TODAY,-7)
+  Object.keys(techAbsences).forEach(d=>{if(d<cutoff)delete techAbsences[d]})
+  localStorage.setItem('optiq_absences',JSON.stringify(techAbsences))
+}
 function loadAbsences(){
   try{
     const s=localStorage.getItem('optiq_absences')
@@ -732,8 +741,26 @@ function loadAbsences(){
     const cutoff=addDays(TODAY,-7)
     Object.keys(techAbsences).forEach(d=>{if(d<cutoff)delete techAbsences[d]})
   }catch(e){}
+  // Charger depuis Supabase (priorité sur localStorage)
+  if(isDeployed){
+    sbGet('app_state?key=eq.optiq_absences&select=value')
+      .then(rows=>{ if(rows[0]?.value){ _applyAbsences(rows[0].value); if(curView==='depart') rDepart() } })
+      .catch(e=>console.warn('absences load:',e.message))
+  }
 }
-function saveAbsences(){ localStorage.setItem('optiq_absences',JSON.stringify(techAbsences)) }
+function saveAbsences(){
+  localStorage.setItem('optiq_absences',JSON.stringify(techAbsences))
+  // Sync Supabase en arrière-plan
+  if(isDeployed){
+    sbGet('app_state?key=eq.optiq_absences&select=value').then(rows=>{
+      const merged=Object.assign({},rows[0]?.value||{},techAbsences)
+      fetch(`${SB_URL}/rest/v1/app_state`,{method:'POST',headers:{
+        'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,
+        'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'
+      },body:JSON.stringify({key:'optiq_absences',value:merged})}).catch(e=>console.warn('absences sync:',e.message))
+    }).catch(e=>console.warn('absences fetch:',e.message))
+  }
+}
 function isTechAbsent(techId,date){ return !!(techAbsences[date]&&techAbsences[date].includes(techId)) }
 function toggleTechAbsent(techId,date){
   if(!techAbsences[date]) techAbsences[date]=[]
@@ -7865,6 +7892,20 @@ function initCloud(){
             if(!val || typeof val !== 'object') return
             _tourProgressData = val
             if(curView==='dashboard') renderTourTracker()
+          })
+          .subscribe()
+
+        // Canal absences tech — dispo/indispo par jour
+        sbClient.channel('absences-sync')
+          .on('postgres_changes',{
+            event:'*', schema:'public', table:'app_state',
+            filter:'key=eq.optiq_absences'
+          }, payload => {
+            const val = payload.new?.value
+            if(!val||typeof val!=='object') return
+            _applyAbsences(val)
+            if(curView==='depart') rDepart()
+            else if(curView==='dashboard') rDash()
           })
           .subscribe()
 
