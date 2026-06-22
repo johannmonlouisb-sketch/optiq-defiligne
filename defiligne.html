@@ -2468,6 +2468,35 @@ function matSummaryHTML(techIvs, techName){
   </div>`
 }
 
+// Version compacte pour Départ & Carte — catégories + comptages sans détails
+function matSummaryCompact(techIvs){
+  // Compter par catégorie
+  let dae=0, arm=0, padPak=0, padPakPed=0, bat=0, elec=0, hasUrgent=false
+  for(const iv of techIvs){
+    const inst=iv.type==="installation"
+    const hasDae=(inst)||(iv.dea&&iv.dea!=="0"&&iv.dea!==0)
+    const hasArm=(inst)||(iv.arm&&iv.arm!=="0"&&iv.arm!==0)
+    if(hasDae) dae++
+    if(hasArm) arm++
+    if(iv.padPak||iv.type==='maintenance_complex') padPak++
+    if(iv.padPakDatePed&&Math.round((new Date(iv.padPakDatePed+"T12:00:00")-new Date())/86400000)<180) padPakPed++
+    if(iv.batChange) bat++
+    if(iv.electrodeDate&&Math.round((new Date(iv.electrodeDate+"T12:00:00")-new Date())/86400000)<90) elec++
+    // Détecter urgences
+    if(iv.urgencePadPak==='expired'||iv.urgencePadPak==='urgent') hasUrgent=true
+  }
+  if(!dae&&!arm&&!padPak&&!padPakPed&&!bat&&!elec) return ""
+  const chip=(label,col="#1565C0",bg="#E3F2FD")=>`<span style="background:${bg};color:${col};padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap">${label}</span>`
+  const parts=[]
+  if(dae)   parts.push(chip(`🫀 ${dae} DAE`,"#1B5E20","#E8F5E9"))
+  if(arm)   parts.push(chip(`🗄️ ${arm} armoire${arm>1?"s":""}`))
+  if(padPak) parts.push(chip(`⚡ ${padPak} Pad Pak`,hasUrgent?"#C62828":"#E65100",hasUrgent?"#FFEBEE":"#FFF3E0"))
+  if(padPakPed) parts.push(chip(`⚡ ${padPakPed} Pad Pak péd.`,"#E65100","#FFF3E0"))
+  if(bat)   parts.push(chip(`🔋 ${bat} batterie${bat>1?"s":""}`,"#1B5E20","#F1F8E9"))
+  if(elec)  parts.push(chip(`⚡ ${elec} électrode${elec>1?"s":""}`,"#E65100","#FFF3E0"))
+  return `<div style="display:flex;gap:5px;flex-wrap:wrap;padding:5px 0 2px">${parts.join("")}</div>`
+}
+
 // DÉPART DU JOUR — TABLET OPTIMIZED
 // ═══════════════════════════════════════════════════════
 function rDepart(){
@@ -2573,8 +2602,9 @@ function rDepart(){
           </button>
         </div>
       </div>`
-      // ── Résumé matériel du technicien ──
-      html+=matSummaryHTML(techIvs,tc.name)
+      // ── Résumé matériel compact (catégories + comptages) ──
+      const matCompact=matSummaryCompact(techIvs)
+      if(matCompact) html+=`<div style="padding:2px 4px 6px;margin-left:2px">${matCompact}</div>`
       // ── Cartes interventions du technicien ──
       techIvs.forEach((iv,techIdx)=>{
         const done=depValidated[iv.id],fail=depFailed[iv.id]
