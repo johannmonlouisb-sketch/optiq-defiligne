@@ -2244,12 +2244,19 @@ ${iv.contact?`<div style="font-size:11px;color:#6A1B9A;margin-top:2px">👤 ${iv
         </div>
       </div>
       <div class="card">
-        <h3 style="font-size:13px;font-weight:600;margin-bottom:10px">Matériel à emporter</h3>
-        ${[["🗄️","Armoires",mat.arm],["⚡","DEA",mat.dea],["🔋","Batteries",mat.bat]].map(([i,l,v],idx)=>`
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;${idx<2?"border-bottom:1px solid var(--bg)":""}">
-          <span style="font-size:13px;color:var(--gray)">${i} ${l}</span>
-          <span style="font-size:17px;font-weight:700;color:${v>0?"var(--blue)":"var(--gray)"}">${v}</span>
-        </div>`).join("")}
+        <h3 style="font-size:13px;font-weight:600;margin-bottom:12px">📦 Matériel à emporter</h3>
+        ${(()=>{
+          const techsWithIvs=TECHS.filter(t=>t.avail).map(t=>({t,ivs:day.filter(i=>i.techId===t.id)})).filter(({ivs})=>ivs.length)
+          if(!techsWithIvs.length) return `<div style="font-size:12px;color:var(--gray)">Aucune intervention</div>`
+          return techsWithIvs.map(({t,ivs:tIvs})=>{
+            const sumHtml=matSummaryHTML(tIvs,t.name)
+            if(!sumHtml) return ''
+            return `<div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--bg)">
+              <div style="display:flex;align-items:center;gap:7px;margin-bottom:6px">${ava(t.init,20,t.color||'#1565C0')}<span style="font-size:12px;font-weight:700;color:var(--dark)">${t.name}</span></div>
+              ${sumHtml}
+            </div>`
+          }).join('') || `<div style="font-size:12px;color:var(--gray)">Rien de spécial à préparer</div>`
+        })()}
       </div>
     </div>
   </div>`
