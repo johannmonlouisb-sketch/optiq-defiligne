@@ -502,7 +502,7 @@ tr:hover td{background:var(--bg)}
       </div>
       <div class="np-prop">
         <div class="np-lbl">📅 Date <span style="font-size:10px;color:var(--blue);font-weight:normal">(auto-suggérée)</span></div>
-        <input type="date" id="m-date" class="np-val" onchange="onDateChange();autoSaveField()"/>
+        <input type="date" id="m-date" class="np-val" onchange="onDateChange();autoSaveFieldNow()"/>
       </div>
       <div class="np-prop">
         <div class="np-lbl">👤 Technicien</div>
@@ -5102,6 +5102,13 @@ function autoSaveFieldNow(){
   clearTimeout(autoSaveField._notionT)  // annule le debounce
   const updated=ivs.find(i=>i.id===id)
   if(updated) pushIvToNotion(updated)   // push Notion immédiat
+  // Rafraîchir la vue en arrière-plan (après le rendu de la fiche)
+  setTimeout(()=>{
+    if(curView==='dashboard') rDash()
+    else if(curView==='depart') rDepart()
+    else if(curView==='planning') rPlan()
+    else if(curView==='interventions') rIv()
+  }, 50)
 }
 function deleteIv(){
   const id=parseInt(document.getElementById("m-id").value)
