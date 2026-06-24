@@ -576,9 +576,6 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && ddOpen) closeDropdown()
 })
 
-const existing = (() => { try { return JSON.parse(localStorage.getItem('optiq_session')) } catch{} return null })()
-if (existing?.token) location.href = existing.role === 'admin' ? '/defiligne' : '/tech'
-
 applyTheme('tech')
 loadTechs(); buildKeypad(); renderDots()
 </script>
