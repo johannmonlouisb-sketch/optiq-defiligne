@@ -5283,6 +5283,41 @@ function rParam(){
     </div>`}).join("")}
     <button class="bb bsm" onclick="addTech()">➕ Ajouter technicien</button>
   </div>
+
+  <div class="ss" id="ss-login-access">
+    <h2>🔐 Accès login techniciens</h2>
+    <p style="font-size:13px;color:var(--gray);margin-bottom:14px">Gérez qui peut se connecter via la page d'identification. Les modifications sont actives immédiatement.</p>
+    <div id="login-access-list">
+      ${TECHS.map(t=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)" id="la-row-${t.id}">
+        ${ava(t.init,32,t.color||'#1565C0')}
+        <div style="flex:1;font-size:14px;font-weight:600">${t.name}</div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <input type="password" id="la-pin-${t.id}" value="${t.code||''}" maxlength="4"
+            placeholder="PIN" style="width:72px;font-size:15px;letter-spacing:3px;padding:5px 8px;font-family:monospace;border-radius:6px;border:1.5px solid var(--border)"
+            oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,4)"
+            onchange="savePinAccess(${t.id})"/>
+          <button onclick="togglePinVis2(${t.id})" title="Voir/masquer" style="background:none;border:none;cursor:pointer;font-size:15px;color:var(--gray);padding:4px" id="la-eye-${t.id}">👁</button>
+          ${t.code?`<span style="font-size:11px;color:#2E7D32;white-space:nowrap">✓ accès actif</span>`:`<span style="font-size:11px;color:#9E9E9E;white-space:nowrap">sans accès</span>`}
+        </div>
+        <button onclick="revokePinAccess(${t.id})" title="Révoquer l'accès" style="padding:4px 10px;border-radius:6px;border:1px solid #FFCDD2;background:#FFEBEE;color:#C62828;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap">Révoquer</button>
+      </div>`).join('')}
+    </div>
+    <div style="display:flex;gap:8px;margin-top:14px;align-items:flex-end">
+      <div style="flex:1">
+        <label class="lbl">Nouveau prénom</label>
+        <input id="la-new-name" placeholder="ex: Marie" style="font-size:13px;width:100%"/>
+      </div>
+      <div style="width:90px">
+        <label class="lbl">PIN (4 chiffres)</label>
+        <input id="la-new-pin" type="password" maxlength="4" placeholder="••••" style="font-size:14px;letter-spacing:3px;font-family:monospace;width:100%"
+          oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,4)"/>
+      </div>
+      <button class="bb bsm" onclick="addLoginAccess()" style="white-space:nowrap;margin-bottom:1px">➕ Ajouter accès</button>
+    </div>
+    <div id="la-status" style="font-size:12px;margin-top:8px;color:var(--gray)"></div>
+  </div>
+
   <div class="ss">
     <h2>⏱️ Durées des interventions</h2>
     ${Object.entries(TYPES).map(([k,t])=>`
@@ -5376,6 +5411,55 @@ function toggleCodeVis(id){
   if(btn)btn.textContent=inp.type==="password"?"👁":"🙈"
 }
 function togTechParam(id){const t=TECHS.find(t=>t.id===id);if(t)t.avail=!t.avail;autoSaveSettings(true);rParam()}
+
+// ── Gestion accès login techniciens ─────────────────────────────────────
+function savePinAccess(id){
+  const t=TECHS.find(t=>t.id===id); if(!t)return
+  const pin=(document.getElementById("la-pin-"+id)?.value||"").replace(/[^0-9]/g,"").slice(0,4)
+  t.code=pin
+  autoSaveSettings(true)
+  const st=document.getElementById("la-status")
+  if(st){st.textContent=pin?`Code PIN de ${t.name} mis à jour.`:`Accès supprimé pour ${t.name}.`;setTimeout(()=>st.textContent="",2500)}
+  rParam()
+}
+
+function revokePinAccess(id){
+  const t=TECHS.find(t=>t.id===id); if(!t)return
+  t.code=""
+  autoSaveSettings(true)
+  rParam()
+}
+
+function togglePinVis2(id){
+  const inp=document.getElementById("la-pin-"+id)
+  const btn=document.getElementById("la-eye-"+id)
+  if(!inp)return
+  inp.type=inp.type==="password"?"text":"password"
+  if(btn)btn.textContent=inp.type==="password"?"👁":"🙈"
+}
+
+function addLoginAccess(){
+  const name=(document.getElementById("la-new-name")?.value||"").trim()
+  const pin=(document.getElementById("la-new-pin")?.value||"").replace(/[^0-9]/g,"").slice(0,4)
+  const st=document.getElementById("la-status")
+  if(!name){if(st)st.textContent="Entrez un prénom.";return}
+  if(pin.length!==4){if(st)st.textContent="Le PIN doit faire 4 chiffres.";return}
+  if(TECHS.find(t=>t.name.toLowerCase()===name.toLowerCase())){
+    // Tech existant : juste mettre à jour le PIN
+    const t=TECHS.find(t=>t.name.toLowerCase()===name.toLowerCase())
+    t.code=pin; autoSaveSettings(true); rParam()
+    if(st){st.textContent=`Code PIN de ${t.name} mis à jour.`;setTimeout(()=>st.textContent="",2500)}
+    return
+  }
+  // Nouveau technicien
+  const newId=Math.max(0,...TECHS.map(t=>t.id))+1
+  const init=name.substring(0,2).toUpperCase()
+  TECHS.push({id:newId,name,init,vehicle:"—",conso:7.0,avail:true,color:"#1565C0",code:pin})
+  autoSaveSettings(true)
+  refreshTechSels()
+  rParam()
+  if(st){st.textContent=`${name} ajouté avec accès login.`;setTimeout(()=>st.textContent="",2500)}
+}
 
 // ════════════════════════════════════════════════════════════
 // AUTO-SAVE PARAMÈTRES — Netlify Blobs (persistant cross-device)
