@@ -6,6 +6,16 @@
   NOTION_DB_KIZEO = "4326bdb2994b42509759a897ff7a4a1f"
 
 [[redirects]]
+  from   = "/login"
+  to     = "/login.html"
+  status = 200
+
+[[redirects]]
+  from   = "/api/auth/login"
+  to     = "/.netlify/functions/auth"
+  status = 200
+
+[[redirects]]
   from   = "/defiligne"
   to     = "/defiligne.html"
   status = 200
