@@ -506,7 +506,7 @@ tr:hover td{background:var(--bg)}
       </div>
       <div class="np-prop">
         <div class="np-lbl">👤 Technicien</div>
-        <select id="m-tech" class="np-val" onchange="autoSaveField()"></select>
+        <select id="m-tech" class="np-val" onchange="autoSaveFieldNow()"></select>
       </div>
       <div class="np-prop">
         <div class="np-lbl">💼 Commercial</div>
@@ -516,7 +516,7 @@ tr:hover td{background:var(--bg)}
       </div>
       <div class="np-prop">
         <div class="np-lbl">🏷️ Type</div>
-        <select id="m-type" class="np-val" onchange="autoSaveField()">
+        <select id="m-type" class="np-val" onchange="autoSaveFieldNow()">
           <option value="maintenance_simple">Annuel — Maintenance physique · 15 min</option>
           <option value="maintenance_complex">PAD PAK — Maintenance + consumables · 25 min</option>
           <option value="installation">Installation · 35 min</option>
@@ -525,7 +525,7 @@ tr:hover td{background:var(--bg)}
       </div>
       <div class="np-prop">
         <div class="np-lbl">📊 Statut</div>
-        <select id="m-status" class="np-val" onchange="autoSaveField()">
+        <select id="m-status" class="np-val" onchange="autoSaveFieldNow()">
           <option value="pending">En attente</option>
           <option value="confirmed">Confirmé</option>
           <option value="completed">Terminé</option>
@@ -5098,10 +5098,15 @@ function autoSaveField(){
 function autoSaveFieldNow(){
   const id=parseInt(document.getElementById("m-id").value)||null
   if(!id) return
-  autoSaveField()                    // sauvegarde + debounce habituel
+  autoSaveField()                       // sauvegarde ivs + cloudSave
   clearTimeout(autoSaveField._notionT)  // annule le debounce
   const updated=ivs.find(i=>i.id===id)
-  if(updated) pushIvToNotion(updated)  // push immédiat
+  if(updated) pushIvToNotion(updated)   // push Notion immédiat
+  // Rafraîchir la vue derrière la fiche
+  if(curView==='dashboard') rDash()
+  else if(curView==='depart') rDepart()
+  else if(curView==='planning') rPlan()
+  else if(curView==='interventions') rIv()
 }
 function deleteIv(){
   const id=parseInt(document.getElementById("m-id").value)
