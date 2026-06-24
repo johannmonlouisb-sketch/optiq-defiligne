@@ -727,6 +727,22 @@ let TECHS=[
 ]
 // ── Commerciaux ───────────────────────────────────────────────────────
 let COMMERCIALS = []   // [{id, name, email, phone, color}] — géré dans Paramètres
+let _NOTION_COMMERCIAL_PROP = ''  // nom exact de la propriété Commercial dans Notion (détecté au démarrage)
+
+async function _detectNotionCommercialProp(){
+  if(!isDeployedApp) return
+  try{
+    const d = await notionCall('get_db')
+    const props = d.properties || []
+    // Chercher une propriété contenant "commercial" (insensible à la casse et aux espaces)
+    const match = props.find(p => p.toLowerCase().replace(/\s/g,'') === 'commercial')
+    _NOTION_COMMERCIAL_PROP = match || ''
+    if(match) console.info('[Notion] Propriété commercial trouvée :', JSON.stringify(match))
+    else console.warn('[Notion] Propriété commercial absente de la DB — champ non synchronisé')
+  }catch(e){
+    console.warn('[Notion] Impossible de lire le schéma DB :', e.message)
+  }
+}
 
 function refreshCommercialSels(){
   const s=document.getElementById("m-commercial")
@@ -8830,7 +8846,9 @@ function _buildNotionPropsCore(iv){
   }
   if(iv.cphone)     props['Téléphone']   ={phone_number:iv.cphone}
   if(iv.cemail)     props['E-mail']      ={email:iv.cemail}
-  if(iv.commercial) props['Commercial '] ={select:{name:iv.commercial}}
+  // Commercial : uniquement si la propriété existe dans la DB (nom exact requis)
+  if(iv.commercial && _NOTION_COMMERCIAL_PROP)
+    props[_NOTION_COMMERCIAL_PROP] = {select:{name:iv.commercial}}
   return props
 }
 
@@ -9024,7 +9042,8 @@ async function _warmTechDepotCoords(){
 ;(async function boot(){
   await loadSettings()
   initCloud()
-  _warmTechDepotCoords() // sans await — arrière-plan
+  _warmTechDepotCoords()         // sans await — arrière-plan
+  _detectNotionCommercialProp()  // sans await — détecte le vrai nom de la propriété Commercial
 })()
 
 // ── Auto-chargement Notion au démarrage ──────────────────────────────────────

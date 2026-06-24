@@ -89,6 +89,14 @@ exports.handler = async (event) => {
         return { statusCode: r.status, headers: CORS, body: JSON.stringify(await r.json()) }
       }
 
+      // ── GET DB SCHEMA : liste les propriétés réelles de la DB ───────────
+      case 'get_db': {
+        const r = await fetch(`${NOTION_BASE}/databases/${dbId}`, { headers })
+        const d = await r.json()
+        const props = Object.keys(d.properties || {})
+        return { statusCode: r.status, headers: CORS, body: JSON.stringify({ properties: props }) }
+      }
+
       // ── UPDATE PAGE : modifier statut, technicien, etc. ─────────────────
       case 'update_page': {
         const { properties } = body
