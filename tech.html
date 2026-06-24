@@ -2923,9 +2923,8 @@ function _submitPin(){
 function logout(){
   if(!confirm('Se déconnecter ?')) return
   _clearAuth()
-  const btn=document.getElementById('btn-tech')
-  if(btn) btn.style.display=''
-  showLogin()
+  localStorage.removeItem('optiq_session')
+  location.href='/login'
 }
 
 // ════════════════════════════════════════════
@@ -2980,6 +2979,20 @@ try{
   const t=sessionStorage.getItem('optiq_tech_tab')||localStorage.getItem('optiq_tech_tab')
   if(t)curTab=t
 }catch(e){}
+
+// ── Connexion depuis la page login externe (optiq_session) ───────────────────
+;(()=>{
+  try{
+    const s=JSON.parse(localStorage.getItem('optiq_session')||'null')
+    if(!s?.token||s.role!=='tech'||!s.nom) return
+    if(Date.now()-(s.savedAt||0)>AUTH_DURATION_MS) return
+    const tc=TECHS.find(t=>t.name.toLowerCase()===s.nom.toLowerCase())
+    if(!tc) return
+    _setAuth(tc.id)
+    curTech=tc.id
+    localStorage.setItem('tech_id',tc.id)
+  }catch(e){}
+})()
 
 // ── Auth : afficher le login si la session a expiré ──────────────────────────
 if(!_authValid()){
