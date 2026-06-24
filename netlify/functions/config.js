@@ -4,9 +4,9 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: { ...CORS, 'Access-Control-Allow-Methods': 'GET,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' }, body: '' }
 
   // Liste des techniciens déduite de TECH_PINS (clés du JSON)
-  let techniciens = ['HERBET', 'BEUZELIN']
+  let techniciens = ['HERBET', 'BEUZELIN', 'JOHANN MONLOUIS']
   try {
-    const pins = JSON.parse(process.env.TECH_PINS || '{}')
+    const pins = JSON.parse(process.env.TECH_PINS || '{"HERBET":"","BEUZELIN":"","JOHANN MONLOUIS":"7802"}')
     const keys = Object.keys(pins)
     if (keys.length) techniciens = keys
   } catch {}

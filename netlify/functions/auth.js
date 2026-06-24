@@ -51,7 +51,7 @@ exports.handler = async (event) => {
     }
 
     let pins = {}
-    try { pins = JSON.parse(process.env.TECH_PINS || '{}') } catch {}
+    try { pins = JSON.parse(process.env.TECH_PINS || '{"HERBET":"","BEUZELIN":"","JOHANN MONLOUIS":"7802"}') } catch {}
 
     const key = nom.toUpperCase()
     const expected = pins[key] || pins[nom]
