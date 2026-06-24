@@ -13,7 +13,9 @@ export default async (request) => {
     const store = getStore({ name: 'optiq-config', consistency: 'strong' })
     const settings = await store.get('settings', { type: 'json' })
     if (settings?.techs?.length) {
-      techniciens = settings.techs.filter(t => t.avail !== false).map(t => t.name)
+      techniciens = settings.techs
+        .filter(t => t.avail !== false)
+        .map(t => ({ nom: t.name, color: t.color || '#1565C0' }))
     }
   } catch {}
 
@@ -24,7 +26,12 @@ export default async (request) => {
       if (keys.length) techniciens = keys
     } catch {}
   }
-  if (!techniciens.length) techniciens = ['Johann', 'Cindy', 'Priscillia', 'Nathan']
+  if (!techniciens.length) techniciens = [
+    { nom: 'Johann',     color: '#E65100' },
+    { nom: 'Cindy',      color: '#1565C0' },
+    { nom: 'Priscillia', color: '#7B1FA2' },
+    { nom: 'Nathan',     color: '#B71C1C' },
+  ]
 
   return new Response(JSON.stringify({
     companyName:  process.env.OPTIQ_COMPANY_NAME  || 'Defiligne',

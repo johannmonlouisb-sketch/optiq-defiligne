@@ -7,6 +7,12 @@
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
+/* ── Propriétés animables ──────────────────────────────────────────────── */
+@property --cur      { syntax:'<color>'; inherits:true; initial-value:#2563EB }
+@property --cur-lo   { syntax:'<color>'; inherits:true; initial-value:rgba(37,99,235,.08) }
+@property --cur-glow { syntax:'<color>'; inherits:true; initial-value:rgba(37,99,235,.07) }
+@property --cur-hi   { syntax:'<color>'; inherits:true; initial-value:rgba(37,99,235,.3) }
+
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
   --blue:#2563EB;    --blue-lo:rgba(37,99,235,.08);   --blue-hi:rgba(37,99,235,.5);
@@ -18,8 +24,9 @@
   --border-hi:rgba(255,255,255,.12);
   --text:#EFF2F8;   --text2:#6B7A9E;   --text3:#3D4A6B;
   --err:#EF4444;    --ok:#10B981;
-  /* dynamique selon onglet actif */
-  --cur:#2563EB;    --cur-lo:rgba(37,99,235,.08); --cur-glow:rgba(37,99,235,.07);
+  /* dynamique — animé via @property */
+  --cur:#2563EB;    --cur-lo:rgba(37,99,235,.08); --cur-glow:rgba(37,99,235,.07); --cur-hi:rgba(37,99,235,.3);
+  transition: --cur .5s ease, --cur-lo .5s ease, --cur-glow .5s ease, --cur-hi .5s ease;
 }
 
 html,body{height:100%}
@@ -303,6 +310,14 @@ body::after{
 .foot-dot{width:3px;height:3px;border-radius:50%;background:var(--text3)}
 
 @keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+
+/* Flash couleur sur sélection tech */
+@keyframes techFlash{
+  0%  {box-shadow:0 0 0 4px var(--cur-lo), 0 32px 64px -16px rgba(0,0,0,.6)}
+  40% {box-shadow:0 0 0 10px var(--cur-lo), 0 32px 64px -16px rgba(0,0,0,.6)}
+  100%{box-shadow:0 0 0 1px rgba(255,255,255,.02) inset, 0 32px 64px -16px rgba(0,0,0,.6)}
+}
+.card.flash{animation:techFlash .55s cubic-bezier(.22,1,.36,1) both}
 </style>
 </head>
 <body>
@@ -399,19 +414,33 @@ body::after{
 // ── Config ────────────────────────────────────────────────────────────────
 const KEY_SUB = {'2':'ABC','3':'DEF','4':'GHI','5':'JKL','6':'MNO','7':'PQRS','8':'TUV','9':'WXYZ','0':'+'}
 const PIN_LEN = 4
-let currentPin = '', selectedTech = '', isLoading = false, ddOpen = false
+let currentPin = '', selectedTech = '', selectedColor = '#2563EB', isLoading = false, ddOpen = false
+let techData = [] // [{nom, color}]
+
+// ── Couleur → rgba ────────────────────────────────────────────────────────
+function hexToRgb(hex) {
+  hex = hex.replace('#','')
+  if (hex.length === 3) hex = hex.split('').map(c=>c+c).join('')
+  return { r: parseInt(hex.slice(0,2),16), g: parseInt(hex.slice(2,4),16), b: parseInt(hex.slice(4,6),16) }
+}
+
+function applyColor(hex) {
+  const {r,g,b} = hexToRgb(hex)
+  const root = document.documentElement.style
+  root.setProperty('--cur',      hex)
+  root.setProperty('--cur-lo',   `rgba(${r},${g},${b},.1)`)
+  root.setProperty('--cur-glow', `rgba(${r},${g},${b},.12)`)
+  root.setProperty('--cur-hi',   `rgba(${r},${g},${b},.35)`)
+  selectedColor = hex
+}
 
 // ── Thème onglet ──────────────────────────────────────────────────────────
-const THEME = {
-  tech:  { cur:'#2563EB', curLo:'rgba(37,99,235,.08)',  curGlow:'rgba(37,99,235,.07)', curHi:'rgba(37,99,235,.3)' },
-  admin: { cur:'#D97706', curLo:'rgba(217,119,6,.08)',   curGlow:'rgba(217,119,6,.06)', curHi:'rgba(217,119,6,.25)' }
-}
 function applyTheme(t) {
-  const th = THEME[t], r = document.documentElement.style
-  r.setProperty('--cur',     th.cur)
-  r.setProperty('--cur-lo',  th.curLo)
-  r.setProperty('--cur-glow',th.curGlow)
-  r.setProperty('--cur-hi',  th.curHi)
+  if (t === 'admin') {
+    applyColor('#D97706')
+  } else {
+    applyColor(selectedColor === '#D97706' ? '#2563EB' : selectedColor)
+  }
 }
 
 // ── Tabs ──────────────────────────────────────────────────────────────────
@@ -458,19 +487,26 @@ async function loadTechs() {
   try {
     const r = await fetch('/api/config')
     const d = await r.json()
-    buildDropdown(d.techniciens || ['HERBET','BEUZELIN'])
+    const raw = d.techniciens || []
+    // Normalise : accepte [{nom,color}] ou [string]
+    techData = raw.map(t => typeof t === 'string' ? { nom: t, color: '#1565C0' } : t)
+    buildDropdown(techData)
   } catch {
-    buildDropdown(['HERBET','BEUZELIN'])
+    techData = [{ nom: 'Johann', color: '#E65100' }, { nom: 'Cindy', color: '#1565C0' }]
+    buildDropdown(techData)
   }
 }
 
 function buildDropdown(techs) {
   const menu = document.getElementById('dd-menu')
   menu.innerHTML = techs.map(t => {
-    const initials = t.slice(0,2).toUpperCase()
-    return `<button class="dd-item" onclick="selectTech('${t}')">
-      <div class="dd-avatar">${initials}</div>
-      ${t}
+    const nom = t.nom || t
+    const color = t.color || '#1565C0'
+    const initials = nom.slice(0,2).toUpperCase()
+    const {r,g,b} = hexToRgb(color)
+    return `<button class="dd-item" onclick="selectTech('${nom}')">
+      <div class="dd-avatar" style="background:rgba(${r},${g},${b},.18);border-color:rgba(${r},${g},${b},.3);color:${color}">${initials}</div>
+      ${nom}
       <svg class="dd-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
         <polyline points="20 6 9 17 4 12"/>
       </svg>
@@ -480,9 +516,12 @@ function buildDropdown(techs) {
 
 function selectTech(nom) {
   selectedTech = nom
+  const tech = techData.find(t => (t.nom || t) === nom)
+  const color = tech?.color || '#2563EB'
+
+  // Mise à jour du label
   const lbl = document.getElementById('dd-label')
-  lbl.textContent = nom
-  lbl.className = ''
+  lbl.textContent = nom; lbl.className = ''
   const trigger = document.getElementById('dd-trigger')
   trigger.classList.add('selected')
   document.querySelectorAll('.dd-item').forEach(b =>
@@ -490,6 +529,12 @@ function selectTech(nom) {
   )
   closeDropdown()
   currentPin = ''; renderDots(); clearMsg()
+
+  // Animation couleur
+  applyColor(color)
+  const card = document.getElementById('card')
+  card.classList.remove('flash')
+  requestAnimationFrame(() => card.classList.add('flash'))
 }
 
 // ── PIN ───────────────────────────────────────────────────────────────────
