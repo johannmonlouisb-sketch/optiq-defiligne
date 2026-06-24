@@ -2667,28 +2667,6 @@ function rDepart(){
       if(ord) ord.filter(iv=>iv.date===date&&!seenIds.has(iv.id)).forEach(iv=>{seenIds.add(iv.id);displayIvs.push(iv)})
     })
     dayIvs.filter(iv=>!seenIds.has(iv.id)).forEach(iv=>{seenIds.add(iv.id);displayIvs.push(iv)})
-    // Réordonner les IVs à heure imposée dans la liste de chaque tech (sans changer l'ordre des libres)
-    const techOrder2=depSelectedTechs.length?depSelectedTechs:TECHS.map(t=>t.id)
-    const reordered=[]
-    techOrder2.forEach(tid=>{
-      let tivs=displayIvs.filter(iv=>iv.techId===tid)
-      const anchored=tivs.filter(iv=>iv.timeStart).sort((a,b)=>a.timeStart.localeCompare(b.timeStart))
-      if(anchored.length){
-        const free=tivs.filter(iv=>!iv.timeStart)
-        // Réinsérer chaque libre à sa position d'origine relative parmi les libres,
-        // en intercalant les ancrées par ordre chronologique
-        const step=free.length/(anchored.length+1)
-        tivs=[]
-        let ai=0
-        free.forEach((iv,fi)=>{
-          while(ai<anchored.length&&fi>=Math.round(step*(ai+1))){tivs.push(anchored[ai++])}
-          tivs.push(iv)
-        })
-        while(ai<anchored.length) tivs.push(anchored[ai++])
-      }
-      reordered.push(...tivs)
-    })
-    displayIvs=reordered
   } else {
     // Pas encore de carte : grouper par tech, pré-trier par horaire si défini
     displayIvs=[]
