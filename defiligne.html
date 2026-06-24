@@ -510,7 +510,9 @@ tr:hover td{background:var(--bg)}
       </div>
       <div class="np-prop">
         <div class="np-lbl">💼 Commercial</div>
-        <input id="m-commercial-name" class="np-val" placeholder="Nom du commercial..." onblur="autoSaveField()"/>
+        <select id="m-commercial" class="np-val" onchange="autoSaveField()">
+          <option value="">— Aucun —</option>
+        </select>
       </div>
       <div class="np-prop">
         <div class="np-lbl">🏷️ Type</div>
@@ -723,6 +725,42 @@ let TECHS=[
   {id:4,name:"Nathan",    init:"NA",vehicle:"—",              conso:7.0,avail:true, color:"#B71C1C"},
   {id:5,name:"Johann",    init:"JO",vehicle:"—",              conso:7.0,avail:true, color:"#E65100"},
 ]
+// ── Commerciaux ───────────────────────────────────────────────────────
+let COMMERCIALS = []   // [{id, name, email, phone, color}] — géré dans Paramètres
+
+function refreshCommercialSels(){
+  const s=document.getElementById("m-commercial")
+  if(!s) return
+  const prev=s.value
+  s.innerHTML=`<option value="">— Aucun —</option>`+COMMERCIALS.map(c=>`<option value="${c.name}">${c.name}</option>`).join("")
+  if(prev) s.value=prev
+}
+function addCommercial(){
+  const newId=COMMERCIALS.length?Math.max(...COMMERCIALS.map(c=>c.id))+1:1
+  COMMERCIALS.push({id:newId,name:"Nouveau commercial",email:"",phone:"",color:"#1565C0"})
+  autoSaveSettings(true)
+  rParam()
+}
+function saveCommercial(id){
+  const c=COMMERCIALS.find(c=>c.id===id); if(!c) return
+  const n=(document.getElementById("cn-"+id)?.value||"").trim()
+  const e=(document.getElementById("ce-"+id)?.value||"").trim()
+  const p=(document.getElementById("cp-"+id)?.value||"").trim()
+  const col=document.getElementById("ccol-"+id)?.value
+  if(n) c.name=n
+  c.email=e; c.phone=p
+  if(col) c.color=col
+  autoSaveSettings()
+  refreshCommercialSels()
+}
+function deleteCommercial(id){
+  if(!confirm("Supprimer ce commercial ?")) return
+  COMMERCIALS=COMMERCIALS.filter(c=>c.id!==id)
+  autoSaveSettings(true)
+  refreshCommercialSels()
+  rParam()
+}
+
 // ── Absences techniciens (persistées localStorage, semaine courante) ──
 let techAbsences = {}
 function _applyAbsences(val){
@@ -1923,6 +1961,7 @@ function addYears(d,n){const dt=new Date(d+"T12:00:00");dt.setFullYear(dt.getFul
 function daysUntil(d){return Math.round((new Date(d+"T12:00:00")-new Date())/(1000*60*60*24))}
 function refreshTechSels(){
   const s=document.getElementById("m-tech");if(s){const prev=s.value;s.innerHTML=TECHS.map(t=>`<option value="${t.id}">${t.name}</option>`).join("");if(prev)s.value=prev}
+  refreshCommercialSels()
 }
 function onDeaChange(){
   const dea=document.getElementById("m-dea")?.value||""
@@ -4893,8 +4932,7 @@ function openAdd(){
   document.getElementById("m-cphone").value=""
   document.getElementById("m-cemail").value=""
   document.getElementById("m-siege").value=""
-  const mcommName=document.getElementById("m-commercial-name")
-  if(mcommName) mcommName.value=""
+  const mc=document.getElementById("m-commercial"); if(mc) mc.value=""
   document.getElementById("m-edit").classList.add("open")
 }
 function editIv(id){
@@ -4932,8 +4970,7 @@ function editIv(id){
   const mcs=document.getElementById("m-cscontact");if(mcs)mcs.value=iv.contact_siege||""
   const mce=document.getElementById("m-csemail");if(mce)mce.value=iv.email_siege||""
   const mcp=document.getElementById("m-csphone");if(mcp)mcp.value=iv.phone_siege||""
-  const mcommName=document.getElementById("m-commercial-name")
-  if(mcommName) mcommName.value=iv.commercial||""
+  const mc=document.getElementById("m-commercial"); if(mc) mc.value=iv.commercial||""
   document.getElementById("m-edit").classList.add("open")
 }
 function closeEdit(){document.getElementById("m-edit").classList.remove("open")}
@@ -4964,7 +5001,7 @@ function saveEdit(){
     email_siege:document.getElementById("m-csemail")?.value.trim()||"",
     phone_siege:document.getElementById("m-csphone")?.value.trim()||"",
     // Conserver le commercial affiché dans la fiche (lecture seule si vient de Notion, ou nom du connecté)
-    commercial: document.getElementById("m-commercial-name")?.value.trim()||""}
+    commercial: document.getElementById("m-commercial")?.value||""}
   if(id){
     const prev=ivs.find(i=>i.id===id)
     ivs=ivs.map(i=>i.id===id?{...i,...obj}:i)
@@ -5024,7 +5061,7 @@ function autoSaveField(){
     contact_siege:document.getElementById("m-cscontact")?.value.trim()||"",
     email_siege:document.getElementById("m-csemail")?.value.trim()||"",
     phone_siege:document.getElementById("m-csphone")?.value.trim()||"",
-    commercial: document.getElementById("m-commercial-name")?.value.trim()||""
+    commercial: document.getElementById("m-commercial")?.value||""
   }
   ivs=ivs.map(i=>i.id===id?{...i,...obj}:i)
   const ind=document.getElementById("np-saved")
@@ -5255,6 +5292,21 @@ function rParam(){
     </div>
   </div>
   <div class="ss">
+    <h2>👔 Commerciaux</h2>
+    ${COMMERCIALS.length ? COMMERCIALS.map(c=>`
+    <div style="background:var(--bg);border-radius:10px;margin-bottom:10px;padding:10px 12px;border:1.5px solid var(--border)">
+      <div style="display:grid;grid-template-columns:auto 1fr 1fr 1fr auto auto;gap:8px;align-items:center">
+        <div style="width:34px;height:34px;border-radius:50%;background:${c.color||'#1565C0'}22;color:${c.color||'#1565C0'};font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${(c.name||'?').substring(0,2).toUpperCase()}</div>
+        <div><label class="lbl" style="margin-bottom:2px">Prénom Nom</label><input id="cn-${c.id}" value="${c.name}" style="font-size:13px" onchange="saveCommercial(${c.id})"/></div>
+        <div><label class="lbl" style="margin-bottom:2px">E-mail</label><input id="ce-${c.id}" value="${c.email||''}" placeholder="jean@exemple.fr" style="font-size:13px" onchange="saveCommercial(${c.id})"/></div>
+        <div><label class="lbl" style="margin-bottom:2px">Téléphone</label><input id="cp-${c.id}" value="${c.phone||''}" placeholder="06 xx xx xx xx" style="font-size:13px" onchange="saveCommercial(${c.id})"/></div>
+        <div><label class="lbl" style="margin-bottom:2px">Couleur</label><input type="color" id="ccol-${c.id}" value="${c.color||'#1565C0'}" style="width:36px;height:32px;padding:2px;border-radius:6px;border:1.5px solid var(--border);cursor:pointer" onchange="saveCommercial(${c.id})"/></div>
+        <button onclick="deleteCommercial(${c.id})" title="Supprimer" style="width:30px;height:30px;border-radius:50%;border:none;background:#FFEBEE;color:#C62828;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0" onmouseover="this.style.background='#FFCDD2'" onmouseout="this.style.background='#FFEBEE'">✕</button>
+      </div>
+    </div>`).join("") : `<p style="font-size:13px;color:var(--gray);margin-bottom:10px">Aucun commercial configuré.</p>`}
+    <button class="bb bsm" onclick="addCommercial()">➕ Ajouter commercial</button>
+  </div>
+  <div class="ss">
     <h2>ℹ️ À propos</h2>
     <p style="font-size:13px;color:var(--gray);line-height:1.8"><strong>OptiQ</strong> — Plateforme de gestion technicien DEA<br>Phase 1 · Développé pour <strong>OptiQ</strong></p>
   </div>`
@@ -5303,7 +5355,8 @@ function buildSettingsPayload(){
       conso:t.conso, avail:t.avail, color:t.color||'#1565C0', depotAddr:t.depotAddr||'',
       depotLat:t.depotLat||null, depotLng:t.depotLng||null, code: t.code||'' })),
     types: Object.fromEntries(Object.entries(TYPES).map(([k,v])=>[k,{dur:v.dur}])),
-    adminCreds: { id: _admCreds.id, pw: _admCreds.pw }
+    adminCreds: { id: _admCreds.id, pw: _admCreds.pw },
+    commercials: COMMERCIALS
   }
 }
 
@@ -5364,6 +5417,8 @@ async function loadSettings(){
     // Credentials admin
     if(s.adminCreds?.id) _admCreds.id=s.adminCreds.id
     if(s.adminCreds?.pw) _admCreds.pw=s.adminCreds.pw
+    // Commerciaux
+    if(Array.isArray(s.commercials)) COMMERCIALS=s.commercials
     loadTechDepots() // merge avec localStorage pour lat/lng géocodés
   }catch(e){
     console.warn('loadSettings error:', e.message)
