@@ -1,13 +1,14 @@
 // netlify/functions/auth.js
 // Authentification OptiTechX — techniciens (PIN) et admin (identifiant/mot de passe)
 //
-// Variables d'environnement Netlify à configurer :
-//   TECH_PINS   = JSON  ex: {"HERBET":"1234","BEUZELIN":"5678"}
-//   ADMIN_USER  = string  ex: admin
+// Variables d'environnement Netlify (fallback si le blob settings n'est pas disponible) :
+//   TECH_PINS   = JSON  ex: {"Johann":"7802","Cindy":"1234"}
+//   ADMIN_USER  = string  ex: defiligne
 //   ADMIN_PASS  = string  ex: monMotDePasse
-//   AUTH_SECRET = string  clé de signature des tokens (aléatoire, longue)
+//   AUTH_SECRET = string  clé de signature des tokens
 
 const crypto = require('crypto')
+const { getStore } = require('@netlify/blobs')
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
@@ -15,11 +16,26 @@ const CORS = {
   'Content-Type': 'application/json'
 }
 
-// Signe un payload JSON → token opaque (base64.hmac)
 function signToken(payload, secret) {
   const data = JSON.stringify(payload)
   const hmac = crypto.createHmac('sha256', secret).update(data).digest('hex')
   return Buffer.from(data).toString('base64url') + '.' + hmac
+}
+
+// Charge les PINs depuis le blob settings (source principale) ou depuis l'env var (fallback)
+async function loadTechPins() {
+  try {
+    const store = getStore({ name: 'optiq-config', consistency: 'strong' })
+    const settings = await store.get('settings', { type: 'json' })
+    if (settings?.techs?.length) {
+      const pins = {}
+      settings.techs.forEach(t => { if (t.name && t.code) pins[t.name.toUpperCase()] = t.code })
+      if (Object.keys(pins).length) return pins
+    }
+  } catch {}
+  // Fallback env var
+  try { return JSON.parse(process.env.TECH_PINS || '{"JOHANN MONLOUIS":"7802"}') } catch {}
+  return {}
 }
 
 exports.handler = async (event) => {
@@ -50,11 +66,12 @@ exports.handler = async (event) => {
       body: JSON.stringify({ ok: false, error: 'Nom et PIN requis' })
     }
 
-    let pins = {}
-    try { pins = JSON.parse(process.env.TECH_PINS || '{"HERBET":"","BEUZELIN":"","JOHANN MONLOUIS":"7802"}') } catch {}
-
+    const pins = await loadTechPins()
     const key = nom.toUpperCase()
-    const expected = pins[key] || pins[nom]
+    // Recherche insensible à la casse
+    const entry = Object.entries(pins).find(([k]) => k.toUpperCase() === key)
+    const expected = entry?.[1]
+
     if (!expected || pin !== String(expected)) return {
       statusCode: 401, headers: CORS,
       body: JSON.stringify({ ok: false, error: 'Code PIN incorrect' })

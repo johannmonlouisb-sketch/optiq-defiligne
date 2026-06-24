@@ -1,15 +1,28 @@
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' }
+const { getStore } = require('@netlify/blobs')
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: { ...CORS, 'Access-Control-Allow-Methods': 'GET,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' }, body: '' }
 
-  // Liste des techniciens déduite de TECH_PINS (clés du JSON)
-  let techniciens = ['HERBET', 'BEUZELIN', 'JOHANN MONLOUIS']
+  // Noms des techniciens actifs depuis le blob settings (source = panneau Paramètres admin)
+  let techniciens = []
   try {
-    const pins = JSON.parse(process.env.TECH_PINS || '{"HERBET":"","BEUZELIN":"","JOHANN MONLOUIS":"7802"}')
-    const keys = Object.keys(pins)
-    if (keys.length) techniciens = keys
+    const store = getStore({ name: 'optiq-config', consistency: 'strong' })
+    const settings = await store.get('settings', { type: 'json' })
+    if (settings?.techs?.length) {
+      techniciens = settings.techs.filter(t => t.avail !== false).map(t => t.name)
+    }
   } catch {}
+
+  // Fallback : env var TECH_PINS (clés) puis défauts hardcodés
+  if (!techniciens.length) {
+    try {
+      const pins = JSON.parse(process.env.TECH_PINS || '{}')
+      const keys = Object.keys(pins)
+      if (keys.length) techniciens = keys
+    } catch {}
+  }
+  if (!techniciens.length) techniciens = ['Johann', 'Cindy', 'Priscillia', 'Nathan']
 
   return {
     statusCode: 200,
