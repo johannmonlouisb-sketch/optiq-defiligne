@@ -2667,6 +2667,28 @@ function rDepart(){
       if(ord) ord.filter(iv=>iv.date===date&&!seenIds.has(iv.id)).forEach(iv=>{seenIds.add(iv.id);displayIvs.push(iv)})
     })
     dayIvs.filter(iv=>!seenIds.has(iv.id)).forEach(iv=>{seenIds.add(iv.id);displayIvs.push(iv)})
+    // Réordonner les IVs à heure imposée dans la liste de chaque tech (sans changer l'ordre des libres)
+    const techOrder2=depSelectedTechs.length?depSelectedTechs:TECHS.map(t=>t.id)
+    const reordered=[]
+    techOrder2.forEach(tid=>{
+      let tivs=displayIvs.filter(iv=>iv.techId===tid)
+      const anchored=tivs.filter(iv=>iv.timeStart).sort((a,b)=>a.timeStart.localeCompare(b.timeStart))
+      if(anchored.length){
+        const free=tivs.filter(iv=>!iv.timeStart)
+        // Réinsérer chaque libre à sa position d'origine relative parmi les libres,
+        // en intercalant les ancrées par ordre chronologique
+        const step=free.length/(anchored.length+1)
+        tivs=[]
+        let ai=0
+        free.forEach((iv,fi)=>{
+          while(ai<anchored.length&&fi>=Math.round(step*(ai+1))){tivs.push(anchored[ai++])}
+          tivs.push(iv)
+        })
+        while(ai<anchored.length) tivs.push(anchored[ai++])
+      }
+      reordered.push(...tivs)
+    })
+    displayIvs=reordered
   } else {
     // Pas encore de carte : grouper par tech, pré-trier par horaire si défini
     displayIvs=[]
@@ -6026,21 +6048,108 @@ function orOpt(depotC, route){
   return best
 }
 
-// Point d'entrée principal — teste N configurations, garde le meilleur
+// 2-opt contraint : ne déplace pas les IVs avec heure imposée
+function twoOptConstrained(depotC, route, anchorIds){
+  let best=[...route], bestD=routeDist(depotC,best), improved=true, iter=0
+  while(improved && iter++<100){
+    improved=false
+    for(let i=0;i<best.length-1;i++){
+      for(let j=i+2;j<best.length;j++){
+        if(best.slice(i+1,j+1).some(x=>anchorIds.has(x.iv.id))) continue
+        const cand=[...best.slice(0,i+1),...best.slice(i+1,j+1).reverse(),...best.slice(j+1)]
+        const d=routeDist(depotC,cand)
+        if(d<bestD-0.001){best=cand;bestD=d;improved=true}
+      }
+    }
+  }
+  return best
+}
+
+// Or-opt contraint : ne déplace pas les IVs avec heure imposée
+function orOptConstrained(depotC, route, anchorIds){
+  let best=[...route], bestD=routeDist(depotC,best), improved=true
+  while(improved){
+    improved=false
+    for(let i=0;i<best.length;i++){
+      if(anchorIds.has(best[i].iv.id)) continue
+      const pt=best[i]
+      const without=best.filter((_,k)=>k!==i)
+      for(let j=0;j<=without.length;j++){
+        const cand=[...without.slice(0,j),pt,...without.slice(j)]
+        const d=routeDist(depotC,cand)
+        if(d<bestD-0.001){best=cand;bestD=d;improved=true;break}
+      }
+      if(improved) break
+    }
+  }
+  return best
+}
+
+// Point d'entrée principal — respecte les heures imposées (timeStart)
 function optimizeRoute(depotC, pts){
   if(!pts.length) return pts
   if(pts.length===1) return pts
-  let best=null, bestDist=Infinity
-  // Essayer depuis le dépôt + depuis chaque point de départ
-  const starts=[-1,...pts.map((_,i)=>i)]; window._lastStarts=starts.length
-  starts.forEach(startIdx=>{
-    let candidate=buildNN(depotC,pts,startIdx)
-    candidate=twoOpt(depotC,candidate)      // amélioration 2-opt
-    candidate=orOpt(depotC,candidate)       // amélioration Or-opt
-    const d=routeDist(depotC,candidate)
-    if(d<bestDist){bestDist=d;best=candidate}
-  })
-  return best||pts
+
+  const anchored=pts.filter(x=>x.iv.timeStart).sort((a,b)=>a.iv.timeStart.localeCompare(b.iv.timeStart))
+  const free=pts.filter(x=>!x.iv.timeStart)
+  const anchorIds=new Set(anchored.map(x=>x.iv.id))
+
+  if(!anchored.length){
+    // Aucune contrainte horaire → optimisation pure distance
+    let best=null, bestDist=Infinity
+    const starts=[-1,...pts.map((_,i)=>i)]; window._lastStarts=starts.length
+    starts.forEach(startIdx=>{
+      let c=buildNN(depotC,pts,startIdx); c=twoOpt(depotC,c); c=orOpt(depotC,c)
+      const d=routeDist(depotC,c); if(d<bestDist){bestDist=d;best=c}
+    })
+    return best||pts
+  }
+
+  // Avec IVs ancrées : optimiser les libres, insérer les ancrées à leur créneau
+  const _toMin=s=>s.split(':').map(Number).reduce((h,m)=>h*60+m)
+  const _hav=(a,b)=>{
+    const R=6371,dLat=(b.lat-a.lat)*Math.PI/180,dLng=(b.lng-a.lng)*Math.PI/180
+    const sa=Math.sin(dLat/2)**2+Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLng/2)**2
+    return R*2*Math.asin(Math.sqrt(sa))*1.3
+  }
+
+  // Optimiser les IVs libres seules
+  let freeOpt=[]
+  if(free.length){
+    let best=null, bestDist=Infinity
+    const starts=free.length<=10?[-1,...free.map((_,i)=>i)]:[-1]; window._lastStarts=starts.length
+    starts.forEach(startIdx=>{
+      let c=buildNN(depotC,free,startIdx); c=twoOpt(depotC,c); c=orOpt(depotC,c)
+      const d=routeDist(depotC,c); if(d<bestDist){bestDist=d;best=c}
+    })
+    freeOpt=best||free
+  }
+
+  // Insérer chaque ancrée à la position où le technicien arrive le mieux dans son créneau
+  let result=[...freeOpt]
+  for(const anchor of anchored){
+    const targetMin=_toMin(anchor.iv.timeStart)
+    let bestPos=result.length, bestScore=Infinity
+    let curMin=8*60, prev=depotC
+    for(let i=0;i<=result.length;i++){
+      const trav=Math.round(_hav(prev,anchor.coords)/50*60)
+      const arrMin=curMin+trav
+      // Pénaliser arrivée tardive (×3) plus que l'attente (×1)
+      const score=arrMin<=targetMin?(targetMin-arrMin):(arrMin-targetMin)*3
+      if(score<bestScore){bestScore=score;bestPos=i}
+      if(i<result.length){
+        const legMin=Math.round(_hav(prev,result[i].coords)/50*60)
+        curMin+=legMin+dur(result[i].iv.type,result[i].iv.form)
+        prev=result[i].coords
+      }
+    }
+    result=[...result.slice(0,bestPos),anchor,...result.slice(bestPos)]
+  }
+
+  // Affiner les libres autour des ancrées (sans bouger les ancrées)
+  result=twoOptConstrained(depotC,result,anchorIds)
+  result=orOptConstrained(depotC,result,anchorIds)
+  return result
 }
 
 // Alias pour compatibilité
