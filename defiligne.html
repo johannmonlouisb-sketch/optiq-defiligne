@@ -518,7 +518,7 @@ tr:hover td{background:var(--bg)}
         <div class="np-lbl">🏷️ Type</div>
         <select id="m-type" class="np-val" onchange="autoSaveField()">
           <option value="maintenance_simple">Annuel · 15 min</option>
-          <option value="maintenance_complex">Maintenance + PAD PAK · 25 min</option>
+          <option value="maintenance_complex">PAD PAK · 25 min</option>
           <option value="installation">Installation · 35 min</option>
           <option value="tele_maintenance">Télémaintenance · 10 min</option>
           <option value="formation">Formation · 60 min</option>
@@ -8842,7 +8842,7 @@ const _rt = (s) => ({rich_text:[{text:{content:(s||'').substring(0,2000)}}]})
 
 function _buildNotionPropsCore(iv){
   const tech=TECHS.find(t=>t.id===iv.techId)
-  const typeMap={maintenance_simple:'Annuel',maintenance_complex:'Maintenance + PAD PAK',installation:'Installation',tele_maintenance:'Télémaintenance',formation:'Formation',livraison:'Livraison'}
+  const typeMap={maintenance_simple:'Annuel',maintenance_complex:'PAD PAK',installation:'Installation',tele_maintenance:'Télémaintenance',formation:'Formation',livraison:'Livraison'}
   const props={
     'Société':           {title:[{text:{content:(iv.client||'').substring(0,2000)}}]},
     'Date intervention': {date:{start:iv.timeStart?iv.date+'T'+iv.timeStart+':00':iv.date}},
