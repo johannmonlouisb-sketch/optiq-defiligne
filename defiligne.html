@@ -8810,51 +8810,56 @@ async function pullNotionLastMonth(){
 // ══════════════════════════════════════════════════════════════
 // PUSH NOTION — Créer une intervention depuis l'app dans Notion
 // ══════════════════════════════════════════════════════════════
+// Alias raccourci pour rich_text Notion
+const _rt = (s) => ({rich_text:[{text:{content:(s||'').substring(0,2000)}}]})
+
 function _buildNotionPropsCreate(iv){
   const tech=TECHS.find(t=>t.id===iv.techId)
   const typeMap={maintenance_simple:'Annuel',maintenance_complex:'PAD PAK',installation:'Installation',tele_maintenance:'Télémaintenance'}
   const props={
-    'Société':           {title:     [{text:{content:(iv.client||'').substring(0,2000)}}]},
-    'Date intervention': {date:      {start:iv.timeStart?iv.date+'T'+iv.timeStart+':00':iv.date}},
-    'Adresse Site':      {rich_text: [{text:{content:(iv.addr||'').substring(0,2000)}}]},
+    'Société':           {title:[{text:{content:(iv.client||'').substring(0,2000)}}]},
+    'Date intervention': {date:{start:iv.timeStart?iv.date+'T'+iv.timeStart+':00':iv.date}},
+    'Adresse Site':      _rt(iv.addr),
     'Technicien':        {select:{name:tech?tech.name:''}},
     'INTERVENTION':      {multi_select:[{name:typeMap[iv.type]||'Annuel'}]},
     'Terminer':          {checkbox:iv.status==='completed'},
     'Echec':             {checkbox:iv.status==='not_responded'},
+    'INFO ':             _rt(iv.notes),
+    'Contact site':      _rt(iv.contact),
+    'Téléphone':         {phone_number:iv.cphone||null},
+    'E-mail':            {email:iv.cemail||null},
+    'Adresse Siéges':    _rt(iv.siege),
   }
-  if(iv.notes)         props['INFO ']               ={rich_text:[{text:{content:(iv.notes||'').substring(0,2000)}}]}
-  if(iv.siege)         props['Adresse Siéges']       ={rich_text:[{text:{content:iv.siege.substring(0,2000)}}]}
-  if(iv.contact)       props['Contact site']         ={rich_text:[{text:{content:iv.contact.substring(0,2000)}}]}
-  if(iv.cphone)        props['Téléphone']            ={phone_number:iv.cphone}
-  if(iv.cemail)        props['E-mail']               ={email:iv.cemail}
-  if(iv.contact_siege) props['Contact sieges']       ={rich_text:[{text:{content:iv.contact_siege.substring(0,2000)}}]}
-  if(iv.email_siege)   props['E-mail Siéges']        ={email:iv.email_siege}
-  if(iv.phone_siege)   props['Téléphone  siéges']    ={phone_number:iv.phone_siege}
-  if(iv.commercial) props['Commercial'] = {select:{name:iv.commercial}}
+  if(iv.commercial)    props['Commercial ']           ={select:{name:iv.commercial}}
+  if(iv.contact_siege) props['Contact sieges']        =_rt(iv.contact_siege)
+  if(iv.email_siege)   props['E-mail Siéges']         ={email:iv.email_siege}
+  if(iv.phone_siege)   props['Téléphone  siéges']     ={phone_number:iv.phone_siege}
   return props
 }
 
-// Construit les props Notion pour une mise à jour — inclut tous les champs éditables
+// Construit les props Notion pour une mise à jour — tous les champs éditables
 function _buildNotionPropsUpdate(iv){
   const tech=TECHS.find(t=>t.id===iv.techId)
   const typeMap={maintenance_simple:'Annuel',maintenance_complex:'PAD PAK',installation:'Installation',tele_maintenance:'Télémaintenance'}
+  // Champs principaux — toujours envoyés (permet d'effacer dans Notion)
   const props={
+    'Société':           {title:[{text:{content:(iv.client||'').substring(0,2000)}}]},
     'Date intervention': {date:{start:iv.timeStart?iv.date+'T'+iv.timeStart+':00':iv.date}},
+    'Adresse Site':      _rt(iv.addr),
     'Technicien':        {select:{name:tech?tech.name:''}},
     'INTERVENTION':      {multi_select:[{name:typeMap[iv.type]||'Annuel'}]},
-    'Adresse Site':      {rich_text:[{text:{content:(iv.addr||'').substring(0,2000)}}]},
     'Terminer':          {checkbox:iv.status==='completed'},
     'Echec':             {checkbox:iv.status==='not_responded'},
-    'INFO ':             {rich_text:[{text:{content:(iv.notes||'').substring(0,2000)}}]},
+    'INFO ':             _rt(iv.notes),
+    'Contact site':      _rt(iv.contact),
+    'Téléphone':         {phone_number:iv.cphone||null},
+    'E-mail':            {email:iv.cemail||null},
+    'Adresse Siéges':    _rt(iv.siege),
   }
-  if(iv.contact)       props['Contact site']         ={rich_text:[{text:{content:(iv.contact||'').substring(0,2000)}}]}
-  if(iv.cphone)        props['Téléphone']            ={phone_number:iv.cphone}
-  if(iv.cemail)        props['E-mail']               ={email:iv.cemail}
-  if(iv.siege)         props['Adresse Siéges']       ={rich_text:[{text:{content:(iv.siege||'').substring(0,2000)}}]}
-  if(iv.contact_siege) props['Contact sieges']       ={rich_text:[{text:{content:(iv.contact_siege||'').substring(0,2000)}}]}
-  if(iv.email_siege)   props['E-mail Siéges']        ={email:iv.email_siege}
-  if(iv.phone_siege)   props['Téléphone  siéges']    ={phone_number:iv.phone_siege}
-  if(iv.commercial) props['Commercial'] = {select:{name:iv.commercial}}
+  if(iv.commercial)    props['Commercial ']           ={select:{name:iv.commercial}}
+  if(iv.contact_siege) props['Contact sieges']        =_rt(iv.contact_siege)
+  if(iv.email_siege)   props['E-mail Siéges']         ={email:iv.email_siege}
+  if(iv.phone_siege)   props['Téléphone  siéges']     ={phone_number:iv.phone_siege}
   return props
 }
 
@@ -8863,11 +8868,22 @@ async function pushIvToNotion(iv){
   if(iv.notionId){
     const props=_buildNotionPropsUpdate(iv)
     try{
-      await notionCall('update_page',{pageId:iv.notionId,properties:props})
+      const r=await notionCall('update_page',{pageId:iv.notionId,properties:props})
+      if(r?.object==='error') throw new Error(r.message)
       showToast('☁️ Notion mis à jour','#1B5E20')
     }catch(e){
-      console.warn('Notion update error:',e.message)
-      showToast('⚠️ Notion : '+e.message,'#E65100')
+      // Si un champ optionnel cause l'erreur → retry sans contact_siege/email_siege/phone_siege/Commercial
+      console.warn('Notion update error (full):',e.message)
+      const safeProps={...props}
+      delete safeProps['Contact sieges']; delete safeProps['E-mail Siéges']
+      delete safeProps['Téléphone  siéges']; delete safeProps['Commercial ']
+      try{
+        await notionCall('update_page',{pageId:iv.notionId,properties:safeProps})
+        showToast('☁️ Notion mis à jour (sans commercial)','#E65100')
+      }catch(e2){
+        console.warn('Notion update error (safe):',e2.message)
+        showToast('⚠️ Notion : '+e2.message,'#E65100')
+      }
     }
   } else {
     // Création avec tous les champs
