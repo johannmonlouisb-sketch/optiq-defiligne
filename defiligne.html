@@ -610,21 +610,10 @@ tr:hover td{background:var(--bg)}
 
       <div class="np-div"></div>
 
-      <!-- ── Notes & Motif (corps de page) ── -->
+      <!-- ── Notes (corps de page) ── -->
       <div class="np-sec-title">Notes</div>
       <div class="np-notes">
-        <textarea id="m-notes" class="np-notes-ta" rows="3" placeholder="Notes internes, informations spécifiques..." onblur="autoSaveField()"></textarea>
-      </div>
-      <div class="np-prop" style="align-items:flex-start;margin-top:8px">
-        <div class="np-lbl">📝 Motif</div>
-        <textarea id="m-motif" class="np-val" rows="2" placeholder="Motif de l'intervention (Notion)..." onblur="autoSaveField()" style="resize:vertical;min-height:52px;font-family:inherit;font-size:13px"></textarea>
-      </div>
-      <div class="np-prop">
-        <div class="np-lbl">🚨 Urgent</div>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-          <input id="m-urgent" type="checkbox" onchange="autoSaveField()" style="width:16px;height:16px;cursor:pointer"/>
-          <span style="font-size:13px;color:var(--text)">Intervention urgente</span>
-        </label>
+        <textarea id="m-notes" class="np-notes-ta" rows="4" placeholder="Ajouter des notes, informations spécifiques..." onblur="autoSaveField()"></textarea>
       </div>
 
       <div class="np-div"></div>
@@ -4953,8 +4942,6 @@ function openAdd(){
   const _bd0=document.getElementById("m-batdate");if(_bd0)_bd0.value=""
   onDeaChange()
   document.getElementById("m-notes").value=""
-  const _mm=document.getElementById("m-motif");if(_mm)_mm.value=""
-  const _mu=document.getElementById("m-urgent");if(_mu)_mu.checked=false
   document.getElementById("m-padpak").checked=false
   document.getElementById("m-padpakdate").value=""
   document.getElementById("m-timestart").value=""
@@ -4985,8 +4972,6 @@ function editIv(id){
   const _bd=document.getElementById("m-batdate");if(_bd)_bd.value=iv.batDate||""
   onDeaChange()
   document.getElementById("m-notes").value=iv.notes||""
-  const _mm2=document.getElementById("m-motif");if(_mm2)_mm2.value=iv.motif||""
-  const _mu2=document.getElementById("m-urgent");if(_mu2)_mu2.checked=!!(iv.urgent)
   document.getElementById("m-padpak").checked=iv.padPak||false
   document.getElementById("m-padpakdate").value=iv.padPakDate||""
   document.getElementById("m-timestart").value=iv.timeStart||""
@@ -5021,8 +5006,7 @@ function saveEdit(){
     batChange:document.getElementById("m-batchg")?.checked||false,
     batDate:document.getElementById("m-batdate")?.value||"",
     notes:document.getElementById("m-notes").value,
-    motif:document.getElementById("m-motif")?.value||"",
-    urgent:document.getElementById("m-urgent")?.checked||false,
+
     padPak:document.getElementById("m-padpak").checked,
     padPakDate:document.getElementById("m-padpakdate").value,
     timeStart:document.getElementById("m-timestart").value||"",
@@ -5083,8 +5067,7 @@ function autoSaveField(){
     batChange:document.getElementById("m-batchg")?.checked||false,
     batDate:document.getElementById("m-batdate")?.value||"",
     notes:document.getElementById("m-notes").value,
-    motif:document.getElementById("m-motif")?.value||"",
-    urgent:document.getElementById("m-urgent")?.checked||false,
+
     padPak:document.getElementById("m-padpak").checked,
     padPakDate:document.getElementById("m-padpakdate").value,
     timeStart:document.getElementById("m-timestart").value||"",
