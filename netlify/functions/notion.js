@@ -68,8 +68,8 @@ exports.handler = async (event) => {
             ]
           }
         }
-        // Pagination
-        let all = [], next = null
+        // Pagination — max 5 pages (500 interventions) pour rester sous le timeout Netlify
+        let all = [], next = null, pageCount = 0
         do {
           if (next) payload.start_cursor = next
           const r = await fetch(`${NOTION_BASE}/databases/${dbId}/query`, {
@@ -79,8 +79,9 @@ exports.handler = async (event) => {
           if (!r.ok) return { statusCode: r.status, headers: CORS, body: JSON.stringify(d) }
           all = all.concat(d.results || [])
           next = d.has_more ? d.next_cursor : null
-        } while (next)
-        return { statusCode: 200, headers: CORS, body: JSON.stringify({ results: all }) }
+          pageCount++
+        } while (next && pageCount < 5)
+        return { statusCode: 200, headers: CORS, body: JSON.stringify({ results: all, truncated: !!next }) }
       }
 
       // ── GET SINGLE PAGE ─────────────────────────────────────────────────
@@ -277,7 +278,7 @@ exports.handler = async (event) => {
           }
         }
 
-        let all = [], next = null
+        let all = [], next = null, pageCount2 = 0
         do {
           if (next) payload.start_cursor = next
           const r = await fetch(`${NOTION_BASE}/databases/${dbId}/query`, {
@@ -287,7 +288,8 @@ exports.handler = async (event) => {
           if (!r.ok) return { statusCode: r.status, headers: CORS, body: JSON.stringify(d) }
           all = all.concat(d.results || [])
           next = d.has_more ? d.next_cursor : null
-        } while (next)
+          pageCount2++
+        } while (next && pageCount2 < 5)
 
         const ivs = all.map(page => {
           const p   = page.properties || {}

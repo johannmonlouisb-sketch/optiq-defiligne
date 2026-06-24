@@ -5091,12 +5091,12 @@ function autoSaveField(){
   const ind=document.getElementById("np-saved")
   if(ind){ind.classList.add("show");clearTimeout(ind._t);ind._t=setTimeout(()=>ind.classList.remove("show"),1800)}
   cloudSave()
-  // Debounce Notion — 3s pour les champs texte (évite de spammer à chaque frappe)
+  // Push Notion immédiat (debounce 500ms pour éviter les doublons sur saisie rapide)
   clearTimeout(autoSaveField._notionT)
   autoSaveField._notionT=setTimeout(()=>{
     const updated=ivs.find(i=>i.id===id)
     if(updated) pushIvToNotion(updated)
-  },3000)
+  },500)
 }
 
 // Même chose mais push Notion immédiat — utilisé pour les selects (commercial, type, tech…)
