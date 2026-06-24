@@ -5102,11 +5102,6 @@ function autoSaveFieldNow(){
   clearTimeout(autoSaveField._notionT)  // annule le debounce
   const updated=ivs.find(i=>i.id===id)
   if(updated) pushIvToNotion(updated)   // push Notion immédiat
-  // Rafraîchir la vue derrière la fiche
-  if(curView==='dashboard') rDash()
-  else if(curView==='depart') rDepart()
-  else if(curView==='planning') rPlan()
-  else if(curView==='interventions') rIv()
 }
 function deleteIv(){
   const id=parseInt(document.getElementById("m-id").value)
