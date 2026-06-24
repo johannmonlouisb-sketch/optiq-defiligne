@@ -192,7 +192,7 @@ tr:hover td{background:var(--bg)}
         <line x1="20" y1="15.5" x2="22" y2="15.5" stroke="#1565C0" stroke-width="2" stroke-linecap="round"/>
       </svg>
       <div style="font-size:22px;font-weight:800;color:#0F172A;letter-spacing:-.5px">OptiTechX</div>
-      <div style="font-size:13px;color:#64748B;margin-top:4px">Espace administration & commercial</div>
+      <div style="font-size:13px;color:#64748B;margin-top:4px">Espace administrateur</div>
     </div>
     <!-- Champs -->
     <div style="margin-bottom:14px">
@@ -508,9 +508,9 @@ tr:hover td{background:var(--bg)}
         <div class="np-lbl">👤 Technicien</div>
         <select id="m-tech" class="np-val" onchange="autoSaveField()"></select>
       </div>
-      <div id="m-commercial-row" class="np-prop" style="display:none">
+      <div class="np-prop">
         <div class="np-lbl">💼 Commercial</div>
-        <span id="m-commercial-name" style="font-size:14px;color:#1d4ed8;font-weight:600;padding:3px 7px"></span>
+        <input id="m-commercial-name" class="np-val" placeholder="Nom du commercial..." onblur="autoSaveField()"/>
       </div>
       <div class="np-prop">
         <div class="np-lbl">🏷️ Type</div>
@@ -4893,15 +4893,8 @@ function openAdd(){
   document.getElementById("m-cphone").value=""
   document.getElementById("m-cemail").value=""
   document.getElementById("m-siege").value=""
-  // Si l'utilisateur connecté est un commercial → pré-remplir son nom
-  const mcommRow=document.getElementById("m-commercial-row")
   const mcommName=document.getElementById("m-commercial-name")
-  if(curUser.role==='commercial'){
-    if(mcommRow) mcommRow.style.display="flex"
-    if(mcommName) mcommName.textContent=curUser.name
-  } else {
-    if(mcommRow) mcommRow.style.display="none"
-  }
+  if(mcommName) mcommName.value=""
   document.getElementById("m-edit").classList.add("open")
 }
 function editIv(id){
@@ -4939,13 +4932,8 @@ function editIv(id){
   const mcs=document.getElementById("m-cscontact");if(mcs)mcs.value=iv.contact_siege||""
   const mce=document.getElementById("m-csemail");if(mce)mce.value=iv.email_siege||""
   const mcp=document.getElementById("m-csphone");if(mcp)mcp.value=iv.phone_siege||""
-  // Afficher le commercial si renseigné dans Notion
-  const mcommRow=document.getElementById("m-commercial-row")
   const mcommName=document.getElementById("m-commercial-name")
-  if(mcommRow&&mcommName){
-    if(iv.commercial){mcommName.textContent=iv.commercial;mcommRow.style.display="flex"}
-    else mcommRow.style.display="none"
-  }
+  if(mcommName) mcommName.value=iv.commercial||""
   document.getElementById("m-edit").classList.add("open")
 }
 function closeEdit(){document.getElementById("m-edit").classList.remove("open")}
@@ -4976,7 +4964,7 @@ function saveEdit(){
     email_siege:document.getElementById("m-csemail")?.value.trim()||"",
     phone_siege:document.getElementById("m-csphone")?.value.trim()||"",
     // Conserver le commercial affiché dans la fiche (lecture seule si vient de Notion, ou nom du connecté)
-    commercial: document.getElementById("m-commercial-name")?.textContent.trim()||""}
+    commercial: document.getElementById("m-commercial-name")?.value.trim()||""}
   if(id){
     const prev=ivs.find(i=>i.id===id)
     ivs=ivs.map(i=>i.id===id?{...i,...obj}:i)
@@ -5036,7 +5024,7 @@ function autoSaveField(){
     contact_siege:document.getElementById("m-cscontact")?.value.trim()||"",
     email_siege:document.getElementById("m-csemail")?.value.trim()||"",
     phone_siege:document.getElementById("m-csphone")?.value.trim()||"",
-    commercial: document.getElementById("m-commercial-name")?.textContent.trim()||""
+    commercial: document.getElementById("m-commercial-name")?.value.trim()||""
   }
   ivs=ivs.map(i=>i.id===id?{...i,...obj}:i)
   const ind=document.getElementById("np-saved")
@@ -5267,28 +5255,6 @@ function rParam(){
     </div>
   </div>
   <div class="ss">
-    <h2>👔 Comptes commerciaux</h2>
-    <p style="font-size:12px;color:var(--gray);margin-bottom:14px">Les commerciaux peuvent se connecter et créer des interventions — leur nom est automatiquement renseigné dans la fiche et envoyé dans Notion.</p>
-    <div id="commercial-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
-      ${_commercialCreds.map(c=>`
-      <div style="display:flex;align-items:center;gap:8px;background:#F8F9FA;border:1px solid var(--border);border-radius:8px;padding:8px 12px">
-        <span style="flex:1;font-size:13px;font-weight:600;color:var(--dark)">👤 ${c.name}</span>
-        <span style="font-size:12px;color:var(--gray);background:#EDE7F6;padding:2px 8px;border-radius:10px">${c.id}</span>
-        <button class="bg bsm" onclick="deleteCommercial('${c.id}')" style="background:#FFEBEE;color:#C62828;border:none;padding:4px 8px;border-radius:6px;cursor:pointer;font-size:12px">✕</button>
-      </div>`).join('')}
-    </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;padding:12px;background:#F3E5F5;border-radius:8px">
-      <div><label style="font-size:11px;font-weight:600;color:var(--dark);display:block;margin-bottom:4px">Prénom Nom</label>
-        <input id="s-comm-name" placeholder="Jean Dupont" style="font-size:13px;max-width:180px"/></div>
-      <div><label style="font-size:11px;font-weight:600;color:var(--dark);display:block;margin-bottom:4px">Identifiant</label>
-        <input id="s-comm-id" placeholder="jean.dupont" style="font-size:13px;max-width:140px"/></div>
-      <div><label style="font-size:11px;font-weight:600;color:var(--dark);display:block;margin-bottom:4px">Mot de passe</label>
-        <input type="password" id="s-comm-pw" placeholder="••••••••" style="font-size:13px;max-width:140px"/></div>
-      <button class="bb bsm" onclick="addCommercial()" style="background:#6A1B9A;white-space:nowrap">➕ Ajouter</button>
-    </div>
-    <span id="s-comm-msg" style="font-size:12px;color:#2E7D32;display:block;margin-top:6px"></span>
-  </div>
-  <div class="ss">
     <h2>ℹ️ À propos</h2>
     <p style="font-size:13px;color:var(--gray);line-height:1.8"><strong>OptiQ</strong> — Plateforme de gestion technicien DEA<br>Phase 1 · Développé pour <strong>OptiQ</strong></p>
   </div>`
@@ -5337,8 +5303,7 @@ function buildSettingsPayload(){
       conso:t.conso, avail:t.avail, color:t.color||'#1565C0', depotAddr:t.depotAddr||'',
       depotLat:t.depotLat||null, depotLng:t.depotLng||null, code: t.code||'' })),
     types: Object.fromEntries(Object.entries(TYPES).map(([k,v])=>[k,{dur:v.dur}])),
-    adminCreds: { id: _admCreds.id, pw: _admCreds.pw },
-    commercialCreds: _commercialCreds
+    adminCreds: { id: _admCreds.id, pw: _admCreds.pw }
   }
 }
 
@@ -5399,15 +5364,12 @@ async function loadSettings(){
     // Credentials admin
     if(s.adminCreds?.id) _admCreds.id=s.adminCreds.id
     if(s.adminCreds?.pw) _admCreds.pw=s.adminCreds.pw
-    // Credentials commerciaux
-    if(Array.isArray(s.commercialCreds)) _commercialCreds=s.commercialCreds
     loadTechDepots() // merge avec localStorage pour lat/lng géocodés
   }catch(e){
     console.warn('loadSettings error:', e.message)
   }
   // Vérifier l'auth après chargement des credentials réels
   if(!_admAuthValid()) _showAdmLogin()
-  else _renderUserBadge()
 }
 function deleteTech(id){
   const t=TECHS.find(t=>t.id===id); if(!t)return
@@ -8924,27 +8886,16 @@ function showNotionPanel(){
 
 <script>
 // ════════════════════════════════════════════════════════
-// AUTH ADMIN + COMMERCIAL
+// AUTH ADMIN
 // ════════════════════════════════════════════════════════
 const ADM_SESSION_MS = 24 * 60 * 60 * 1000   // session 24h
 let _admCreds = { id: 'admin', pw: 'optitechx' }  // écrasé par /api/settings au boot
-let _commercialCreds = []   // [{id, name, pw}] — géré dans Paramètres
-
-// Utilisateur courant — {role:'admin'|'commercial', name, id}
-let curUser = {role:'admin', name:'Admin', id:'admin'}
-
-function _loadCurUser(){
-  try{
-    const s=JSON.parse(localStorage.getItem('optiq_cur_user')||'null')
-    if(s && s.ts && (Date.now()-s.ts)<ADM_SESSION_MS){ curUser=s; return true }
-  }catch(e){}
-  return false
-}
-function _saveCurUser(u){ curUser=u; localStorage.setItem('optiq_cur_user',JSON.stringify({...u,ts:Date.now()})) }
-function _clearCurUser(){ localStorage.removeItem('optiq_cur_user'); localStorage.removeItem('adm_auth'); curUser={role:'admin',name:'Admin',id:'admin'} }
 
 function _admAuthValid(){
-  return _loadCurUser()
+  try{
+    const a=JSON.parse(localStorage.getItem('adm_auth')||'null')
+    return a && (Date.now()-a.ts)<ADM_SESSION_MS
+  }catch(e){return false}
 }
 function _showAdmLogin(){
   const ov=document.getElementById('adm-login')
@@ -8958,61 +8909,28 @@ function _hideAdmLogin(){
   if(ov) ov.style.display='none'
   document.getElementById('sidebar').style.visibility=''
   document.getElementById('main').style.visibility=''
-  _renderUserBadge()
 }
 function admLogin(){
   const id=(document.getElementById('adm-login-id').value||'').trim()
   const pw=(document.getElementById('adm-login-pw').value||'')
   const errEl=document.getElementById('adm-login-err')
-
-  // Vérifier admin
   if(id===_admCreds.id && pw===_admCreds.pw){
-    _saveCurUser({role:'admin', name:'Admin', id})
+    localStorage.setItem('adm_auth',JSON.stringify({ts:Date.now()}))
     errEl.textContent=''
     _hideAdmLogin()
-    return
+  } else {
+    errEl.textContent='Identifiant ou mot de passe incorrect'
+    document.getElementById('adm-login-pw').value=''
+    document.getElementById('adm-login-pw').focus()
+    setTimeout(()=>{ const e=document.getElementById('adm-login-err');if(e)e.textContent='' },3000)
   }
-  // Vérifier commerciaux
-  const comm=_commercialCreds.find(c=>c.id===id&&c.pw===pw)
-  if(comm){
-    _saveCurUser({role:'commercial', name:comm.name, id:comm.id})
-    errEl.textContent=''
-    _hideAdmLogin()
-    return
-  }
-  errEl.textContent='Identifiant ou mot de passe incorrect'
-  document.getElementById('adm-login-pw').value=''
-  document.getElementById('adm-login-pw').focus()
-  setTimeout(()=>{ const e=document.getElementById('adm-login-err');if(e)e.textContent='' },3000)
 }
 function admLogout(){
-  if(!confirm(`Se déconnecter (${curUser.name}) ?`)) return
-  _clearCurUser()
+  if(!confirm('Se déconnecter de l\'espace admin ?')) return
+  localStorage.removeItem('adm_auth')
   _showAdmLogin()
   document.getElementById('adm-login-id').value=''
   document.getElementById('adm-login-pw').value=''
-}
-
-// Badge utilisateur dans le topbar
-function _renderUserBadge(){
-  let el=document.getElementById('user-badge')
-  if(!el){
-    el=document.createElement('span')
-    el.id='user-badge'
-    el.style.cssText='display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:4px 10px;border-radius:20px;cursor:pointer;white-space:nowrap;flex-shrink:0'
-    el.title='Cliquer pour se déconnecter'
-    el.onclick=admLogout
-    // Insérer avant le bouton Notion
-    const notionBtn=document.querySelector('#topbar button[title="Sync Notion"]')
-    if(notionBtn) notionBtn.parentNode.insertBefore(el,notionBtn)
-    else document.getElementById('topbar')?.appendChild(el)
-  }
-  const isComm=curUser.role==='commercial'
-  el.style.background=isComm?'#E8F5E9':'#EDE7F6'
-  el.style.color=isComm?'#1B5E20':'#4527A0'
-  el.style.border=`1px solid ${isComm?'#A5D6A7':'#CE93D8'}`
-  const initials=curUser.name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase()
-  el.innerHTML=`<span style="width:22px;height:22px;border-radius:50%;background:${isComm?'#2E7D32':'#6A1B9A'};color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center">${initials}</span>${isComm?'👔 ':''}<span>${curUser.name}</span>`
 }
 function admTogglePw(){
   const inp=document.getElementById('adm-login-pw')
@@ -9020,27 +8938,6 @@ function admTogglePw(){
   if(!inp)return
   inp.type=inp.type==='password'?'text':'password'
   if(btn)btn.textContent=inp.type==='password'?'👁':'🙈'
-}
-function addCommercial(){
-  const name=(document.getElementById('s-comm-name')?.value||'').trim()
-  const id=(document.getElementById('s-comm-id')?.value||'').trim()
-  const pw=(document.getElementById('s-comm-pw')?.value||'').trim()
-  const msg=document.getElementById('s-comm-msg')
-  if(!name||!id||!pw){if(msg){msg.textContent='⚠ Tous les champs sont requis';msg.style.color='#C62828'}return}
-  if(_commercialCreds.find(c=>c.id===id)){if(msg){msg.textContent='⚠ Cet identifiant existe déjà';msg.style.color='#C62828'}return}
-  _commercialCreds.push({id,name,pw})
-  autoSaveSettings(true)
-  document.getElementById('s-comm-name').value=''
-  document.getElementById('s-comm-id').value=''
-  document.getElementById('s-comm-pw').value=''
-  if(msg){msg.textContent='✓ Compte ajouté';msg.style.color='#2E7D32';setTimeout(()=>{if(msg)msg.textContent=''},3000)}
-  rParam()  // rafraîchir la liste
-}
-function deleteCommercial(id){
-  if(!confirm(`Supprimer le compte commercial "${id}" ?`)) return
-  _commercialCreds=_commercialCreds.filter(c=>c.id!==id)
-  autoSaveSettings(true)
-  rParam()
 }
 function saveAdmCreds(){
   const newId=(document.getElementById('s-adm-id')?.value||'').trim()
