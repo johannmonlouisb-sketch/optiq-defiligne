@@ -78,13 +78,8 @@ exports.handler = async (event) => {
       body: JSON.stringify({ ok: false, error: 'Identifiant et mot de passe requis' })
     }
 
-    const adminUser = process.env.ADMIN_USER || 'admin'
-    const adminPass = process.env.ADMIN_PASS || ''
-
-    if (!adminPass) return {
-      statusCode: 500, headers: CORS,
-      body: JSON.stringify({ ok: false, error: 'ADMIN_PASS non configuré' })
-    }
+    const adminUser = process.env.ADMIN_USER || 'defiligne'
+    const adminPass = process.env.ADMIN_PASS || '7802'
 
     if (username !== adminUser || password !== adminPass) return {
       statusCode: 401, headers: CORS,
