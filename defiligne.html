@@ -517,10 +517,12 @@ tr:hover td{background:var(--bg)}
       <div class="np-prop">
         <div class="np-lbl">🏷️ Type</div>
         <select id="m-type" class="np-val" onchange="autoSaveField()">
-          <option value="maintenance_simple">Annuel — Maintenance physique · 15 min</option>
-          <option value="maintenance_complex">PAD PAK — Maintenance + consumables · 25 min</option>
+          <option value="maintenance_simple">Annuel · 15 min</option>
+          <option value="maintenance_complex">Maintenance + PAD PAK · 25 min</option>
           <option value="installation">Installation · 35 min</option>
           <option value="tele_maintenance">Télémaintenance · 10 min</option>
+          <option value="formation">Formation · 60 min</option>
+          <option value="livraison">Livraison · 30 min</option>
         </select>
       </div>
       <div class="np-prop">
@@ -836,6 +838,8 @@ const TYPES={
   maintenance_complex:{label:"Maintenance +",    dur:25,color:"#6A1B9A"},
   installation:       {label:"Installation",     dur:35,color:"#1B5E20"},
   tele_maintenance:   {label:"Télémaintenance",  dur:10,color:"#00897B"},
+  formation:          {label:"Formation",        dur:60,color:"#E65100"},
+  livraison:          {label:"Livraison",        dur:30,color:"#795548"},
 }
 const STATUSES={
   completed:    {label:"Terminé",    color:"#2E7D32",bg:"#E8F5E9"},
@@ -2176,9 +2180,10 @@ function _matchNotionTech(name){
 function _notionTypeToKey(s){
   const t=(s||'').toLowerCase()
   if(t.includes('télé') || t.includes('tele')) return 'tele_maintenance'
-  if(t.includes('install') || t.includes('livraison') || t.includes('formation') ||
-     t.includes('500p') || t.includes('360p') || t.includes('350p') ||
-     t.includes('cr2') || t.includes('rotaid')) return 'installation'
+  if(t.includes('formation')) return 'formation'
+  if(t.includes('livraison')) return 'livraison'
+  if(t.includes('install') || t.includes('500p') || t.includes('360p') ||
+     t.includes('350p') || t.includes('cr2') || t.includes('rotaid')) return 'installation'
   if(t.includes('pad pak') || t.includes('remplac') || t.includes('armoir') ||
      t.includes('électrode')) return 'maintenance_complex'
   return 'maintenance_simple'
@@ -8663,9 +8668,11 @@ function getTypeFromStr(s){
   const v = (s||'').toLowerCase()
   // Valeurs multi_select INTERVENTION de la base Notion Defiligne
   if(v.includes('télé') || v.includes('tele')) return 'tele_maintenance'
-  if(v.includes('install') || v.includes('livraison') || v.includes('500p') ||
-     v.includes('360p')    || v.includes('350p')      || v.includes('cr2')  ||
-     v.includes('rotaid')  || v.includes('pédiatrique')|| v.includes('formation')) return 'installation'
+  if(v.includes('formation')) return 'formation'
+  if(v.includes('livraison')) return 'livraison'
+  if(v.includes('install') || v.includes('500p') || v.includes('360p') ||
+     v.includes('350p') || v.includes('cr2') || v.includes('rotaid') ||
+     v.includes('pédiatrique')) return 'installation'
   if(v.includes('pad pak') || v.includes('remplac') || v.includes('armoir') ||
      v.includes('électrode')) return 'maintenance_complex'
   return 'maintenance_simple'
@@ -8835,7 +8842,7 @@ const _rt = (s) => ({rich_text:[{text:{content:(s||'').substring(0,2000)}}]})
 
 function _buildNotionPropsCore(iv){
   const tech=TECHS.find(t=>t.id===iv.techId)
-  const typeMap={maintenance_simple:'Annuel',maintenance_complex:'Maintenance + PAD PAK',installation:'Installation',tele_maintenance:'Télémaintenance'}
+  const typeMap={maintenance_simple:'Annuel',maintenance_complex:'Maintenance + PAD PAK',installation:'Installation',tele_maintenance:'Télémaintenance',formation:'Formation',livraison:'Livraison'}
   const props={
     'Société':           {title:[{text:{content:(iv.client||'').substring(0,2000)}}]},
     'Date intervention': {date:{start:iv.timeStart?iv.date+'T'+iv.timeStart+':00':iv.date}},
