@@ -8830,7 +8830,7 @@ function _buildNotionPropsCreate(iv){
   if(iv.contact_siege) props['Contact sieges']       ={rich_text:[{text:{content:iv.contact_siege.substring(0,2000)}}]}
   if(iv.email_siege)   props['E-mail Siéges']        ={email:iv.email_siege}
   if(iv.phone_siege)   props['Téléphone  siéges']    ={phone_number:iv.phone_siege}
-  props['Commercial '] = iv.commercial ? {select:{name:iv.commercial}} : {select:null}
+  if(iv.commercial) props['Commercial'] = {select:{name:iv.commercial}}
   return props
 }
 
@@ -8854,7 +8854,7 @@ function _buildNotionPropsUpdate(iv){
   if(iv.contact_siege) props['Contact sieges']       ={rich_text:[{text:{content:(iv.contact_siege||'').substring(0,2000)}}]}
   if(iv.email_siege)   props['E-mail Siéges']        ={email:iv.email_siege}
   if(iv.phone_siege)   props['Téléphone  siéges']    ={phone_number:iv.phone_siege}
-  props['Commercial '] = iv.commercial ? {select:{name:iv.commercial}} : {select:null}
+  if(iv.commercial) props['Commercial'] = {select:{name:iv.commercial}}
   return props
 }
 
