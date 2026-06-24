@@ -2661,9 +2661,12 @@ function rDepart(){
   if(hasTechOrder){
     displayIvs=[]
     const techOrder=depSelectedTechs.length?depSelectedTechs:TECHS.map(t=>t.id)
-    techOrder.forEach(tid=>{const ord=depRouteOrder[tid];if(ord)displayIvs.push(...ord.filter(iv=>iv.date===date))})
-    const seen=new Set(displayIvs.map(iv=>iv.id))
-    dayIvs.filter(iv=>!seen.has(iv.id)).forEach(iv=>displayIvs.push(iv))
+    const seenIds=new Set()
+    techOrder.forEach(tid=>{
+      const ord=depRouteOrder[tid]
+      if(ord) ord.filter(iv=>iv.date===date&&!seenIds.has(iv.id)).forEach(iv=>{seenIds.add(iv.id);displayIvs.push(iv)})
+    })
+    dayIvs.filter(iv=>!seenIds.has(iv.id)).forEach(iv=>{seenIds.add(iv.id);displayIvs.push(iv)})
   } else {
     // Pas encore de carte : grouper par tech, pré-trier par horaire si défini
     displayIvs=[]
