@@ -2,48 +2,585 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>OptiTechX — Gestion technicien DEA</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<title>OptiTechX — Connexion</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Segoe UI',sans-serif;background:#080C15;color:#fff;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 20px}
-.logo{display:flex;align-items:center;gap:14px;margin-bottom:40px}
-.logo-name{font-size:32px;font-weight:800;letter-spacing:-.04em}
-.logo-name b{color:#1D6FFF}
-.sub{font-size:16px;color:#94A3B8;margin-bottom:48px;line-height:1.7;max-width:480px}
-.cards{display:flex;gap:16px;flex-wrap:wrap;justify-content:center}
-.card{background:#111827;border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:32px 40px;text-decoration:none;color:#fff;transition:all .2s;min-width:200px}
-.card:hover{border-color:#1D6FFF;transform:translateY(-4px)}
-.card .ico{font-size:40px;margin-bottom:12px}
-.card h2{font-size:18px;font-weight:700;margin-bottom:6px}
-.card p{font-size:13px;color:#94A3B8}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --blue:#2563EB;    --blue-lo:rgba(37,99,235,.08);   --blue-hi:rgba(37,99,235,.5);
+  --amber:#F59E0B;   --amber-lo:rgba(245,158,11,.08); --amber-hi:rgba(245,158,11,.45);
+  --bg:#07090F;
+  --surface:#0D111C;
+  --s2:rgba(255,255,255,.03);
+  --border:rgba(255,255,255,.06);
+  --border-hi:rgba(255,255,255,.12);
+  --text:#EFF2F8;   --text2:#6B7A9E;   --text3:#3D4A6B;
+  --err:#EF4444;    --ok:#10B981;
+  /* dynamique selon onglet actif */
+  --cur:#2563EB;    --cur-lo:rgba(37,99,235,.08); --cur-glow:rgba(37,99,235,.07);
+}
+
+html,body{height:100%}
+body{
+  font-family:'Inter',system-ui,sans-serif;
+  background:var(--bg);color:var(--text);
+  min-height:100vh;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;padding:24px;
+  position:relative;overflow:hidden;
+}
+
+/* Bruit */
+body::before{
+  content:'';position:fixed;inset:0;z-index:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.03'/%3E%3C/svg%3E");
+  background-size:180px;
+}
+
+/* Halo dynamique */
+body::after{
+  content:'';position:fixed;
+  width:700px;height:700px;border-radius:50%;
+  background:radial-gradient(circle, var(--cur-glow) 0%, transparent 65%);
+  top:-250px;left:50%;transform:translateX(-50%);
+  pointer-events:none;z-index:0;
+  transition:background .5s;
+}
+
+.line-deco{
+  position:fixed;bottom:0;left:0;right:0;height:1px;z-index:0;
+  background:linear-gradient(90deg,transparent,var(--cur-hi, rgba(37,99,235,.3)),transparent);
+  transition:background .5s;
+}
+
+/* ── Wrapper ─────────────────────────────────── */
+.wrapper{position:relative;z-index:1;width:100%;max-width:380px;display:flex;flex-direction:column;align-items:center}
+
+/* ── Logo ────────────────────────────────────── */
+.logo{
+  display:flex;align-items:center;gap:14px;margin-bottom:40px;
+  animation:rise .5s cubic-bezier(.22,1,.36,1) both;
+}
+.logo-badge{
+  width:44px;height:44px;border-radius:12px;
+  background:linear-gradient(145deg,rgba(37,99,235,.15),rgba(37,99,235,.05));
+  border:1px solid rgba(37,99,235,.2);
+  display:flex;align-items:center;justify-content:center;position:relative;
+}
+.logo-text .brand{font-size:22px;font-weight:800;letter-spacing:-.05em}
+.logo-text .brand em{font-style:normal;color:var(--blue)}
+.logo-text .tagline{font-size:10.5px;font-weight:500;color:var(--text3);letter-spacing:.12em;text-transform:uppercase;margin-top:2px}
+
+/* ── Card ────────────────────────────────────── */
+.card{
+  width:100%;background:var(--surface);
+  border:1px solid var(--border);
+  border-top:2px solid var(--cur);
+  border-radius:20px;padding:24px;
+  box-shadow:0 0 0 1px rgba(255,255,255,.02) inset, 0 32px 64px -16px rgba(0,0,0,.6),
+             0 -1px 0 0 var(--cur) inset;
+  animation:rise .5s .08s cubic-bezier(.22,1,.36,1) both;
+  position:relative;overflow:hidden;
+  transition:border-top-color .35s, box-shadow .35s;
+}
+.card::before{
+  content:'';position:absolute;top:0;left:0;width:180px;height:1px;
+  background:linear-gradient(90deg,var(--cur),transparent);opacity:.4;
+  transition:background .35s;
+}
+.card::after{
+  content:'';position:absolute;top:0;left:0;width:1px;height:80px;
+  background:linear-gradient(180deg,var(--cur),transparent);opacity:.25;
+  transition:background .35s;
+}
+
+/* ── Tabs ────────────────────────────────────── */
+.tabs{
+  display:grid;grid-template-columns:1fr 1fr;gap:0;
+  background:var(--s2);border:1px solid var(--border);
+  border-radius:10px;padding:3px;margin-bottom:22px;
+}
+.tab{
+  padding:9px 0;border:none;background:transparent;
+  color:var(--text2);font-size:13px;font-weight:600;
+  cursor:pointer;border-radius:7px;transition:all .25s;
+  font-family:inherit;display:flex;align-items:center;
+  justify-content:center;gap:7px;letter-spacing:.01em;
+}
+.tab svg{width:14px;height:14px;transition:all .25s;opacity:.5}
+
+/* Technicien actif → bleu */
+.tab[data-t="tech"].on{
+  background:rgba(37,99,235,.14);
+  color:#60A5FA;
+  box-shadow:0 0 0 1px rgba(37,99,235,.3) inset;
+}
+.tab[data-t="tech"].on svg{opacity:1;filter:drop-shadow(0 0 4px rgba(37,99,235,.6))}
+
+/* Admin actif → ambre */
+.tab[data-t="admin"].on{
+  background:rgba(245,158,11,.12);
+  color:#FCD34D;
+  box-shadow:0 0 0 1px rgba(245,158,11,.3) inset;
+}
+.tab[data-t="admin"].on svg{opacity:1;filter:drop-shadow(0 0 4px rgba(245,158,11,.5))}
+
+/* Indicateur bas de tab */
+.tab::after{
+  content:'';position:absolute;bottom:-3px;left:50%;transform:translateX(-50%);
+  width:0;height:2px;border-radius:2px;background:var(--cur);
+  transition:width .25s;
+}
+.tab.on::after{width:24px}
+.tabs{position:relative}
+
+/* ── Label ───────────────────────────────────── */
+.lbl{font-size:10.5px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.12em;margin-bottom:10px}
+.sep{height:1px;background:var(--border);margin:18px 0}
+
+/* ── Sections ────────────────────────────────── */
+.section{display:none}
+.section.on{display:block;animation:sectionIn .22s ease both}
+@keyframes sectionIn{from{opacity:0;transform:translateX(6px)}to{opacity:1;transform:translateX(0)}}
+
+/* ── Dropdown profil ─────────────────────────── */
+.dropdown{position:relative;margin-bottom:20px}
+.dd-trigger{
+  width:100%;height:48px;padding:0 14px;
+  background:var(--s2);border:1px solid var(--border);border-radius:10px;
+  color:var(--text);font-size:14px;font-weight:500;font-family:inherit;
+  cursor:pointer;display:flex;align-items:center;justify-content:space-between;
+  transition:border-color .2s,background .2s,box-shadow .2s;
+  text-align:left;
+}
+.dd-trigger:hover{border-color:var(--border-hi);background:rgba(255,255,255,.05)}
+.dd-trigger.open{
+  border-color:rgba(37,99,235,.5);
+  background:rgba(37,99,235,.06);
+  box-shadow:0 0 0 3px rgba(37,99,235,.08);
+  border-radius:10px 10px 0 0;
+}
+.dd-trigger.selected{color:var(--blue);border-color:rgba(37,99,235,.4)}
+.dd-placeholder{color:var(--text2);font-weight:400}
+.dd-chevron{
+  width:16px;height:16px;flex-shrink:0;color:var(--text2);
+  transition:transform .2s;
+}
+.dd-trigger.open .dd-chevron{transform:rotate(180deg)}
+
+.dd-menu{
+  position:absolute;top:100%;left:0;right:0;z-index:100;
+  background:#111827;border:1px solid rgba(37,99,235,.3);
+  border-top:none;border-radius:0 0 10px 10px;
+  overflow:hidden;
+  max-height:0;opacity:0;pointer-events:none;
+  transition:max-height .22s cubic-bezier(.22,1,.36,1),opacity .18s;
+}
+.dd-menu.open{max-height:240px;opacity:1;pointer-events:auto}
+
+.dd-item{
+  width:100%;padding:13px 14px;border:none;background:transparent;
+  color:var(--text2);font-size:13px;font-weight:600;font-family:inherit;
+  cursor:pointer;display:flex;align-items:center;gap:10px;
+  transition:background .15s,color .15s;text-align:left;letter-spacing:.03em;
+}
+.dd-item:not(:last-child){border-bottom:1px solid var(--border)}
+.dd-item:hover{background:rgba(37,99,235,.08);color:var(--text)}
+.dd-item.selected{color:#60A5FA;background:rgba(37,99,235,.1)}
+.dd-item .dd-avatar{
+  width:28px;height:28px;border-radius:8px;flex-shrink:0;
+  background:rgba(37,99,235,.15);border:1px solid rgba(37,99,235,.2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:700;color:#60A5FA;letter-spacing:0;
+}
+.dd-item.selected .dd-avatar{background:rgba(37,99,235,.25)}
+.dd-check{margin-left:auto;opacity:0;color:#60A5FA}
+.dd-item.selected .dd-check{opacity:1}
+
+/* ── PIN ─────────────────────────────────────── */
+.pin-row{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:20px}
+.pin-dot{
+  width:10px;height:10px;border-radius:50%;
+  background:var(--s2);border:1.5px solid var(--border-hi);
+  transition:all .15s cubic-bezier(.34,1.56,.64,1);
+}
+.pin-dot.filled{
+  background:var(--blue);border-color:var(--blue);
+  transform:scale(1.2);box-shadow:0 0 8px rgba(37,99,235,.5);
+}
+.pin-dot.error{background:var(--err);border-color:var(--err);box-shadow:0 0 8px rgba(239,68,68,.4)}
+.pin-dot.shake{animation:shake .38s ease both}
+@keyframes shake{
+  15%{transform:translateX(-5px) scale(1.1)}30%{transform:translateX(4px)}
+  45%{transform:translateX(-3px)}60%{transform:translateX(2px)}
+  75%{transform:translateX(-1px)}100%{transform:translateX(0)}
+}
+
+/* ── Keypad ──────────────────────────────────── */
+.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.key{
+  padding:0;height:56px;
+  border:1px solid var(--border);border-radius:10px;
+  background:var(--s2);color:var(--text);
+  font-size:18px;font-weight:600;cursor:pointer;
+  transition:all .12s;font-family:inherit;
+  user-select:none;-webkit-user-select:none;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+  position:relative;overflow:hidden;
+}
+.key .sub{font-size:7px;font-weight:500;color:var(--text3);letter-spacing:.15em;margin-top:1px}
+.key:active{transform:scale(.94);border-color:var(--border-hi);background:rgba(255,255,255,.06)}
+.key.del{font-size:16px;color:var(--text2)}
+.key.del:active{color:var(--err)}
+.key.empty{border:none;background:transparent;cursor:default;pointer-events:none}
+
+/* ── Admin ───────────────────────────────────── */
+.field{position:relative;margin-bottom:12px}
+.field input{
+  width:100%;padding:22px 14px 8px;height:52px;
+  background:var(--s2);border:1px solid var(--border);border-radius:10px;
+  color:var(--text);font-size:14px;font-family:inherit;outline:none;
+  transition:border-color .2s,box-shadow .2s,background .2s;
+}
+.field input:focus{
+  border-color:rgba(245,158,11,.5);
+  background:rgba(245,158,11,.04);
+  box-shadow:0 0 0 3px rgba(245,158,11,.08);
+}
+.field label{
+  position:absolute;left:14px;top:16px;
+  font-size:14px;font-weight:500;color:var(--text2);
+  pointer-events:none;transform-origin:left top;
+  transition:transform .18s,color .18s;
+}
+.field input:focus ~ label,
+.field input:not(:placeholder-shown) ~ label{
+  transform:translateY(-9px) scale(.75);
+  color:var(--amber);
+}
+.field input:not(:focus):not(:placeholder-shown) ~ label{color:var(--text3)}
+
+.btn-login{
+  width:100%;height:46px;margin-top:4px;
+  color:#fff;border:none;border-radius:10px;
+  font-size:14px;font-weight:600;letter-spacing:.02em;
+  cursor:pointer;font-family:inherit;
+  transition:background .2s,box-shadow .2s,transform .1s;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  position:relative;overflow:hidden;
+  background:var(--cur);
+}
+.btn-login:hover{filter:brightness(1.12);box-shadow:0 4px 20px rgba(0,0,0,.25)}
+.btn-login:active{transform:scale(.98)}
+.btn-login:disabled{opacity:.4;cursor:not-allowed;transform:none;filter:none}
+
+.spin{
+  width:14px;height:14px;border-radius:50%;
+  border:2px solid rgba(255,255,255,.25);border-top-color:#fff;
+  animation:spinning .55s linear infinite;flex-shrink:0;
+}
+@keyframes spinning{to{transform:rotate(360deg)}}
+
+/* ── Message ─────────────────────────────────── */
+.msg{
+  font-size:12.5px;font-weight:500;text-align:center;
+  border-radius:8px;padding:0 10px;margin-bottom:16px;
+  max-height:0;overflow:hidden;opacity:0;
+  transition:max-height .3s,opacity .3s,padding .3s;
+}
+.msg.visible{max-height:40px;opacity:1;padding:9px 10px}
+.msg.error{color:#FCA5A5;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.15)}
+.msg.success{color:#6EE7B7;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.15)}
+
+/* ── Footer ──────────────────────────────────── */
+.foot{
+  position:relative;z-index:1;margin-top:22px;
+  display:flex;align-items:center;gap:8px;
+  font-size:11px;color:var(--text3);letter-spacing:.04em;
+  animation:rise .5s .2s cubic-bezier(.22,1,.36,1) both;
+}
+.foot-dot{width:3px;height:3px;border-radius:50%;background:var(--text3)}
+
+@keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 </style>
 </head>
 <body>
-<div class="logo">
-  <svg width="44" height="44" viewBox="0 0 36 36" fill="none">
-    <circle cx="15.5" cy="15.5" r="10.5" stroke="#1D6FFF" stroke-width="3.2" fill="none"/>
-    <line x1="22" y1="22" x2="33" y2="33" stroke="#1D6FFF" stroke-width="3.2" stroke-linecap="round"/>
-    <circle cx="15.5" cy="15.5" r="3" fill="#1D6FFF" opacity=".4"/>
-    <line x1="15.5" y1="9" x2="15.5" y2="11" stroke="#1D6FFF" stroke-width="2" stroke-linecap="round"/>
-    <line x1="15.5" y1="20" x2="15.5" y2="22" stroke="#1D6FFF" stroke-width="2" stroke-linecap="round"/>
-    <line x1="9" y1="15.5" x2="11" y2="15.5" stroke="#1D6FFF" stroke-width="2" stroke-linecap="round"/>
-    <line x1="20" y1="15.5" x2="22" y2="15.5" stroke="#1D6FFF" stroke-width="2" stroke-linecap="round"/>
-  </svg>
-  <span class="logo-name"><b>OptiTechX</b></span>
+<div class="line-deco"></div>
+<div class="wrapper">
+
+  <!-- Logo -->
+  <div class="logo">
+    <div class="logo-badge">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <circle cx="10" cy="10" r="6.5" stroke="#2563EB" stroke-width="1.8"/>
+        <line x1="14.8" y1="14.8" x2="21" y2="21" stroke="#2563EB" stroke-width="1.8" stroke-linecap="round"/>
+        <circle cx="10" cy="10" r="2" fill="#2563EB" opacity=".5"/>
+      </svg>
+    </div>
+    <div class="logo-text">
+      <div class="brand">Opti<em>TechX</em></div>
+      <div class="tagline">Field Operations</div>
+    </div>
+  </div>
+
+  <!-- Card -->
+  <div class="card" id="card">
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab on" data-t="tech" onclick="switchTab('tech')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+          <polyline points="10 9 9 9 8 9"/>
+        </svg>
+        Technicien
+      </button>
+      <button class="tab" data-t="admin" onclick="switchTab('admin')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+        Admin
+      </button>
+    </div>
+
+    <!-- Message -->
+    <div class="msg" id="msg"></div>
+
+    <!-- ── TECHNICIEN ────────────────────────── -->
+    <div class="section on" id="sec-tech">
+
+      <div class="lbl">Profil</div>
+      <div class="dropdown" id="dropdown">
+        <button class="dd-trigger" id="dd-trigger" onclick="toggleDropdown()">
+          <span class="dd-placeholder" id="dd-label">Sélectionnez votre profil…</span>
+          <svg class="dd-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </button>
+        <div class="dd-menu" id="dd-menu"></div>
+      </div>
+
+      <div class="sep"></div>
+      <div class="lbl">Code PIN</div>
+      <div class="pin-row" id="pin-dots"></div>
+      <div class="keypad" id="keypad"></div>
+    </div>
+
+    <!-- ── ADMIN ─────────────────────────────── -->
+    <div class="section" id="sec-admin">
+      <div class="field">
+        <input type="text" id="adm-user" placeholder=" "
+          autocomplete="username" autocorrect="off" autocapitalize="none" spellcheck="false">
+        <label>Identifiant</label>
+      </div>
+      <div class="field">
+        <input type="password" id="adm-pass" placeholder=" "
+          autocomplete="current-password">
+        <label>Mot de passe</label>
+      </div>
+      <button class="btn-login" id="btn-adm-login" onclick="loginAdmin()">
+        Se connecter
+      </button>
+    </div>
+
+  </div>
+
+  <div class="foot">
+    <span>OptiTechX</span><div class="foot-dot"></div>
+    <span>v2.0</span><div class="foot-dot"></div>
+    <span>Defiligne © 2025</span>
+  </div>
 </div>
-<p class="sub">Plateforme de gestion et planification de tournées techniciens DEA</p>
-<div class="cards">
-  <a href="/defiligne.html" class="card">
-    <div class="ico">📊</div>
-    <h2>Espace Admin</h2>
-    <p>Planning, dispatch,<br>analyse, paramètres</p>
-  </a>
-  <a href="/tech.html" class="card">
-    <div class="ico">🔧</div>
-    <h2>App Technicien</h2>
-    <p>Tournée, carte,<br>validation terrain</p>
-  </a>
-</div>
+
+<script>
+// ── Config ────────────────────────────────────────────────────────────────
+const KEY_SUB = {'2':'ABC','3':'DEF','4':'GHI','5':'JKL','6':'MNO','7':'PQRS','8':'TUV','9':'WXYZ','0':'+'}
+const PIN_LEN = 4
+let currentPin = '', selectedTech = '', isLoading = false, ddOpen = false
+
+// ── Thème onglet ──────────────────────────────────────────────────────────
+const THEME = {
+  tech:  { cur:'#2563EB', curLo:'rgba(37,99,235,.08)',  curGlow:'rgba(37,99,235,.07)', curHi:'rgba(37,99,235,.3)' },
+  admin: { cur:'#D97706', curLo:'rgba(217,119,6,.08)',   curGlow:'rgba(217,119,6,.06)', curHi:'rgba(217,119,6,.25)' }
+}
+function applyTheme(t) {
+  const th = THEME[t], r = document.documentElement.style
+  r.setProperty('--cur',     th.cur)
+  r.setProperty('--cur-lo',  th.curLo)
+  r.setProperty('--cur-glow',th.curGlow)
+  r.setProperty('--cur-hi',  th.curHi)
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────
+function switchTab(t) {
+  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.t === t))
+  document.getElementById('sec-tech').classList.toggle('on',  t === 'tech')
+  document.getElementById('sec-admin').classList.toggle('on', t === 'admin')
+  applyTheme(t)
+  clearMsg()
+  if (ddOpen) closeDropdown()
+}
+
+// ── Message ───────────────────────────────────────────────────────────────
+function showMsg(text, type='error') {
+  const el = document.getElementById('msg')
+  el.textContent = text; el.className = 'msg ' + type
+  requestAnimationFrame(() => el.classList.add('visible'))
+}
+function clearMsg() {
+  const el = document.getElementById('msg')
+  el.classList.remove('visible')
+  setTimeout(() => { el.textContent=''; el.className='msg' }, 300)
+}
+
+// ── Dropdown ──────────────────────────────────────────────────────────────
+function toggleDropdown() { ddOpen ? closeDropdown() : openDropdown() }
+
+function openDropdown() {
+  ddOpen = true
+  document.getElementById('dd-trigger').classList.add('open')
+  document.getElementById('dd-menu').classList.add('open')
+}
+function closeDropdown() {
+  ddOpen = false
+  document.getElementById('dd-trigger').classList.remove('open')
+  document.getElementById('dd-menu').classList.remove('open')
+}
+
+document.addEventListener('click', e => {
+  if (ddOpen && !document.getElementById('dropdown').contains(e.target)) closeDropdown()
+})
+
+async function loadTechs() {
+  try {
+    const r = await fetch('/api/config')
+    const d = await r.json()
+    buildDropdown(d.techniciens || ['HERBET','BEUZELIN'])
+  } catch {
+    buildDropdown(['HERBET','BEUZELIN'])
+  }
+}
+
+function buildDropdown(techs) {
+  const menu = document.getElementById('dd-menu')
+  menu.innerHTML = techs.map(t => {
+    const initials = t.slice(0,2).toUpperCase()
+    return `<button class="dd-item" onclick="selectTech('${t}')">
+      <div class="dd-avatar">${initials}</div>
+      ${t}
+      <svg class="dd-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+    </button>`
+  }).join('')
+}
+
+function selectTech(nom) {
+  selectedTech = nom
+  const lbl = document.getElementById('dd-label')
+  lbl.textContent = nom
+  lbl.className = ''
+  const trigger = document.getElementById('dd-trigger')
+  trigger.classList.add('selected')
+  document.querySelectorAll('.dd-item').forEach(b =>
+    b.classList.toggle('selected', b.textContent.trim().startsWith(nom))
+  )
+  closeDropdown()
+  currentPin = ''; renderDots(); clearMsg()
+}
+
+// ── PIN ───────────────────────────────────────────────────────────────────
+function renderDots() {
+  document.getElementById('pin-dots').innerHTML =
+    Array.from({length: PIN_LEN}, (_,i) =>
+      `<div class="pin-dot ${i < currentPin.length ? 'filled' : ''}"></div>`
+    ).join('')
+}
+
+function buildKeypad() {
+  const keys = ['1','2','3','4','5','6','7','8','9','','0','⌫']
+  document.getElementById('keypad').innerHTML = keys.map(k => {
+    if (!k) return `<button class="key empty"></button>`
+    if (k === '⌫') return `<button class="key del" onclick="pinDel()">⌫</button>`
+    const sub = KEY_SUB[k] || ''
+    return `<button class="key" onclick="pinPress('${k}')">${k}${sub ? `<span class="sub">${sub}</span>` : ''}</button>`
+  }).join('')
+}
+
+function pinPress(digit) {
+  if (isLoading) return
+  if (!selectedTech) { showMsg('Sélectionnez d\'abord votre profil'); return }
+  if (currentPin.length >= PIN_LEN) return
+  currentPin += digit; renderDots()
+  if (currentPin.length === PIN_LEN) setTimeout(loginTech, 140)
+}
+function pinDel() {
+  if (isLoading) return
+  currentPin = currentPin.slice(0,-1); renderDots()
+}
+
+// ── Login tech ────────────────────────────────────────────────────────────
+async function loginTech() {
+  if (!selectedTech || currentPin.length < PIN_LEN) return
+  isLoading = true
+  try {
+    const r = await fetch('/api/auth/login', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ type:'tech', nom:selectedTech, pin:currentPin })
+    })
+    const d = await r.json()
+    if (!r.ok || !d.ok) { pinError(); showMsg(d.error || 'Code PIN incorrect') }
+    else { saveSession(d); showMsg('Accès autorisé','success'); setTimeout(() => location.href='/tech', 700) }
+  } catch { showMsg('Erreur réseau — réessayez'); pinError() }
+  finally { isLoading = false }
+}
+
+function pinError() {
+  currentPin = ''
+  const dots = document.querySelectorAll('.pin-dot')
+  dots.forEach(d => d.classList.add('error','shake'))
+  setTimeout(() => { dots.forEach(d => d.classList.remove('error','shake')); renderDots() }, 650)
+}
+
+// ── Login admin ───────────────────────────────────────────────────────────
+async function loginAdmin() {
+  const username = document.getElementById('adm-user').value.trim()
+  const password = document.getElementById('adm-pass').value
+  if (!username || !password) { showMsg('Tous les champs sont requis'); return }
+  const btn = document.getElementById('btn-adm-login')
+  btn.disabled = true; btn.innerHTML = '<div class="spin"></div>Vérification…'
+  try {
+    const r = await fetch('/api/auth/login', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ type:'admin', username, password })
+    })
+    const d = await r.json()
+    if (!r.ok || !d.ok) { showMsg(d.error || 'Identifiants incorrects') }
+    else { saveSession(d); showMsg('Accès autorisé','success'); setTimeout(() => location.href='/defiligne', 700) }
+  } catch { showMsg('Erreur réseau — réessayez') }
+  finally { btn.disabled=false; btn.innerHTML='Se connecter' }
+}
+
+// ── Session / Init ────────────────────────────────────────────────────────
+function saveSession(data) {
+  localStorage.setItem('optiq_session', JSON.stringify({
+    token:data.token, nom:data.nom, role:data.role, savedAt:Date.now()
+  }))
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.getElementById('sec-admin').classList.contains('on')) loginAdmin()
+  if (e.key === 'Escape' && ddOpen) closeDropdown()
+})
+
+const existing = (() => { try { return JSON.parse(localStorage.getItem('optiq_session')) } catch{} return null })()
+if (existing?.token) location.href = existing.role === 'admin' ? '/defiligne' : '/tech'
+
+applyTheme('tech')
+loadTechs(); buildKeypad(); renderDots()
+</script>
 </body>
 </html>
