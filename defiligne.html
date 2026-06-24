@@ -532,11 +532,11 @@ tr:hover td{background:var(--bg)}
       </div>
       <div class="np-prop">
         <div class="np-lbl">🕐 Début souhaité</div>
-        <input type="time" id="m-timestart" class="np-val" onchange="autoSaveField()"/>
+        <input type="time" id="m-timestart" class="np-val" onchange="autoSaveField();_lastSuggestAddr='';suggestDates()"/>
       </div>
       <div class="np-prop">
         <div class="np-lbl">⏰ Heure limite</div>
-        <input type="time" id="m-timeend" class="np-val" onchange="autoSaveField()"/>
+        <input type="time" id="m-timeend" class="np-val" onchange="autoSaveField();_lastSuggestAddr='';suggestDates()"/>
       </div>
       <div class="np-prop">
         <div class="np-lbl">🎓 Formation</div>
@@ -4703,24 +4703,46 @@ function _bestInsertDetour(techId, date, newAddr){
 
 const _TRAVEL_PER_IV = 25  // estimation trajet moyen entre clients (min) — cohérent avec dashboard
 
+// Convertit "HH:MM" en minutes depuis minuit
+function _toMin(hhmm){ if(!hhmm) return null; const[h,m]=hhmm.split(':').map(Number); return h*60+m }
+
+// Vérifie si un horaire imposé entre en conflit avec les interventions ancrées du tech ce jour
+// Retourne {conflict:true, with: iv} si conflit, sinon {conflict:false, anchors: n}
+function _checkTimeConflict(techId, date, newStart, newEnd, ivMin){
+  const techIvs = ivs.filter(i=>i.date===date&&i.techId===techId&&(i.timeStart||i.timeEnd))
+  let anchors = techIvs.length
+  if(!newStart && !newEnd) return {conflict:false, anchors}
+  const ns = _toMin(newStart)||0
+  const ne = newEnd ? _toMin(newEnd) : ns + ivMin
+  for(const iv of techIvs){
+    const is = _toMin(iv.timeStart)||0
+    const ie = iv.timeEnd ? _toMin(iv.timeEnd) : is + dur(iv.type, iv.form)
+    if(ns < ie && ne > is) return {conflict:true, with:iv}
+  }
+  return {conflict:false, anchors}
+}
+
 // Score complet pour un (date, tech) — plus bas = meilleur
-// Retourne null si le tech n'a pas la capacité
-function _scoreTechDate(techId, date, newAddr, ivMin){
-  const dayMax = Math.min(window.dispatchCfg.maxDayHours, window.dispatchCfg.maxLegalHours) * 60  // ex: 540 min (9h)
-  const perTechMax = dayMax * 0.90  // seuil à 90% — garder 10% pour imprévus
-  // Charge réelle = travail + trajet pour chaque intervention déjà planifiée
+// Retourne null si le tech n'a pas la capacité ou si conflit d'horaire
+function _scoreTechDate(techId, date, newAddr, ivMin, newTimeStart='', newTimeEnd=''){
+  const dayMax = Math.min(window.dispatchCfg.maxDayHours, window.dispatchCfg.maxLegalHours) * 60
+  const perTechMax = dayMax * 0.90
   const techIvs = ivs.filter(i=>i.date===date&&i.techId===techId)
   const techLoad = techIvs.reduce((a,i)=>a+dur(i.type,i.form)+_TRAVEL_PER_IV, 0)
   if(techLoad+ivMin>perTechMax) return null  // journée pleine
 
-  const detour=_bestInsertDetour(techId, date, newAddr)
-  const loadPct=Math.round(techLoad/dayMax*100)  // % sur la vraie journée (pas le seuil buffered)
-  // Pénalité charge : éviter les techs déjà à >80% de leur vraie journée
-  const loadPenalty=loadPct>80?200:loadPct>60?50:0
-  // Bonus : coordonnées GPS précises = score plus fiable, on leur fait confiance
-  const preciseBonus=_addrPrecise(newAddr)?0:30
+  // Vérifier conflit d'horaire imposé
+  const tc = _checkTimeConflict(techId, date, newTimeStart, newTimeEnd, ivMin)
+  if(tc.conflict) return null  // créneau déjà occupé
 
-  return detour*10 + loadPenalty + preciseBonus
+  const detour=_bestInsertDetour(techId, date, newAddr)
+  const loadPct=Math.round(techLoad/dayMax*100)
+  const loadPenalty=loadPct>80?200:loadPct>60?50:0
+  const preciseBonus=_addrPrecise(newAddr)?0:30
+  // Pénalité si la journée a déjà des interventions ancrées (moins de flexibilité)
+  const anchorPenalty=tc.anchors*15
+
+  return detour*10 + loadPenalty + preciseBonus + anchorPenalty
 }
 
 function effectiveCap(date){
@@ -5009,6 +5031,12 @@ function autoSaveField(){
   const ind=document.getElementById("np-saved")
   if(ind){ind.classList.add("show");clearTimeout(ind._t);ind._t=setTimeout(()=>ind.classList.remove("show"),1800)}
   cloudSave()
+  // Debounce Notion push — évite de spammer à chaque frappe (délai 3s)
+  clearTimeout(autoSaveField._notionT)
+  autoSaveField._notionT=setTimeout(()=>{
+    const updated=ivs.find(i=>i.id===id)
+    if(updated) pushIvToNotion(updated)
+  },3000)
 }
 function deleteIv(){
   const id=parseInt(document.getElementById("m-id").value)
@@ -7129,6 +7157,11 @@ function suggestDates(){
 
   const ivType = document.getElementById("m-type")?.value || "maintenance_simple"
   const ivMin = dur(ivType, false) + 35
+  // Lire l'horaire imposé depuis le formulaire
+  const ivTimeStart = document.getElementById("m-timestart")?.value || ""
+  const ivTimeEnd   = document.getElementById("m-timeend")?.value   || ""
+  const hasFixedTime = !!(ivTimeStart || ivTimeEnd)
+
   const slots = getAvailableSlots(45)
   const addedLoad = {}
   const MOIS = ["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"]
@@ -7162,8 +7195,9 @@ function suggestDates(){
 
     let bestScore=Infinity, bestTech=null, bestDetour=0
     for(const tech of targets){
-      const s=_scoreTechDate(tech.id, date, addr, ivMin)
-      if(s===null) continue   // pas de capacité
+      // Inclure l'horaire imposé pour détecter les conflits de créneau
+      const s=_scoreTechDate(tech.id, date, addr, ivMin, ivTimeStart, ivTimeEnd)
+      if(s===null) continue   // pas de capacité ou conflit d'horaire imposé
       if(s<bestScore){ bestScore=s; bestTech=tech; bestDetour=Math.max(0,_bestInsertDetour(tech.id,date,addr)) }
     }
     if(bestTech===null) continue   // aucun tech n'a la place
@@ -7178,9 +7212,12 @@ function suggestDates(){
     const sameDeptIvs = dayIvs.filter(i=>extractDept(i.addr)===dept)
     const absentNames = TECHS.filter(t=>t.avail&&isTechAbsent(t.id,date)).map(t=>t.name)
 
+    // Nombre d'interventions ancrées (horaire fixé) du bestTech ce jour
+    const anchoredCount = techIvsDay.filter(i=>i.timeStart||i.timeEnd).length
+
     suggestions.push({date, coherent, extraKm, dayIvs:dayIvs.length, loadPct, overnight,
       score:bestScore, sameDeptIvs:sameDeptIvs.length, avail:avail.length, absentNames,
-      bestTech, precise})
+      bestTech, precise, anchoredCount})
   }
   suggestions.sort((a,b)=>a.score-b.score)
 
@@ -7232,6 +7269,7 @@ function suggestDates(){
           ${s.overnight?`<span style="font-size:10px;background:#FFEBEE;color:#C62828;padding:1px 6px;border-radius:3px">🏨 Découchage</span>`:""}
           ${s.absentNames?.length?`<span style="font-size:10px;background:#FFF3E0;color:#E65100;padding:1px 6px;border-radius:3px">🚫 ${s.absentNames.join(', ')} absent${s.absentNames.length>1?'s':''}</span>`:""}
           ${!s.precise?`<span style="font-size:10px;background:#F5F5F5;color:#9E9E9E;padding:1px 6px;border-radius:3px">~estimation dept.</span>`:""}
+          ${s.anchoredCount>0?`<span style="font-size:10px;background:#EDE7F6;color:#4527A0;padding:1px 6px;border-radius:3px">🕐 ${s.anchoredCount} ancré${s.anchoredCount>1?"s":""}</span>`:""}
         </div>
         <div style="height:4px;background:rgba(21,101,192,.15);border-radius:2px;overflow:hidden">
           <div style="height:100%;width:${s.loadPct}%;background:${s.loadPct>80?"#C62828":s.loadPct>60?"#E65100":"#1565C0"};border-radius:2px"></div>
@@ -7243,7 +7281,12 @@ function suggestDates(){
   }).join("")
 
   if(warn_el){
-    if(overnight){
+    if(hasFixedTime){
+      const ts=ivTimeStart?ivTimeStart.replace(':','h'):'', te=ivTimeEnd?ivTimeEnd.replace(':','h'):''
+      const label=ts&&te?`${ts}–${te}`:ts||te
+      warn_el.innerHTML=`🕐 <strong>Horaire imposé : ${label}</strong> — les créneaux en conflit sont exclus`
+      warn_el.style.display="block"
+    } else if(overnight){
       warn_el.textContent="⚠️ Cette adresse nécessite probablement un découchage ("+Math.round(kmDep)+" km du dépôt)"
       warn_el.style.display="block"
     } else {
@@ -8715,26 +8758,44 @@ function _buildNotionPropsCreate(iv){
     'Terminer':          {checkbox:iv.status==='completed'},
     'Echec':             {checkbox:iv.status==='not_responded'},
   }
-  if(iv.notes)   props['INFO ']          ={rich_text:[{text:{content:iv.notes.substring(0,2000)}}]}
-  if(iv.siege)   props['Adresse Siéges'] ={rich_text:[{text:{content:iv.siege.substring(0,2000)}}]}
-  if(iv.contact) props['Contact site']   ={rich_text:[{text:{content:iv.contact.substring(0,2000)}}]}
-  if(iv.cphone)  props['Téléphone']      ={phone_number:iv.cphone}
+  if(iv.notes)         props['INFO ']               ={rich_text:[{text:{content:(iv.notes||'').substring(0,2000)}}]}
+  if(iv.siege)         props['Adresse Siéges']       ={rich_text:[{text:{content:iv.siege.substring(0,2000)}}]}
+  if(iv.contact)       props['Contact site']         ={rich_text:[{text:{content:iv.contact.substring(0,2000)}}]}
+  if(iv.cphone)        props['Téléphone']            ={phone_number:iv.cphone}
+  if(iv.cemail)        props['E-mail']               ={email:iv.cemail}
+  if(iv.contact_siege) props['Contact sieges']       ={rich_text:[{text:{content:iv.contact_siege.substring(0,2000)}}]}
+  if(iv.email_siege)   props['E-mail Siéges']        ={email:iv.email_siege}
+  if(iv.phone_siege)   props['Téléphone  siéges']    ={phone_number:iv.phone_siege}
+  return props
+}
+
+// Construit les props Notion pour une mise à jour — inclut tous les champs éditables
+function _buildNotionPropsUpdate(iv){
+  const tech=TECHS.find(t=>t.id===iv.techId)
+  const typeMap={maintenance_simple:'Annuel',maintenance_complex:'PAD PAK',installation:'Installation',tele_maintenance:'Télémaintenance'}
+  const props={
+    'Date intervention': {date:{start:iv.timeStart?iv.date+'T'+iv.timeStart+':00':iv.date}},
+    'Technicien':        {select:{name:tech?tech.name:''}},
+    'INTERVENTION':      {multi_select:[{name:typeMap[iv.type]||'Annuel'}]},
+    'Adresse Site':      {rich_text:[{text:{content:(iv.addr||'').substring(0,2000)}}]},
+    'Terminer':          {checkbox:iv.status==='completed'},
+    'Echec':             {checkbox:iv.status==='not_responded'},
+    'INFO ':             {rich_text:[{text:{content:(iv.notes||'').substring(0,2000)}}]},
+  }
+  if(iv.contact)       props['Contact site']         ={rich_text:[{text:{content:(iv.contact||'').substring(0,2000)}}]}
+  if(iv.cphone)        props['Téléphone']            ={phone_number:iv.cphone}
+  if(iv.cemail)        props['E-mail']               ={email:iv.cemail}
+  if(iv.siege)         props['Adresse Siéges']       ={rich_text:[{text:{content:(iv.siege||'').substring(0,2000)}}]}
+  if(iv.contact_siege) props['Contact sieges']       ={rich_text:[{text:{content:(iv.contact_siege||'').substring(0,2000)}}]}
+  if(iv.email_siege)   props['E-mail Siéges']        ={email:iv.email_siege}
+  if(iv.phone_siege)   props['Téléphone  siéges']    ={phone_number:iv.phone_siege}
   return props
 }
 
 async function pushIvToNotion(iv){
   if(!isDeployedApp) return
   if(iv.notionId){
-    // Update : uniquement les champs confirmés (date + statuts + notes)
-    // Notion retourne 400 si un seul champ a le mauvais type → tout l'update échoue
-    const tech=TECHS.find(t=>t.id===iv.techId)
-    const props={
-      'Date intervention': {date:{start:iv.timeStart?iv.date+'T'+iv.timeStart+':00':iv.date}},
-      'Technicien':        {select:{name:tech?tech.name:''}},
-      'Terminer':          {checkbox:iv.status==='completed'},
-      'Echec':             {checkbox:iv.status==='not_responded'},
-    }
-    if(iv.notes!==undefined) props['INFO ']={rich_text:[{text:{content:(iv.notes||'').substring(0,2000)}}]}
+    const props=_buildNotionPropsUpdate(iv)
     try{
       await notionCall('update_page',{pageId:iv.notionId,properties:props})
       showToast('☁️ Notion mis à jour','#1B5E20')
