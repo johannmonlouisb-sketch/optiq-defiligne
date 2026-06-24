@@ -8835,7 +8835,7 @@ const _rt = (s) => ({rich_text:[{text:{content:(s||'').substring(0,2000)}}]})
 
 function _buildNotionPropsCore(iv){
   const tech=TECHS.find(t=>t.id===iv.techId)
-  const typeMap={maintenance_simple:'Annuel',maintenance_complex:'PAD PAK',installation:'Installation',tele_maintenance:'Télémaintenance'}
+  const typeMap={maintenance_simple:'Annuel',maintenance_complex:'Maintenance + PAD PAK',installation:'Installation',tele_maintenance:'Télémaintenance'}
   const props={
     'Société':           {title:[{text:{content:(iv.client||'').substring(0,2000)}}]},
     'Date intervention': {date:{start:iv.timeStart?iv.date+'T'+iv.timeStart+':00':iv.date}},
