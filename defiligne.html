@@ -510,7 +510,7 @@ tr:hover td{background:var(--bg)}
       </div>
       <div class="np-prop">
         <div class="np-lbl">💼 Commercial</div>
-        <select id="m-commercial" class="np-val" onchange="autoSaveField()">
+        <select id="m-commercial" class="np-val" onchange="autoSaveFieldNow()">
           <option value="">— Aucun —</option>
         </select>
       </div>
@@ -5067,12 +5067,22 @@ function autoSaveField(){
   const ind=document.getElementById("np-saved")
   if(ind){ind.classList.add("show");clearTimeout(ind._t);ind._t=setTimeout(()=>ind.classList.remove("show"),1800)}
   cloudSave()
-  // Debounce Notion push — évite de spammer à chaque frappe (délai 3s)
+  // Debounce Notion — 3s pour les champs texte (évite de spammer à chaque frappe)
   clearTimeout(autoSaveField._notionT)
   autoSaveField._notionT=setTimeout(()=>{
     const updated=ivs.find(i=>i.id===id)
     if(updated) pushIvToNotion(updated)
   },3000)
+}
+
+// Même chose mais push Notion immédiat — utilisé pour les selects (commercial, type, tech…)
+function autoSaveFieldNow(){
+  const id=parseInt(document.getElementById("m-id").value)||null
+  if(!id) return
+  autoSaveField()                    // sauvegarde + debounce habituel
+  clearTimeout(autoSaveField._notionT)  // annule le debounce
+  const updated=ivs.find(i=>i.id===id)
+  if(updated) pushIvToNotion(updated)  // push immédiat
 }
 function deleteIv(){
   const id=parseInt(document.getElementById("m-id").value)
@@ -8820,7 +8830,7 @@ function _buildNotionPropsCreate(iv){
   if(iv.contact_siege) props['Contact sieges']       ={rich_text:[{text:{content:iv.contact_siege.substring(0,2000)}}]}
   if(iv.email_siege)   props['E-mail Siéges']        ={email:iv.email_siege}
   if(iv.phone_siege)   props['Téléphone  siéges']    ={phone_number:iv.phone_siege}
-  if(iv.commercial)    props['Commercial ']           ={select:{name:iv.commercial}}
+  props['Commercial '] = iv.commercial ? {select:{name:iv.commercial}} : {select:null}
   return props
 }
 
@@ -8844,7 +8854,7 @@ function _buildNotionPropsUpdate(iv){
   if(iv.contact_siege) props['Contact sieges']       ={rich_text:[{text:{content:(iv.contact_siege||'').substring(0,2000)}}]}
   if(iv.email_siege)   props['E-mail Siéges']        ={email:iv.email_siege}
   if(iv.phone_siege)   props['Téléphone  siéges']    ={phone_number:iv.phone_siege}
-  if(iv.commercial)    props['Commercial ']           ={select:{name:iv.commercial}}
+  props['Commercial '] = iv.commercial ? {select:{name:iv.commercial}} : {select:null}
   return props
 }
 
