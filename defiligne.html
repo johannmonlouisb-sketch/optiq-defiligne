@@ -5013,9 +5013,6 @@ function saveEdit(){
     padPakDate:document.getElementById("m-padpakdate").value,
     timeStart:document.getElementById("m-timestart").value||"",
     timeEnd:document.getElementById("m-timeend").value||"",
-    // userSetTime : vrai uniquement si l'utilisateur a saisi ou modifié l'heure manuellement
-    userSetTime:(document.getElementById("m-timestart").value||"")!==(window._editIvOrigTimeStart||"")
-              ||(document.getElementById("m-timestart").value||""!=="" && !(window._editIvOrigTimeStart)),
     unplanned:document.getElementById("m-unplanned").checked,
     contact:document.getElementById("m-contact").value.trim(),
     cphone:document.getElementById("m-cphone").value.trim(),
@@ -5027,7 +5024,10 @@ function saveEdit(){
     commercial: document.getElementById("m-commercial")?.value||""}
   if(id){
     const prev=ivs.find(i=>i.id===id)
-    ivs=ivs.map(i=>i.id===id?{...i,...obj}:i)
+    // userSetTime : sticky — reste vrai si déjà manuellement saisi ; passe à vrai si l'heure a changé
+    const _newTime=document.getElementById("m-timestart").value||""
+    const userSetTime=prev?.userSetTime===true||(_newTime!==(window._editIvOrigTimeStart||""))
+    ivs=ivs.map(i=>i.id===id?{...i,...obj,userSetTime}:i)
     // Si une installation vient d'être marquée terminée → créer maintenance auto
     if(prev&&prev.type==="installation"&&obj.status==="completed"&&prev.status!=="completed"){
       autoMaintFromInstall({...prev,...obj})
@@ -5087,7 +5087,11 @@ function autoSaveField(){
     phone_siege:document.getElementById("m-csphone")?.value.trim()||"",
     commercial: document.getElementById("m-commercial")?.value||""
   }
-  ivs=ivs.map(i=>i.id===id?{...i,...obj}:i)
+  // userSetTime sticky : vrai si déjà saisi manuellement, ou si l'heure a changé depuis l'ouverture du formulaire
+  const _prevAf=ivs.find(i=>i.id===id)
+  const _newTimeAf=document.getElementById("m-timestart").value||""
+  const _userSetTimeAf=_prevAf?.userSetTime===true||(_newTimeAf!==(window._editIvOrigTimeStart||""))
+  ivs=ivs.map(i=>i.id===id?{...i,...obj,userSetTime:_userSetTimeAf}:i)
   const ind=document.getElementById("np-saved")
   if(ind){ind.classList.add("show");clearTimeout(ind._t);ind._t=setTimeout(()=>ind.classList.remove("show"),1800)}
   cloudSave()
