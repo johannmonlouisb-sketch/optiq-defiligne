@@ -898,8 +898,9 @@ function dropCard(targetId){
   setTechRouteLock(date,true)
   saveRouteOrder(date)
   _dragId=null
+  // Invalider les ETAs/données de route obsolètes avant le recalcul
+  techETAs={}; _routeOrderedPts=[]; techRouteLegDurations=[]
   renderDepart()
-  refreshLiveETAs()
   if(!building) calcMap()
   // Mettre à jour les numéros sur la carte
   order.forEach((id,idx)=>{
@@ -939,8 +940,8 @@ function reverseTechRoute(){
   techRouteOrder[date]=order
   setTechRouteLock(date,true)
   saveRouteOrder(date)
+  techETAs={}; _routeOrderedPts=[]; techRouteLegDurations=[]
   renderDepart()
-  refreshLiveETAs()
   if(!building) calcMap()
 }
 function setFirstTechIv(ivId){
@@ -954,8 +955,8 @@ function setFirstTechIv(ivId){
   techRouteOrder[date]=order
   setTechRouteLock(date,true)
   saveRouteOrder(date)
+  techETAs={}; _routeOrderedPts=[]; techRouteLegDurations=[]
   renderDepart()
-  refreshLiveETAs()
   if(!building) calcMap()
 }
 
