@@ -879,6 +879,53 @@ function saveRouteOrder(date){
     localStorage.setItem("optiq_route_order",JSON.stringify(stored))
   }catch(e){}
 }
+// Calcul ETAs sans Leaflet — utilisé après réordonnancement quand la carte n'est pas ouverte
+let _etasRunning=false
+async function _calcETAsHeadless(){
+  if(_etasRunning||building) return
+  _etasRunning=true
+  try{
+    const date=depDate()
+    const dayIvs=myIvs(date)
+    if(!dayIvs.length){_etasRunning=false;return}
+    const tc=TB(curTech)
+    const depotAddr=tc.depotAddr||DEPOT
+    // Coordonnées dépôt (cache puis géocodage)
+    let dc=gCache[depotAddr]
+    if(!dc){
+      dc=(await _geocodeAddok(depotAddr))||(await _geocodeNominatim(depotAddr))||{lat:48.965,lng:1.967}
+      gCache[depotAddr]=dc
+    }
+    // Coordonnées interventions (cache puis géocodage)
+    const pts=[]
+    for(const iv of dayIvs){
+      const kc=(iv.lat&&iv.lng&&isFrance(iv.lat,iv.lng))?{lat:iv.lat,lng:iv.lng}:null
+      const c=gCache[iv.addr]||kc||(await geocodeWithFallback(iv.addr,iv.client,iv.siege||''))
+      if(c){if(!gCache[iv.addr])gCache[iv.addr]=c;pts.push({iv,c})}
+    }
+    if(!pts.length){_etasRunning=false;return}
+    // Appliquer l'ordre stocké
+    loadRouteOrder(date)
+    const storedIds=techRouteOrder[date]
+    const byId=Object.fromEntries(pts.map(p=>[p.iv.id,p]))
+    let orderedPts=storedIds?.length ? storedIds.map(id=>byId[id]).filter(Boolean) : pts
+    orderedPts.push(...pts.filter(p=>!orderedPts.includes(p)))
+    // Adresse d'arrivée
+    const arrAddr=tc.arrivalAddr&&tc.arrivalAddr.trim()?tc.arrivalAddr.trim():null
+    const ac=arrAddr?(gCache[arrAddr]||dc):dc
+    const all=techRoundTrip?[dc,...orderedPts.map(p=>p.c),ac]:[dc,...orderedPts.map(p=>p.c)]
+    // Appel route-traffic
+    const startHHMM=depStartTime()
+    const res=await fetch('/api/route-traffic',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({waypoints:all,departureHHMM:startHHMM})})
+    if(!res.ok){_etasRunning=false;return}
+    const data=await res.json()
+    techRouteLegDurations=data.legs||[]
+    _routeOrderedPts=[...orderedPts]
+    refreshLiveETAs()
+    if(techRouteLegDurations.length) startLiveETAs()
+  }catch(e){}
+  _etasRunning=false
+}
 function loadRouteOrder(date){
   try{
     const stored=JSON.parse(localStorage.getItem("optiq_route_order")||"{}")
@@ -901,7 +948,7 @@ function dropCard(targetId){
   // Invalider les ETAs/données de route obsolètes avant le recalcul
   techETAs={}; _routeOrderedPts=[]; techRouteLegDurations=[]
   renderDepart()
-  if(!building) calcMap()
+  if(mapObj&&!building) calcMap(); else _calcETAsHeadless()
   // Mettre à jour les numéros sur la carte
   order.forEach((id,idx)=>{
     if(mapMarkers[id]){
@@ -942,7 +989,7 @@ function reverseTechRoute(){
   saveRouteOrder(date)
   techETAs={}; _routeOrderedPts=[]; techRouteLegDurations=[]
   renderDepart()
-  if(!building) calcMap()
+  if(mapObj&&!building) calcMap(); else _calcETAsHeadless()
 }
 function setFirstTechIv(ivId){
   const date=depDate()
@@ -957,7 +1004,7 @@ function setFirstTechIv(ivId){
   saveRouteOrder(date)
   techETAs={}; _routeOrderedPts=[]; techRouteLegDurations=[]
   renderDepart()
-  if(!building) calcMap()
+  if(mapObj&&!building) calcMap(); else _calcETAsHeadless()
 }
 
 let toastTimer
@@ -1663,6 +1710,7 @@ async function geocodeWithFallback(addr, client='', siege=''){
 async function calcMap(){
   if(building) return
   building=true
+  try{ // try/finally garantit que building=false même si Leaflet ou une API plante
   const date=depDate()
   const dayIvs=myIvs(date)
   document.getElementById("dep-init-msg").style.display="none"
@@ -1893,11 +1941,11 @@ async function calcMap(){
   }
   setProgress(100,"✓")
   setTimeout(()=>document.getElementById("dep-prog").style.display="none",800)
-  building=false
   document.getElementById("btn-reoptimize").style.display="flex"
   if(window.innerWidth<640) showDepMap()
   if(techRouteLegDurations.length) startLiveETAs()
   refreshLiveETAs() // actualiser les cartes immédiatement après le recalcul de route
+  }catch(e){console.error("calcMap:",e)}finally{building=false}
 }
 
 function showDepMap(){
