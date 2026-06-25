@@ -306,7 +306,7 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
       <!-- Barre date + actions -->
       <div id="dep-bar">
         <input type="date" id="dep-date" style="font-size:14px;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit" onchange="onDepDateChange()"/>
-        <input type="time" id="dep-time" value="08:00" title="Heure de départ du dépôt" style="font-size:14px;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit" onchange="techCfg.startTime=this.value;saveCfg()"/>
+        <input type="time" id="dep-time" value="08:00" title="Heure de départ du dépôt" style="font-size:14px;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit" onchange="techCfg.startTime=this.value;saveCfg();techETAs={};_routeOrderedPts=[];techRouteLegDurations=[];renderDepart();if(mapObj&&!building)calcMap();else _calcETAsHeadless()"/>
         <button class="btn btn-blue btn-sm" onclick="calcMap()">🗺️ Itinéraire</button>
         <button id="btn-map-toggle" class="btn btn-gray btn-sm" style="display:none" onclick="toggleDepMap()">📋 Liste</button>
         <button id="btn-reoptimize" class="btn btn-green btn-sm" style="display:none" onclick="reoptimizeFromDepot()" title="Recalculer depuis votre position GPS (ou dépôt si GPS indisponible)">📍 Recalculer</button>

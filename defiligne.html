@@ -2018,7 +2018,7 @@ function rDepTechDropdownContent(){
   </div>`}).join("")}`
 }
 let _depMapAutoTimer=null
-function _schedDepMap(){clearTimeout(_depMapAutoTimer);_depMapAutoTimer=setTimeout(()=>initDepMap(),700)}
+function _schedDepMap(){clearTimeout(_depMapAutoTimer);depBuilding=false;_depMapAutoTimer=setTimeout(()=>initDepMap(),700)}
 let _calcRouteTimer=null
 function _schedCalcRoute(){clearTimeout(_calcRouteTimer);_calcRouteTimer=setTimeout(()=>calcRoute(),700)}
 
