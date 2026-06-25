@@ -900,7 +900,7 @@ function dropCard(targetId){
   _dragId=null
   renderDepart()
   refreshLiveETAs()
-  if(mapObj&&!building) calcMap()
+  if(!building) calcMap()
   // Mettre à jour les numéros sur la carte
   order.forEach((id,idx)=>{
     if(mapMarkers[id]){
@@ -941,7 +941,7 @@ function reverseTechRoute(){
   saveRouteOrder(date)
   renderDepart()
   refreshLiveETAs()
-  if(mapObj&&!building) calcMap()
+  if(!building) calcMap()
 }
 function setFirstTechIv(ivId){
   const date=depDate()
@@ -956,7 +956,7 @@ function setFirstTechIv(ivId){
   saveRouteOrder(date)
   renderDepart()
   refreshLiveETAs()
-  if(mapObj&&!building) calcMap()
+  if(!building) calcMap()
 }
 
 let toastTimer
@@ -1896,6 +1896,7 @@ async function calcMap(){
   document.getElementById("btn-reoptimize").style.display="flex"
   if(window.innerWidth<640) showDepMap()
   if(techRouteLegDurations.length) startLiveETAs()
+  refreshLiveETAs() // actualiser les cartes immédiatement après le recalcul de route
 }
 
 function showDepMap(){
