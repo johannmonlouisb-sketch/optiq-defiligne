@@ -4977,6 +4977,7 @@ function editIv(id){
   document.getElementById("m-padpakdate").value=iv.padPakDate||""
   document.getElementById("m-timestart").value=iv.timeStart||""
   document.getElementById("m-timeend").value=iv.timeEnd||""
+  window._editIvOrigTimeStart=iv.timeStart||"" // mémoriser pour détecter une saisie manuelle
   // Auto-suggestion pad pak si maintenance (pas installation) - changement tous les 2 ans
   if(iv.type!=="installation"&&!iv.padPak){
     const age=iv.date?(new Date()-new Date(iv.date+"T12:00:00"))/(1000*60*60*24*365):0
@@ -5012,6 +5013,9 @@ function saveEdit(){
     padPakDate:document.getElementById("m-padpakdate").value,
     timeStart:document.getElementById("m-timestart").value||"",
     timeEnd:document.getElementById("m-timeend").value||"",
+    // userSetTime : vrai uniquement si l'utilisateur a saisi ou modifié l'heure manuellement
+    userSetTime:(document.getElementById("m-timestart").value||"")!==(window._editIvOrigTimeStart||"")
+              ||(document.getElementById("m-timestart").value||""!=="" && !(window._editIvOrigTimeStart)),
     unplanned:document.getElementById("m-unplanned").checked,
     contact:document.getElementById("m-contact").value.trim(),
     cphone:document.getElementById("m-cphone").value.trim(),
@@ -9032,7 +9036,8 @@ function _buildNotionPropsCore(iv){
   const typeMap={maintenance_simple:'Annuel',maintenance_complex:'PAD PAK',installation:'Installation',tele_maintenance:'Télémaintenance'}
   const props={
     'Société':           {title:[{text:{content:(iv.client||'').substring(0,2000)}}]},
-    'Date intervention': {date:{start:iv.timeStart?iv.date+'T'+iv.timeStart+':00':iv.date}},
+    // N'inclure l'heure que si l'utilisateur l'a saisie manuellement (pas les heures Notion ou ETAs)
+    'Date intervention': {date:{start:(iv.userSetTime&&iv.timeStart)?iv.date+'T'+iv.timeStart+':00':iv.date}},
     'Adresse Site':      _rt(iv.addr),
     'Technicien':        {select:{name:tech?tech.name:''}},
     'INTERVENTION':      {multi_select:[{name:typeMap[iv.type]||'Annuel'}]},
