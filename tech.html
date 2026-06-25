@@ -2969,6 +2969,8 @@ if(isDeployedApp){
       }
     })
     if(s.depot) window._settingsDepot=s.depot
+    // Appliquer les durées personnalisées depuis les paramètres admin
+    if(s.types) Object.entries(s.types).forEach(([k,v])=>{ if(TYPES[k]&&v.dur) TYPES[k].dur=v.dur })
     updateTopbar()
     renderDepart()
   }).catch(()=>{})
