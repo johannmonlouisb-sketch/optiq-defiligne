@@ -3043,20 +3043,62 @@ async function initDepMap(){
       mk.bindPopup(`<strong>${idx+1}. ${iv.client}</strong><br><small style="color:${techCol}">● ${tech.name}</small><br><small>${iv.addr}</small>${iv.notes?`<br><small style="color:#E65100">📝 ${iv.notes}</small>`:""}${iv.contact?`<br><small>👤 ${iv.contact}</small>`:""}`)
       depMarkers[iv.id]=mk
     })
-    // ── Route OSRM ──
+    // ── Route avec trafic réel + ETAs par arrêt ──
     setP(65+Math.round(activeTechs.indexOf(tech)/activeTechs.length*30),`${tech.name} — Calcul itinéraire...`)
+    const toHM=m=>`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`
+    let routeOk=false
     try{
       const allP=[dc,...ivc.map(x=>x.coords),dc]
-      const cs=allP.map(c=>c.lng+","+c.lat).join(";")
-      const res=await fetch("https://router.project-osrm.org/route/v1/driving/"+cs+"?overview=full&geometries=geojson")
-      const data=await res.json()
-      if(data.routes?.[0]){
-        totalKm+=Math.round(data.routes[0].distance/1000)
-        totalTMin+=Math.round(data.routes[0].duration/60)
-        if(depRouteLines[tech.id])depRGroup.removeLayer(depRouteLines[tech.id])
-        depRouteLines[tech.id]=L.geoJSON(data.routes[0].geometry,{style:{color:techCol,weight:5,opacity:.85}}).addTo(depRGroup)
+      const depHH=`${String(_effSH).padStart(2,'0')}:${String(_effSM).padStart(2,'0')}`
+      const res=await fetch('/api/route-traffic',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({waypoints:allP,departureHHMM:depHH})})
+      if(res.ok){
+        const data=await res.json()
+        totalKm+=Math.round(data.totalDistanceKm||0)
+        totalTMin+=data.trafficDurationMin||0
+        if(data.polylineGeoJson){
+          if(depRouteLines[tech.id])depRGroup.removeLayer(depRouteLines[tech.id])
+          depRouteLines[tech.id]=L.geoJSON(data.polylineGeoJson,{style:{color:techCol,weight:5,opacity:.85}}).addTo(depRGroup)
+        }
+        // Calculer les ETAs par arrêt depuis les durées de leg réelles (trafic)
+        if(data.legs?.length){
+          let curMin=_effStartMin
+          ivc.forEach(({iv},idx)=>{
+            curMin+=data.legs[idx]?.trafficDurationMin||0
+            if(iv.timeStart){const[th,tm]=iv.timeStart.split(':').map(Number);if(curMin<th*60+tm)curMin=th*60+tm}
+            const wm=dur(iv.type,iv.form)
+            depETAs[iv.id]={eta:toHM(curMin),leave:toHM(curMin+wm),travelMin:data.legs[idx]?.trafficDurationMin||0}
+            curMin+=wm
+          })
+        }
+        routeOk=true
       }
     }catch(e){}
+    // Fallback OSRM si route-traffic indisponible
+    if(!routeOk){
+      try{
+        const cs=[dc,...ivc.map(x=>x.coords),dc].map(c=>c.lng+","+c.lat).join(";")
+        const res=await fetch("https://router.project-osrm.org/route/v1/driving/"+cs+"?overview=full&geometries=geojson")
+        const data=await res.json()
+        if(data.routes?.[0]){
+          totalKm+=Math.round(data.routes[0].distance/1000)
+          totalTMin+=Math.round(data.routes[0].duration/60)
+          if(depRouteLines[tech.id])depRGroup.removeLayer(depRouteLines[tech.id])
+          depRouteLines[tech.id]=L.geoJSON(data.routes[0].geometry,{style:{color:techCol,weight:5,opacity:.85}}).addTo(depRGroup)
+          // ETAs approximatives depuis la durée totale répartie proportionnellement
+          if(ivc.length){
+            const legMin=Math.round(data.routes[0].duration/60/ivc.length)
+            let curMin=_effStartMin
+            ivc.forEach(({iv})=>{
+              curMin+=legMin
+              if(iv.timeStart){const[th,tm]=iv.timeStart.split(':').map(Number);if(curMin<th*60+tm)curMin=th*60+tm}
+              const wm=dur(iv.type,iv.form)
+              depETAs[iv.id]={eta:toHM(curMin),leave:toHM(curMin+wm),travelMin:legMin}
+              curMin+=wm
+            })
+          }
+        }
+      }catch(e2){}
+    }
   }
   // ── Stats globales ──
   const sk=document.getElementById("dsk"),st=document.getElementById("dst"),sw=document.getElementById("dsw"),rs=document.getElementById("dep-rte-stats")
