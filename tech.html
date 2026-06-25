@@ -879,7 +879,7 @@ function saveRouteOrder(date){
     localStorage.setItem("optiq_route_order",JSON.stringify(stored))
   }catch(e){}
 }
-// Calcul ETAs sans Leaflet — utilisé après réordonnancement quand la carte n'est pas ouverte
+// Calcul ETAs sans Leaflet — même logique que initDepMap() côté admin
 let _etasRunning=false
 async function _calcETAsHeadless(){
   if(_etasRunning||building) return
@@ -887,44 +887,62 @@ async function _calcETAsHeadless(){
   try{
     const date=depDate()
     const dayIvs=myIvs(date)
-    if(!dayIvs.length){_etasRunning=false;return}
+    if(!dayIvs.length) return
     const tc=TB(curTech)
     const depotAddr=tc.depotAddr||DEPOT
-    // Coordonnées dépôt (cache puis géocodage)
+    // Coordonnées dépôt
     let dc=gCache[depotAddr]
     if(!dc){
       dc=(await _geocodeAddok(depotAddr))||(await _geocodeNominatim(depotAddr))||{lat:48.965,lng:1.967}
       gCache[depotAddr]=dc
     }
-    // Coordonnées interventions (cache puis géocodage)
+    // Coordonnées des interventions (cache Kizeo → géocodage)
     const pts=[]
     for(const iv of dayIvs){
       const kc=(iv.lat&&iv.lng&&isFrance(iv.lat,iv.lng))?{lat:iv.lat,lng:iv.lng}:null
       const c=gCache[iv.addr]||kc||(await geocodeWithFallback(iv.addr,iv.client,iv.siege||''))
       if(c){if(!gCache[iv.addr])gCache[iv.addr]=c;pts.push({iv,c})}
     }
-    if(!pts.length){_etasRunning=false;return}
-    // Appliquer l'ordre stocké
+    if(!pts.length) return
+    // Appliquer l'ordre stocké (même logique que calcMap)
     loadRouteOrder(date)
     const storedIds=techRouteOrder[date]
     const byId=Object.fromEntries(pts.map(p=>[p.iv.id,p]))
-    let orderedPts=storedIds?.length ? storedIds.map(id=>byId[id]).filter(Boolean) : pts
-    orderedPts.push(...pts.filter(p=>!orderedPts.includes(p)))
+    const ordered=storedIds?.length ? storedIds.map(id=>byId[id]).filter(Boolean) : pts
+    // Ajouter les pts absents de l'ordre (nouvelles interventions)
+    const seenIds=new Set(ordered.map(p=>p.iv.id))
+    ordered.push(...pts.filter(p=>!seenIds.has(p.iv.id)))
     // Adresse d'arrivée
-    const arrAddr=tc.arrivalAddr&&tc.arrivalAddr.trim()?tc.arrivalAddr.trim():null
+    const arrAddr=tc.arrivalAddr?.trim()||null
     const ac=arrAddr?(gCache[arrAddr]||dc):dc
-    const all=techRoundTrip?[dc,...orderedPts.map(p=>p.c),ac]:[dc,...orderedPts.map(p=>p.c)]
-    // Appel route-traffic
+    const waypoints=techRoundTrip?[dc,...ordered.map(p=>p.c),ac]:[dc,...ordered.map(p=>p.c)]
+    // Appel route-traffic (même API que admin)
     const startHHMM=depStartTime()
-    const res=await fetch('/api/route-traffic',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({waypoints:all,departureHHMM:startHHMM})})
-    if(!res.ok){_etasRunning=false;return}
+    const res=await fetch('/api/route-traffic',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({waypoints,departureHHMM:startHHMM})})
+    if(!res.ok) return
     const data=await res.json()
+    // Mettre à jour pour refreshLiveETAs (intervalle 60s)
     techRouteLegDurations=data.legs||[]
-    _routeOrderedPts=[...orderedPts]
-    refreshLiveETAs()
+    _routeOrderedPts=[...ordered]
+    // Calculer les ETAs directement — même pattern que admin initDepMap
+    if(data.legs?.length){
+      const[sh,sm]=startHHMM.split(':').map(Number)
+      const nowMin=nowMinParis()
+      let curMin=sh*60+sm
+      ordered.forEach((p,idx)=>{
+        curMin+=data.legs[idx]?.trafficDurationMin||0
+        if(p.iv.timeStart){const[th,tm]=p.iv.timeStart.split(':').map(Number);if(curMin<th*60+tm)curMin=th*60+tm}
+        if(tourRunning&&curMin<nowMin&&!validated[p.iv.id]&&!failed[p.iv.id]) curMin=nowMin
+        const wm=dur(p.iv.type,p.iv.form)
+        techETAs[p.iv.id]={eta:toHHMM(curMin),leave:toHHMM(curMin+wm),travelMin:data.legs[idx]?.trafficDurationMin||0}
+        curMin+=wm
+      })
+    }
     if(techRouteLegDurations.length) startLiveETAs()
-  }catch(e){}
-  _etasRunning=false
+    renderDepart()
+  }catch(e){console.error('_calcETAsHeadless:',e)}
+  finally{_etasRunning=false}
 }
 function loadRouteOrder(date){
   try{
