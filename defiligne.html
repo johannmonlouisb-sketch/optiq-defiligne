@@ -2462,6 +2462,7 @@ function reverseDepRoute(techId){
   depRouteOrder[techId]=[...ord.reverse(),...(depRouteOrder[techId]||[]).filter(iv=>iv.date!==date)]
   setRouteLock(techId,date,true)
   saveRouteOrder(date)
+  ivs.filter(i=>i.date===date&&i.techId===techId).forEach(i=>delete depETAs[i.id])
   rDepart()
   _schedDepMap()
   if(depMapObj){
@@ -2484,6 +2485,7 @@ function setFirstDepIv(ivId,techId){
   depRouteOrder[techId]=[...ord,...(depRouteOrder[techId]||[]).filter(iv=>iv.date!==date)]
   setRouteLock(techId,date,true)
   saveRouteOrder(date)
+  ivs.filter(i=>i.date===date&&i.techId===techId).forEach(i=>delete depETAs[i.id])
   rDepart()
   _schedDepMap()
   if(depMapObj){
@@ -2511,6 +2513,8 @@ function dropDepCard(targetId){
   setRouteLock(techId,date,true)
   saveRouteOrder(date)
   _dragId=null
+  // Vider les ETAs obsolètes du tech reordonné pour éviter d'afficher de mauvaises heures
+  ivs.filter(i=>i.date===date&&i.techId===techId).forEach(i=>delete depETAs[i.id])
   rDepart()
   _schedDepMap()
   if(depMapObj){
@@ -2885,6 +2889,7 @@ async function initDepMap(){
   }
   if(depBuilding)return
   depBuilding=true
+  try{ // try/finally garantit que depBuilding=false même si Leaflet ou une API plante
   const mm=document.getElementById("dep-map-msg")
   const pb=document.getElementById("dep-map-pb")
   if(mm)mm.style.display="none"
@@ -3112,7 +3117,7 @@ async function initDepMap(){
   const depTimeVal=document.getElementById('dep-time')?.value||'08:00'
   try{localStorage.setItem('optiq_dep_etas',JSON.stringify({date:selDate,etas:depETAs,depTime:depTimeVal}))}catch(e){}
   setTimeout(()=>{if(pb)pb.style.display="none";rDepart()},1200)
-  depBuilding=false
+  }catch(e){console.error("initDepMap:",e)}finally{depBuilding=false}
 }
 
 
