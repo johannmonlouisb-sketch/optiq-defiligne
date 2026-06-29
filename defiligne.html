@@ -13,7 +13,7 @@
 :root{--blue:#1565C0;--blueDark:#0D47A1;--blueLight:#E3F2FD;--green:#1B5E20;--greenLight:#E8F5E9;--orange:#E65100;--red:#C62828;--purple:#6A1B9A;--gray:#757575;--border:#E0E0E0;--bg:#F5F5F5;--white:#fff;--dark:#1A1A1A}
 body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);display:flex;height:100vh;overflow:hidden;font-size:15px}
 /* ── SIDEBAR ── */
-#sidebar{width:220px;background:var(--blueDark);display:flex;flex-direction:column;flex-shrink:0;transition:width 0.2s}
+#sidebar{width:220px;background:var(--blueDark);display:flex;flex-direction:column;flex-shrink:0;transition:width 0.2s;overflow-y:auto;overflow-x:hidden}
 #logo-z{padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.12);margin-bottom:4px}
 #logo-z img{height:30px;object-fit:contain;background:#fff;border-radius:4px;padding:2px}
 #logo-z p{font-size:11px;color:rgba(255,255,255,0.5);margin-top:6px}
@@ -173,6 +173,8 @@ tr:hover td{background:var(--bg)}
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+#sidebar::-webkit-scrollbar-thumb{background:rgba(255,255,255,.2)}
+#sidebar{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.2) transparent}
 </style>
 </head>
 <body>
@@ -2024,7 +2026,7 @@ function clearDepTechs(e){
 // ═══════════════════════════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════════════════════════
-const VT={dashboard:"Tableau de bord",depart:"Départ du jour & Itinéraire",planning:"Planning de la semaine",zones:"Zones & Techniciens",interventions:"Toutes les interventions",materiel:"Matériel du jour",previsions:"Prévisions maintenances",notifications:"Notifications clients",parametres:"Paramètres",import:"Import Kizeo"}
+const VT={dashboard:"Tableau de bord",depart:"Départ du jour & Itinéraire",planning:"Planning de la semaine",zones:"Zones & Techniciens",interventions:"Toutes les interventions",materiel:"Matériel du jour",previsions:"Prévisions maintenances",analyse:"Analyse",notifications:"Notifications clients",parametres:"Paramètres",import:"Import Kizeo"}
 let _depSubTab="depart"
 function switchDepSub(tab){ _depSubTab=tab; _saveUIState() }
 function _syncMapDate(){
