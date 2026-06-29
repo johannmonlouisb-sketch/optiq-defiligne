@@ -56,6 +56,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);display:flex;h
 .bsm{padding:5px 12px!important;font-size:12px!important;border-radius:6px!important}
 .bicon{padding:5px 9px;border-radius:6px;border:1px solid var(--border);background:#fff;cursor:pointer;font-size:14px;color:var(--blue)}
 /* BADGES */
+@keyframes spin{to{transform:rotate(360deg)}}
+.spin{display:inline-block;animation:spin 1s linear infinite}
 .bdg{display:inline-block;font-size:11px;font-weight:500;padding:2px 9px;border-radius:100px;white-space:nowrap}
 .bdg-click{cursor:pointer;transition:opacity 0.12s}.bdg-click:hover{opacity:0.75}
 /* KPI */
@@ -262,6 +264,7 @@ tr:hover td{background:var(--bg)}
         <input type="date" id="dep-date" style="width:auto;font-size:13px;padding:6px 10px" onchange="setSelDate(this.value)"/>
         <input type="time" id="dep-time" value="08:00" title="Heure de départ" style="width:auto;font-size:13px;padding:6px 10px" oninput="_schedDepMap()"/>
         <button onclick="depNow()" title="Utiliser l'heure actuelle (Paris)" style="padding:6px 10px;font-size:12px;border-radius:8px;border:1.5px solid var(--blue);background:#E3F2FD;color:#1565C0;cursor:pointer;font-family:inherit;font-weight:600;white-space:nowrap">🕐 Maintenant</button>
+        <button id="dep-refresh-btn" onclick="_schedDepMap()" title="Recalculer les ETAs et l'itinéraire" style="padding:6px 10px;font-size:12px;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:var(--dark);cursor:pointer;font-family:inherit;font-weight:600;white-space:nowrap;display:flex;align-items:center;gap:4px"><span id="dep-refresh-ic">🔄</span> Recalculer</button>
         <div style="position:relative;display:inline-block">
           <button id="dep-tech-btn" onclick="toggleDepTechDropdown(event)" style="padding:6px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;font-size:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:8px;min-width:160px;white-space:nowrap">
             <span id="dep-tech-label" style="flex:1;text-align:left">Tous les techniciens</span>
@@ -1980,7 +1983,17 @@ function rDepTechDropdownContent(){
   </div>`}).join("")}`
 }
 let _depMapAutoTimer=null
-function _schedDepMap(){clearTimeout(_depMapAutoTimer);depBuilding=false;_depMapAutoTimer=setTimeout(()=>initDepMap(),700)}
+function _schedDepMap(){
+  clearTimeout(_depMapAutoTimer)
+  depBuilding=false
+  const ic=document.getElementById('dep-refresh-ic')
+  if(ic){ic.textContent='⏳';ic.classList.add('spin')}
+  _depMapAutoTimer=setTimeout(()=>initDepMap(),700)
+}
+function _stopDepSpinner(){
+  const ic=document.getElementById('dep-refresh-ic')
+  if(ic){ic.classList.remove('spin');ic.textContent='🔄'}
+}
 let _calcRouteTimer=null
 function _schedCalcRoute(){clearTimeout(_calcRouteTimer);_calcRouteTimer=setTimeout(()=>calcRoute(),700)}
 
@@ -3079,7 +3092,7 @@ async function initDepMap(){
   const depTimeVal=document.getElementById('dep-time')?.value||'08:00'
   try{localStorage.setItem('optiq_dep_etas',JSON.stringify({date:selDate,etas:depETAs,depTime:depTimeVal}))}catch(e){}
   setTimeout(()=>{if(pb)pb.style.display="none";rDepart()},1200)
-  }catch(e){console.error("initDepMap:",e)}finally{depBuilding=false}
+  }catch(e){console.error("initDepMap:",e)}finally{depBuilding=false;_stopDepSpinner()}
 }
 
 
@@ -3560,6 +3573,7 @@ function rIv(){
     <span style="font-size:12px;color:var(--gray)">→</span>
     <input id="iv-ed" type="date" value="${ed}" title="Au" style="width:auto;font-size:12px;padding:5px 8px" onchange="rIv()"/>
     <span style="font-size:12px;color:var(--gray);margin-left:4px">${list.length} résultat${list.length>1?"s":""}</span>
+    <button class="bg bsm" onclick="exportCSV()" title="Exporter toutes les interventions en CSV" style="margin-left:auto">⬇️ Export CSV</button>
   </div>
   ${!list.length?`<div class="card" style="text-align:center;color:var(--gray);padding:36px">Aucune intervention trouvée${filtersActive?`<br><button class="bg bsm" style="margin-top:10px" onclick="resetIvFilters()">↩ Réinitialiser les filtres</button>`:" (aucune intervention créée)"}</div>`:""}
   ${list.map(iv=>{
@@ -5003,6 +5017,13 @@ function editIv(id){
   document.getElementById("m-edit").classList.add("open")
 }
 function closeEdit(){document.getElementById("m-edit").classList.remove("open")}
+
+// Fermer le modal ouvert avec ESC
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Escape')return
+  const open=document.querySelector('.mo.open')
+  if(open)open.classList.remove('open')
+})
 function saveEdit(){
   const id=parseInt(document.getElementById("m-id").value)||null
   const c=document.getElementById("m-client").value.trim()
