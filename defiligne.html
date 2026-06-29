@@ -2001,11 +2001,13 @@ function _schedCalcRoute(){clearTimeout(_calcRouteTimer);_calcRouteTimer=setTime
 function _nowParis(){
   return new Date().toLocaleTimeString('fr-FR',{timeZone:'Europe/Paris',hour:'2-digit',minute:'2-digit',hour12:false})
 }
-// Auto-met dep-time à l'heure de Paris si la date sélectionnée est aujourd'hui
+// Ajuste dep-time selon la date : heure courante Paris si aujourd'hui, 08:00 sinon
+// (évite de garder l'heure actuelle quand on navigue vers une date passée/future)
 function _autoDepTime(){
-  if(selDate!==TODAY) return
   const dtEl=document.getElementById('dep-time')
-  if(dtEl) dtEl.value=_nowParis()
+  if(!dtEl) return
+  if(selDate===TODAY) dtEl.value=_nowParis()
+  else dtEl.value='08:00'
 }
 // Bouton "Maintenant" : positionne dep-time sur l'heure courante et relance le calcul
 function depNow(){
