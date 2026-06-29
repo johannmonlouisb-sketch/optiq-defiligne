@@ -1027,10 +1027,26 @@ function setFirstTechIv(ivId){
 
 let toastTimer
 function toast(msg,col="#212121",dur=2800){
+  // Retour haptique déduit de la couleur du toast (silencieux sur iOS Safari)
+  const isErr=col.includes('C628')||col.includes('E6510')||col.includes('D32F')
+  const isOk=col.includes('2E7D')||col.includes('1B5E')||col.includes('388E')
+  haptic(isErr?'error':isOk?'success':'tap')
   const el=document.getElementById("toast")
   el.textContent=msg;el.style.background=col;el.classList.add("show")
   clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove("show"),dur)
 }
+
+// ── Retour haptique ──────────────────────────────────────────────────────────
+// Fonctionne sur Android Chrome/Firefox. Silencieux sur iOS Safari (limitation Apple).
+function haptic(type='tap'){
+  if(!('vibrate' in navigator))return
+  const p={tap:10,success:[10,30,10],error:[20,50,20,50,20],drop:15}
+  navigator.vibrate(p[type]??p.tap)
+}
+// Délégation globale : vibration sur tout bouton tactile
+document.addEventListener('click',e=>{
+  if(e.target.closest('.btn,.vbtn,.pin-btn,.login-tech-btn,.nav-btn'))haptic('tap')
+},true)
 
 // ════════════════════════════════════════════
 // NAVIGATION
@@ -2182,7 +2198,7 @@ function renderPlanning(){
       const done=validated[iv.id],fail=failed[iv.id]
       const col=done?"#2E7D32":fail?"#C62828":TYPES[iv.type].color
       return `<div class="dc ${done?"vdone":fail?"vfail":""}" style="margin-bottom:1px">
-        <div class="dc-top" onclick="">
+        <div class="dc-top" onclick="focusClient(${iv.id})">
           <div class="dc-num" style="background:${col}">${done?"✓":fail?"✗":(idx+1)}</div>
           <div class="dc-info">
             <div class="dc-client">${iv.client}</div>
