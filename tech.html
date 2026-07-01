@@ -607,6 +607,7 @@ const TYPES={
   maintenance_simple:{label:"Maintenance",dur:15,color:"#1565C0"},
   maintenance_complex:{label:"Maintenance+",dur:25,color:"#6A1B9A"},
   installation:{label:"Installation",dur:35,color:"#2E7D32"},
+  tele_maintenance:{label:"Télémaintenance",dur:10,color:"#00897B"},
 }
 // Interventions — clé partagée avec l'app admin (optiq_ivs_data)
 let ivs=[]
@@ -671,7 +672,7 @@ const DS=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"]
 function fd(d){if(!d)return "";const dt=new Date(d+"T12:00:00");return dt.getDate()+" "+MS[dt.getMonth()]}
 function fdl(d){if(!d)return "";const dt=new Date(d+"T12:00:00");return DS[dt.getDay()]+" "+dt.getDate()+" "+MS[dt.getMonth()]}
 function fmin(m){if(m<60)return m+"min";return Math.floor(m/60)+"h"+(m%60>0?String(m%60).padStart(2,"0"):"")}
-function dur(t,f){return TYPES[t].dur+(f?10:0)}
+function dur(t,f){return (TYPES[t]||TYPES.maintenance_simple).dur+(f?10:0)}
 function TB(id){return TECHS.find(t=>t.id===id)||TECHS[0]}
 function addMinToTime(hhmm,mins){
   const[h,m]=(hhmm||'00:00').split(':').map(Number)
@@ -1286,7 +1287,7 @@ function renderDepart(){
   </div>`:""
   list.innerHTML=toolbarHtml+dayIvs.map((iv,idx)=>{
     const done=validated[iv.id], fail=failed[iv.id]
-    const col=done?"#2E7D32":fail?"#C62828":TYPES[iv.type].color
+    const col=done?"#2E7D32":fail?"#C62828":(TYPES[iv.type]||TYPES.maintenance_simple).color
     const lbl=done?"✓":fail?"✗":(idx+1)
     // Temps de trajet = ETA(ce stop) - leave(stop précédent ou départ)
     let travelMin=null, waitMin=null, travelStatus=null
@@ -1366,7 +1367,7 @@ function renderDepart(){
         ${iv.notionTime&&iv.timeStart?`<span class="tag" style="background:#FFFBEB;color:#92400E;font-weight:700;border:1px solid #F59E0B">🔔 ${iv.timeStart} — heure imposée</span>`:""}
         ${waitMin?`<span class="tag" style="background:#FFF3E0;color:#E65100;font-weight:600">⏰ Attente ${fmin(waitMin)} — créneau ${iv.timeStart}</span>`:""}
         ${etaLate?`<span class="tag" style="background:#FFEBEE;color:#C62828;font-weight:700">⚠️ Créneau serré (−30min)</span>`:""}
-        <span class="tag tag-info">🔧 ${fmin(workMin)} · ${TYPES[iv.type].label}</span>
+        <span class="tag tag-info">🔧 ${fmin(workMin)} · ${(TYPES[iv.type]||TYPES.maintenance_simple).label}</span>
         ${techETAs[iv.id]?`<span class="tag" style="background:#E8F5E9;color:#2E7D32;font-weight:600">🕐 Arrivée ${techETAs[iv.id].eta} · fin ${techETAs[iv.id].leave}</span>`:""}
         ${iv.timeEnd&&!done?`<span class="tag" style="background:#F3F3F3;color:#757575;font-size:11px">⏰ Au plus tard ${iv.timeEnd}</span>`:""}
         ${unroutedIvs.includes(iv)?`<span class="tag" style="background:#FFF3E0;color:#E65100;font-weight:700">⚠️ Adresse non géolocalisée — hors itinéraire</span>`:""}
@@ -2480,7 +2481,7 @@ function exportJournee(){
 function shiftPlanWeek(n){
   const d=new Date(planSel+"T12:00:00")
   d.setDate(d.getDate()+n)
-  planSel=d.toISOString().split("T")[0]
+  planSel=d.toLocaleDateString('fr-CA',{timeZone:'Europe/Paris'})
   renderPlanning()
 }
 
@@ -2588,6 +2589,7 @@ function getTechIdFromName(name){
 
 function getTypeFromStr(s){
   const v=(s||'').toLowerCase()
+  if(v.includes('télé')||v.includes('tele')) return 'tele_maintenance' // aligné avec l'admin
   if(v.includes('install')||v.includes('livraison')||v.includes('500p')||
      v.includes('360p')||v.includes('350p')||v.includes('cr2')||
      v.includes('rotaid')||v.includes('pédiatrique')||v.includes('formation')) return 'installation'

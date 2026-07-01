@@ -169,8 +169,8 @@ tr:hover td{background:var(--bg)}
   .g2{grid-template-columns:1fr}
 }
 /* CSV DROP */
-#csv-drop{border:2px dashed var(--border);border-radius:10px;padding:30px;text-align:center;cursor:pointer;transition:all 0.15s;color:var(--gray)}
-#csv-drop:hover,#csv-drop.drag{border-color:var(--blue);background:var(--blueLight);color:var(--blue)}
+#csv-drop,#mcsv-drop{border:2px dashed var(--border);border-radius:10px;padding:30px;text-align:center;cursor:pointer;transition:all 0.15s;color:var(--gray)}
+#csv-drop:hover,#csv-drop.drag,#mcsv-drop:hover,#mcsv-drop.drag{border-color:var(--blue);background:var(--blueLight);color:var(--blue)}
 /* SCROLL CUSTOM */
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-track{background:transparent}
@@ -654,7 +654,7 @@ tr:hover td{background:var(--bg)}
     </div>
 
     <!-- Zone de dépôt -->
-    <div id="csv-drop" onclick="document.getElementById('imp-file').click()">
+    <div id="mcsv-drop" onclick="document.getElementById('imp-file').click()">
       <div style="font-size:40px;margin-bottom:10px">📂</div>
       <p style="font-weight:600;font-size:15px">Glisser-déposer votre fichier ici</p>
       <p style="font-size:12px;color:var(--gray);margin-top:6px">Excel · CSV · TSV · ODS · JSON</p>
@@ -674,7 +674,8 @@ tr:hover td{background:var(--bg)}
     </div>
 
     <!-- Résultat -->
-    <div id="csv-preview" style="margin-top:12px"></div>
+    <div id="mcsv-status" style="margin-top:12px;font-size:13px;display:none"></div>
+    <div id="mcsv-preview" style="margin-top:12px"></div>
   </div>
 </div>
 
@@ -1898,8 +1899,9 @@ let ivs=[
 ]
 let nextId=1096
 let curView="dashboard"
-let selDate=new Date().toISOString().split("T")[0]
-let mapDate=new Date().toISOString().split("T")[0]
+const _todayParis=()=>new Date().toLocaleDateString('fr-CA',{timeZone:'Europe/Paris'})
+let selDate=_todayParis()
+let mapDate=_todayParis()
 let depot="7 rue des entrepreneurs, 78540 Vernouillet"
 let fStatus="all",fTech=0,fClient="",fMode="all"
 let depValidated={}
@@ -1914,7 +1916,7 @@ let _dragId=null,_dragTechId=null
 // Map state
 let mapObj=null,rGroup=null,gcache={},building=false
 try{const g=localStorage.getItem('optiq_gcache');if(g){const p=JSON.parse(g);if(p&&typeof p==='object')gcache=p}}catch(e){}
-const TODAY=new Date().toISOString().split("T")[0]
+const TODAY=_todayParis()
 const WEEK=(()=>{
   const d=new Date();d.setHours(12,0,0,0)
   const day=d.getDay();const mon=new Date(d)
@@ -2061,7 +2063,9 @@ function setSelDate(d){
   if(!d||d===selDate) return
   selDate=d; mapDate=d
   depRouteOrder={}
+  depETAs={}        // vider les ETAs de l'ancienne date
   loadRouteOrder(d)
+  syncDepVF()       // resync statuts validé/échoué depuis ivs réels
   _saveUIState()
   _autoDepTime()
   // Synchroniser les deux inputs de date
@@ -4210,7 +4214,8 @@ function buildSmartPlan(){
     const existing = ivs.filter(i=>i.date===date).reduce((a,i)=>a+dur(i.type,i.form)+TRAVEL,0)
     return existing + (addedLoad[date]||0)
   }
-  function dayFreeMin(date){ return Math.max(0, effectiveCap(date) - dayLoad(date,{}).totalMin) }
+  // dayLoad local (ci-dessus) retourne un nombre de minutes (inclut addedLoad) — pas un objet
+  function dayFreeMin(date){ return Math.max(0, effectiveCap(date) - dayLoad(date)) }
 
   // ── 5. Assigner chaque client dans SON propre mois ──
   const proposals  = []  // {iv, date, techId, isBig, clientName, groupSize}
@@ -5267,11 +5272,13 @@ function handleCSV(input){
   reader.readAsText(file,"UTF-8")
 }
 
-// CSV drag & drop
-const drop=document.getElementById("csv-drop")
-drop.addEventListener("dragover",e=>{e.preventDefault();drop.classList.add("drag")})
-drop.addEventListener("dragleave",()=>drop.classList.remove("drag"))
-drop.addEventListener("drop",e=>{e.preventDefault();drop.classList.remove("drag");const f=e.dataTransfer.files[0];if(f){const fi=document.getElementById("csv-file");fi.files=e.dataTransfer.files;handleCSV(fi)}})
+// CSV drag & drop (modal Import universel)
+const drop=document.getElementById("mcsv-drop")
+if(drop){
+  drop.addEventListener("dragover",e=>{e.preventDefault();drop.classList.add("drag")})
+  drop.addEventListener("dragleave",()=>drop.classList.remove("drag"))
+  drop.addEventListener("drop",e=>{e.preventDefault();drop.classList.remove("drag");const f=e.dataTransfer.files[0];if(f)handleCSVFile(f)})
+}
 
 // ═══════════════════════════════════════════════════════
 // PARAMÈTRES
@@ -7881,7 +7888,7 @@ async function syncKizeo(){
     })
 
     // Afficher le résumé avec confirmation
-    showKizeoPreview(preview, data.data)
+    showKizeoSyncPreview(preview, data.data)
 
   }catch(e){
     res.innerHTML=`<div style="background:#FFEBEE;color:#C62828;padding:10px 14px;border-radius:8px;font-size:13px">
@@ -7896,8 +7903,11 @@ async function syncKizeo(){
   }
 }
 
-function showKizeoPreview(preview, rawRecords){
+// Renommée (ex-showKizeoPreview) : évite la collision avec showKizeoPreview(data)
+// du bloc import Kizeo (2e <script>) qui écrasait cette fonction.
+function showKizeoSyncPreview(preview, rawRecords){
   const res = document.getElementById("kizeo-sync-result")
+  if(!res) return
   const updates = preview.filter(p=>p.type==="update")
   const noMatch = preview.filter(p=>p.type==="nomatch")
   const noChange = preview.filter(p=>p.type==="nochange")
@@ -8314,8 +8324,8 @@ function initCloud(){
 
       }catch(e){ console.warn('Realtime init:', e.message) }
 
-      // Poll toutes les 5s — fiable même si Realtime coupe
-      setInterval(()=>{ if(!document.hidden) cloudPoll() }, 5000)
+      // Poll toutes les 15s — fiable même si Realtime coupe (5s était trop agressif)
+      setInterval(()=>{ if(!document.hidden) cloudPoll() }, 15000)
       // Forcer un poll immédiat au retour d'onglet
       document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) cloudPoll() })
     })
@@ -8369,9 +8379,35 @@ function initCloud(){
 
 let _csvImportData = null  // données en attente d'application
 
+// L'import peut être lancé depuis le modal "Import universel" (m-csv) OU depuis
+// la vue Paramètres (csv-status / csv-preview injectés par rParam). On résout
+// dynamiquement les bons éléments pour éviter les null et les IDs dupliqués.
+function _csvStatusEl(){
+  const modalOpen=document.getElementById('m-csv')?.classList.contains('open')
+  return (modalOpen?document.getElementById('mcsv-status'):document.getElementById('csv-status'))
+    ||document.getElementById('csv-status')||document.getElementById('mcsv-status')
+}
+function _csvPreviewEl(){
+  const modalOpen=document.getElementById('m-csv')?.classList.contains('open')
+  return (modalOpen?document.getElementById('mcsv-preview'):document.getElementById('csv-preview'))
+    ||document.getElementById('csv-preview')||document.getElementById('mcsv-preview')
+}
+function closeImport(){
+  document.getElementById('m-csv').classList.remove('open')
+  const cm=document.getElementById('col-mapping'); if(cm)cm.style.display='none'
+  const st=document.getElementById('mcsv-status'); if(st){st.style.display='none';st.innerHTML=''}
+  const pv=document.getElementById('mcsv-preview'); if(pv){pv.style.display='none';pv.innerHTML=''}
+  const fi=document.getElementById('imp-file'); if(fi)fi.value=''
+}
+function confirmImport(){
+  applyCSVImport()
+  closeImport()
+  SV(curView)
+}
+
 function handleCSVDrop(e){
   e.preventDefault()
-  document.getElementById('csv-drop').style.background=''
+  const dz=document.getElementById('csv-drop'); if(dz)dz.style.background=''
   const file = e.dataTransfer.files[0]
   if(file) handleCSVFile(file)
 }
@@ -8379,7 +8415,8 @@ function handleCSVDrop(e){
 function handleCSVFile(file){
   if(!file) return
   const ext = file.name.split('.').pop().toLowerCase()
-  const statusEl = document.getElementById('csv-status')
+  const statusEl = _csvStatusEl()
+  if(!statusEl){ showToast('⚠️ Zone d\'import introuvable — ouvrez Paramètres','#E65100'); return }
   statusEl.style.display='block'
   statusEl.innerHTML=`<span style="color:var(--blue)">⏳ Lecture de <strong>${file.name}</strong>...</span>`
 
@@ -8398,7 +8435,7 @@ function handleCSVFile(file){
         const csv = XLSX.utils.sheet_to_csv(ws)
         parseKizeoCSV(csv, file.name, sheetName)
       } catch(err){
-        document.getElementById('csv-status').innerHTML=`<span style="color:#C62828">❌ Erreur lecture Excel : ${err.message}</span>`
+        statusEl.innerHTML=`<span style="color:#C62828">❌ Erreur lecture Excel : ${err.message}</span>`
       }
     }
     reader.readAsBinaryString(file)
@@ -8408,8 +8445,9 @@ function handleCSVFile(file){
 }
 
 function parseKizeoCSV(text, filename, sheetName=''){
-  const statusEl = document.getElementById('csv-status')
-  const previewEl = document.getElementById('csv-preview')
+  const statusEl = _csvStatusEl()
+  const previewEl = _csvPreviewEl()
+  if(!statusEl||!previewEl) return
   try {
     // Détecter le séparateur
     const sep = text.indexOf(';') > text.indexOf(',') ? ';' : ','
@@ -8565,10 +8603,14 @@ function parseKizeoCSV(text, filename, sheetName=''){
     <div style="font-size:12px;color:var(--gray);margin-top:8px">
       Mode : <strong>fusion</strong> — les interventions existantes (via kizeoId) sont mises à jour, les nouvelles s'ajoutent.
     </div>`
-    document.getElementById('csv-apply-btn').style.display='inline-flex'
+    const applyBtn=document.getElementById('csv-apply-btn')
+    if(applyBtn) applyBtn.style.display='inline-flex'
+    // Depuis le modal : afficher les boutons Annuler / Importer
+    const mapping=document.getElementById('col-mapping')
+    if(mapping&&document.getElementById('m-csv')?.classList.contains('open')) mapping.style.display='block'
 
   } catch(err){
-    document.getElementById('csv-status').innerHTML=`<span style="color:#C62828">❌ Erreur : ${err.message}</span>`
+    statusEl.innerHTML=`<span style="color:#C62828">❌ Erreur : ${err.message}</span>`
     console.error(err)
   }
 }
@@ -8582,9 +8624,9 @@ function applyCSVImport(){
   nextId = Math.max(...ivs.map(i=>i.id)) + 1
   cloudSave(true)
   _csvImportData = null
-  document.getElementById('csv-apply-btn').style.display='none'
-  document.getElementById('csv-status').innerHTML=`<span style="color:#1B5E20">✅ Import appliqué — <strong>${ivs.length} interventions</strong> dans la base</span>`
-  document.getElementById('csv-preview').style.display='none'
+  const applyBtn=document.getElementById('csv-apply-btn'); if(applyBtn)applyBtn.style.display='none'
+  const stEl=_csvStatusEl(); if(stEl){stEl.style.display='block';stEl.innerHTML=`<span style="color:#1B5E20">✅ Import appliqué — <strong>${ivs.length} interventions</strong> dans la base</span>`}
+  const pvEl=_csvPreviewEl(); if(pvEl)pvEl.style.display='none'
   updateSbCount()
   rDash()
   showToast(`✅ ${ivs.length} interventions importées`,"#1B5E20")
@@ -9119,8 +9161,10 @@ async function pushIvToNotion(iv){
 }
 
 // Hook updSt pour aussi mettre à jour Notion
+// ⚠️ Réassignation volontaire (pas une déclaration `function`) : une 2e déclaration
+// serait hissée et _origUpdSt capturerait le wrapper lui-même → récursion infinie.
 const _origUpdSt = updSt
-function updSt(id, s){
+updSt = function(id, s){
   _origUpdSt(id, s)
   pushStatusToNotion(id, s)  // sync Notion en arrière-plan
 }
