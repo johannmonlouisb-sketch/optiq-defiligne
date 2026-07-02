@@ -8998,12 +8998,28 @@ async function pullFromNotion(dateFrom, dateTo, mode='merge'){
       const existIdx = ivs.findIndex(i=>i.notionId===page.id)
       if(existIdx>=0){
         const prev = ivs[existIdx]
-        // Les données locales sont prioritaires — seul "form", heure Notion et padPak Notion mis à jour
+        // Workflow (statut, tech, type, date) : données locales prioritaires
+        // Contenu (notes, contacts, adresses) : Notion gagne si non-vide
+        // — évite que l'app écrase des infos saisies directement dans Notion
         ivs[existIdx] = {
           ...prev,
           notionId: page.id,
-          form: iv.form || prev.form,
+          // Contenu Notion importé si non-vide
+          notes:         iv.notes         || prev.notes,
+          contact:       iv.contact       || prev.contact,
+          cphone:        iv.cphone        || prev.cphone,
+          cemail:        iv.cemail        || prev.cemail,
+          siege:         iv.siege         || prev.siege,
+          motif:         iv.motif         || prev.motif,
+          commercial:    iv.commercial    || prev.commercial,
+          contact_siege: iv.contact_siege || prev.contact_siege,
+          email_siege:   iv.email_siege   || prev.email_siege,
+          phone_siege:   iv.phone_siege   || prev.phone_siege,
+          urgent:        iv.urgent !== undefined ? iv.urgent : prev.urgent,
+          // Formulaire et PAD PAK
+          form:   iv.form  || prev.form,
           padPak: prev.padPak || iv.padPak,
+          // Heure Notion si définie
           ...(iv.timeStart ? {timeStart: iv.timeStart, notionTime: true} : {notionTime: false}),
         }
         updated++
@@ -9137,7 +9153,32 @@ function _buildNotionPropsCore(iv){
 
 function _buildNotionPropsCreate(iv){ return _buildNotionPropsCore(iv) }
 
-function _buildNotionPropsUpdate(iv){ return _buildNotionPropsCore(iv) }
+// Pour les MÀJ : champs workflow toujours envoyés, champs de contenu seulement si non-vides
+// → évite d'écraser dans Notion ce que le bureau a saisi directement si l'app n'a pas encore pullé
+function _buildNotionPropsUpdate(iv){
+  const tech=TECHS.find(t=>t.id===iv.techId)
+  const typeMap={maintenance_simple:'Annuel',maintenance_complex:'PAD PAK',installation:'Installation',tele_maintenance:'Télémaintenance'}
+  const props={
+    'Société':           {title:[{text:{content:(iv.client||'').substring(0,2000)}}]},
+    'Date intervention': {date:{start:(iv.userSetTime&&iv.timeStart)?iv.date+'T'+iv.timeStart+':00':iv.date}},
+    'Adresse Site':      _rt(iv.addr),
+    'Technicien':        {select:{name:tech?tech.name:''}},
+    'INTERVENTION':      {multi_select:[{name:typeMap[iv.type]||'Annuel'}]},
+    'Terminer':          {checkbox:iv.status==='completed'},
+    'Echec':             {checkbox:iv.status==='not_responded'},
+  }
+  // Contenu : ne pas envoyer si vide (évite d'écraser des infos Notion non encore importées)
+  if(iv.notes)   props['INFO ']           = _rt(iv.notes)
+  if(iv.contact) props['Contact site']    = _rt(iv.contact)
+  if(iv.siege)   props['Adresse Siéges'] = _rt(iv.siege)
+  if(iv.cphone)  props['Téléphone']      = {phone_number:iv.cphone}
+  if(iv.cemail)  props['E-mail']         = {email:iv.cemail}
+  if(iv.motif)   props['Motif']          = _rt(iv.motif)
+  if(iv.urgent)  props['Urgent']         = _rt('Yes')
+  if(iv.commercial && _NOTION_COMMERCIAL_PROP)
+    props[_NOTION_COMMERCIAL_PROP] = {select:{name:iv.commercial}}
+  return props
+}
 
 async function pushIvToNotion(iv){
   if(!isDeployedApp) return
