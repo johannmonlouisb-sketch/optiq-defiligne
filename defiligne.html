@@ -8110,6 +8110,7 @@ let cloudSyncing = false
 let cloudSaveTimer = null
 let _cloudUpdatedAt = null
 let _pullInProgress = false   // verrou : empêche cloudPoll d'écraser ivs pendant un pull Notion
+let _savePending    = false   // verrou : empêche cloudPoll d'écraser ivs pendant un cloudSave en cours
 
 async function cloudLoad(){
   if(!isDeployed) return false
@@ -8132,6 +8133,7 @@ async function cloudLoad(){
 async function cloudPoll(){
   if(!isDeployed) return
   if(_pullInProgress) return   // pull Notion en cours — ne pas écraser
+  if(_savePending) return      // sauvegarde locale en attente — ne pas écraser
   try{
     const rows = await sbGet('app_state?key=eq.optiq_ivs_data&select=updated_at')
     const ts = rows[0]?.updated_at
@@ -8158,6 +8160,7 @@ async function cloudPoll(){
 
 function cloudSave(immediate = false){
   clearTimeout(cloudSaveTimer)
+  _savePending = true   // bloquer cloudPoll pendant le délai + la sauvegarde Supabase
   const delay = immediate ? 0 : 1000
   cloudSaveTimer = setTimeout(() => {
     try {
@@ -8172,7 +8175,10 @@ function cloudSave(immediate = false){
         // Mémoriser le timestamp pour ne pas se re-déclencher soi-même au poll
         const rows = await sbGet('app_state?key=eq.optiq_ivs_data&select=updated_at').catch(()=>[])
         if(rows[0]?.updated_at) _cloudUpdatedAt = rows[0].updated_at
-      }).catch(e => console.warn('Supabase save:', e.message))
+        _savePending = false
+      }).catch(e => { console.warn('Supabase save:', e.message); _savePending = false })
+    } else {
+      _savePending = false
     }
   }, delay)
 }
@@ -8999,23 +9005,23 @@ async function pullFromNotion(dateFrom, dateTo, mode='merge'){
       if(existIdx>=0){
         const prev = ivs[existIdx]
         // Workflow (statut, tech, type, date) : données locales prioritaires
-        // Contenu (notes, contacts, adresses) : Notion gagne si non-vide
-        // — évite que l'app écrase des infos saisies directement dans Notion
+        // Contenu : local prioritaire si non-vide, sinon Notion complète les champs vides
+        // — permet d'importer ce que le bureau saisit dans Notion sans écraser les modifs locales
         ivs[existIdx] = {
           ...prev,
           notionId: page.id,
-          // Contenu Notion importé si non-vide
-          notes:         iv.notes         || prev.notes,
-          contact:       iv.contact       || prev.contact,
-          cphone:        iv.cphone        || prev.cphone,
-          cemail:        iv.cemail        || prev.cemail,
-          siege:         iv.siege         || prev.siege,
-          motif:         iv.motif         || prev.motif,
-          commercial:    iv.commercial    || prev.commercial,
-          contact_siege: iv.contact_siege || prev.contact_siege,
-          email_siege:   iv.email_siege   || prev.email_siege,
-          phone_siege:   iv.phone_siege   || prev.phone_siege,
-          urgent:        iv.urgent !== undefined ? iv.urgent : prev.urgent,
+          // Local en priorité — Notion remplit uniquement les champs vides localement
+          notes:         prev.notes         || iv.notes,
+          contact:       prev.contact       || iv.contact,
+          cphone:        prev.cphone        || iv.cphone,
+          cemail:        prev.cemail        || iv.cemail,
+          siege:         prev.siege         || iv.siege,
+          motif:         prev.motif         || iv.motif,
+          commercial:    prev.commercial    || iv.commercial,
+          contact_siege: prev.contact_siege || iv.contact_siege,
+          email_siege:   prev.email_siege   || iv.email_siege,
+          phone_siege:   prev.phone_siege   || iv.phone_siege,
+          urgent:        prev.urgent        || iv.urgent,
           // Formulaire et PAD PAK
           form:   iv.form  || prev.form,
           padPak: prev.padPak || iv.padPak,
