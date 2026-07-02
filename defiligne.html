@@ -2406,8 +2406,15 @@ function toggleRouteLock(techId){
   const date=selDate
   const was=isRouteLocked(techId,date)
   setRouteLock(techId,date,!was)
-  // S'assurer que l'ordre actuel est bien sauvegardé avant de verrouiller
-  if(!was) saveRouteOrder(date)
+  if(!was){
+    saveRouteOrder(date)
+  } else {
+    // Déverrouillage : on efface l'ordre sauvegardé pour permettre une ré-optimisation
+    depRouteOrder[techId]=(depRouteOrder[techId]||[]).filter(iv=>iv.date!==date)
+    saveRouteOrder(date)
+    ivs.filter(i=>i.date===date&&i.techId===techId).forEach(i=>delete depETAs[i.id])
+    _schedDepMap()
+  }
   rDepart()
 }
 
@@ -2491,7 +2498,6 @@ function dropDepCard(targetId){
   const orderedIvs=order.map(id=>byId[id]).filter(Boolean)
   const other=(depRouteOrder[techId]||[]).filter(iv=>iv.date!==date)
   depRouteOrder[techId]=[...orderedIvs,...other]
-  setRouteLock(techId,date,true)
   saveRouteOrder(date)
   _dragId=null
   // Vider les ETAs obsolètes du tech reordonné pour éviter d'afficher de mauvaises heures
@@ -2946,8 +2952,8 @@ async function initDepMap(){
 
 
     let ivcOptimized
-    // ── Si ordre verrouillé : respecter l'ordre sauvegardé pour les restants ──
-    if(isRouteLocked(tech.id,date)){
+    // ── Si ordre sauvegardé (glisser-déposer) ou verrouillé : respecter cet ordre ──
+    if(isRouteLocked(tech.id,date)||savedOrd.length){
       const lockedPending=savedOrd.length
         ? savedOrd.map(iv=>byIdAll[iv.id]).filter(Boolean).filter(x=>!doneIds.has(x.iv.id))
         : ivcPending

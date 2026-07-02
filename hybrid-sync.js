@@ -33,7 +33,8 @@ async function updateIvHybrid(id, data) {
   }
 
   // 3. Envoyer à Supabase (nouveau)
-  if (supabase) {
+  // typeof-check : updateIntervention vit dans supabase-realtime.js, pas toujours chargé
+  if (supabase && typeof updateIntervention === 'function') {
     try {
       await updateIntervention(id, {
         status: data.status,
@@ -72,7 +73,7 @@ async function validateIvHybrid(id) {
   }
 
   // Sync Supabase
-  if (supabase) {
+  if (supabase && typeof updateIntervention === 'function') {
     try {
       await updateIntervention(id, { status: 'completed' })
       console.log('✓ Validation sync Supabase:', id)
@@ -100,7 +101,7 @@ async function createIvHybrid(clientData) {
   saveIvs()
 
   // 2. Créer dans Supabase
-  if (supabase) {
+  if (supabase && typeof insertIntervention === 'function') {
     try {
       const result = await insertIntervention({
         id: newId,
