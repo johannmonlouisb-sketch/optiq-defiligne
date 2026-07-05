@@ -1,7 +1,8 @@
 // netlify/functions/route-traffic.js
-// Routing routier avec modélisation de trafic par heure de la journée
-// Source : OSRM (géométrie réelle) + coefficients heure de pointe France
-// Fallback Google Directions si GOOGLE_MAPS_KEY est défini (trafic live)
+// Routing routier avec trafic réel
+// Source 1 : TomTom Routing API (trafic live) si TOMTOM_KEY est défini
+// Source 2 : Google Directions (trafic live) si GOOGLE_MAPS_KEY est défini
+// Source 3 : OSRM (géométrie réelle) + coefficients heure de pointe France (toujours disponible)
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -10,8 +11,9 @@ const CORS = {
   'Content-Type': 'application/json'
 }
 
-const OSRM_BASE  = 'https://router.project-osrm.org/route/v1/driving/'
-const GOOGLE_DIR = 'https://maps.googleapis.com/maps/api/directions/json'
+const OSRM_BASE   = 'https://router.project-osrm.org/route/v1/driving/'
+const GOOGLE_DIR  = 'https://maps.googleapis.com/maps/api/directions/json'
+const TOMTOM_ROUTE = 'https://api.tomtom.com/routing/1/calculateRoute/'
 
 // ── Modèle de trafic heure de la journée (France, mix urbain/périurbain) ──────
 // Inspiré des données Waze / TomTom pour les zones Île-de-France et régionales
@@ -119,6 +121,52 @@ async function routeGoogle(waypoints, departureTimestamp, key) {
   }
 }
 
+// ── TomTom Routing API (trafic live) ──────────────────────────────────────────
+async function routeTomTom(waypoints, key) {
+  const locations = waypoints.map(p => `${p.lat},${p.lng}`).join(':')
+  const params = new URLSearchParams({
+    key, traffic: 'true', travelMode: 'car', routeType: 'fastest', computeTravelTimeFor: 'all'
+  })
+  const r = await fetch(`${TOMTOM_ROUTE}${encodeURIComponent(locations)}/json?${params}`, { signal: AbortSignal.timeout(8000) })
+  const d = await r.json()
+  const route = d.routes?.[0]
+  if (!route) return null
+
+  const legSummaries = (route.legs || []).map(leg => leg.summary || {})
+  const legs = legSummaries.map(s => {
+    const noTraffic = s.noTrafficTravelTimeInSeconds ?? s.travelTimeInSeconds ?? 0
+    return {
+      distanceKm:         Math.round((s.lengthInMeters || 0) / 100) / 10,
+      durationMin:        Math.round(noTraffic / 60),
+      trafficDurationMin: Math.round((s.travelTimeInSeconds || 0) / 60)
+    }
+  })
+
+  const coords = []
+  for (const leg of route.legs || []) {
+    for (const pt of leg.points || []) coords.push([pt.longitude, pt.latitude])
+  }
+
+  const summary        = route.summary || {}
+  const noTrafficTotal = summary.noTrafficTravelTimeInSeconds ?? summary.travelTimeInSeconds ?? 0
+  const totalDurationMin   = Math.round(noTrafficTotal / 60)
+  const trafficDurationMin = Math.round((summary.travelTimeInSeconds || 0) / 60)
+  const factor = totalDurationMin > 0 ? trafficDurationMin / totalDurationMin : 1
+
+  return {
+    polylineGeoJson: { type: 'LineString', coordinates: coords },
+    totalDistanceKm:  Math.round((summary.lengthInMeters || 0) / 100) / 10,
+    totalDurationMin,
+    trafficDurationMin,
+    delayMin: trafficDurationMin - totalDurationMin,
+    trafficLabel: trafficLabel(factor),
+    factor,
+    legs,
+    hasTraffic: true,
+    source: 'tomtom'
+  }
+}
+
 // ── Handler ───────────────────────────────────────────────────────────────────
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: CORS, body: '' }
@@ -134,9 +182,15 @@ exports.handler = async (event) => {
 
   let result = null
 
-  // 1. Google Directions live (si clé disponible)
+  // 1. TomTom Routing live (si clé disponible) — trafic temps réel
+  const tomtomKey = process.env.TOMTOM_KEY
+  if (tomtomKey) {
+    result = await routeTomTom(waypoints, tomtomKey).catch(() => null)
+  }
+
+  // 2. Google Directions live (si clé disponible)
   const googleKey = process.env.GOOGLE_MAPS_KEY
-  if (googleKey) {
+  if (!result && googleKey) {
     let ts = 'now'
     if (departureHHMM) {
       const [h, m] = departureHHMM.split(':').map(Number)
@@ -146,7 +200,7 @@ exports.handler = async (event) => {
     result = await routeGoogle(waypoints, ts, googleKey).catch(() => null)
   }
 
-  // 2. OSRM + modèle heure de la journée (toujours disponible)
+  // 3. OSRM + modèle heure de la journée (toujours disponible)
   if (!result) result = await routeOSRM(waypoints, departureHHMM).catch(() => null)
 
   if (!result) return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: 'Routing indisponible' }) }

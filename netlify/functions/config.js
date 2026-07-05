@@ -41,6 +41,7 @@ export default async (request) => {
     kizeoToken:   process.env.OPTIQ_KIZEO_TOKEN   || '',
     kizeoFormId:  process.env.OPTIQ_KIZEO_FORM_ID || '',
     brevoKey:     process.env.OPTIQ_BREVO_KEY      || '',
+    tomtomKey:    process.env.TOMTOM_KEY           || '',
     techniciens,
   }), { status: 200, headers: CORS })
 }

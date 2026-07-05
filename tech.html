@@ -310,6 +310,7 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
         <input type="date" id="dep-date" style="font-size:14px;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit" onchange="onDepDateChange()"/>
         <input type="time" id="dep-time" value="08:00" title="Heure de départ du dépôt" style="font-size:14px;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit" onchange="techCfg.startTime=this.value;saveCfg();techETAs={};_routeOrderedPts=[];techRouteLegDurations=[];renderDepart();if(mapObj&&!building)calcMap();else _calcETAsHeadless()"/>
         <button class="btn btn-blue btn-sm" onclick="calcMap()">🗺️ Itinéraire</button>
+        <button id="dep-traffic-btn" class="btn btn-gray btn-sm" onclick="toggleDepTrafficLayer()" title="Afficher/masquer le trafic temps réel">🚦</button>
         <button id="btn-map-toggle" class="btn btn-gray btn-sm" style="display:none" onclick="toggleDepMap()">📋 Liste</button>
         <button id="btn-reoptimize" class="btn btn-green btn-sm" style="display:none" onclick="reoptimizeFromDepot()" title="Recalculer depuis votre position GPS (ou dépôt si GPS indisponible)">📍 Recalculer</button>
         <button id="btn-notion-pull" class="btn btn-sm" style="background:#F3E5F5;color:#6A1B9A;border:1.5px solid #CE93D8" onclick="showNotionPanelTech()">🔄 Notion</button>
@@ -641,6 +642,36 @@ function _cleanBadCoords(){ivs.forEach(iv=>{if(iv.lat&&iv.lng&&!isFrance(iv.lat,
 let curTech=1, curTab="depart", planSel=TODAY(), gCache={}, mapObj=null, mapRoute=null
 // Charger le cache géocodes depuis localStorage (persist les adresses entre sessions)
 try{const g=localStorage.getItem('optiq_gcache');if(g){const p=JSON.parse(g);if(p&&typeof p==='object')gCache=p}}catch(e){}
+
+// ── Couche trafic temps réel (TomTom) sur la carte de tournée ────────────────
+let _tomtomKey=null,depTrafficLayer=null,depTrafficOn=false
+async function _getTomtomKey(){
+  if(_tomtomKey!==null) return _tomtomKey
+  try{ const r=await fetch('/api/config'); const d=await r.json(); _tomtomKey=d.tomtomKey||'' }
+  catch(e){ _tomtomKey='' }
+  return _tomtomKey
+}
+async function _addDepTrafficLayer(){
+  if(!mapObj||depTrafficLayer) return
+  const key=await _getTomtomKey()
+  if(!key) return
+  depTrafficLayer=L.tileLayer(`https://api.tomtom.com/traffic/map/4/tile/flow/relative/{z}/{x}/{y}.png?key=${key}`,{maxZoom:22,opacity:.7}).addTo(mapObj)
+}
+async function toggleDepTrafficLayer(){
+  const btn=document.getElementById('dep-traffic-btn')
+  if(depTrafficLayer){
+    mapObj?.removeLayer(depTrafficLayer)
+    depTrafficLayer=null; depTrafficOn=false
+    if(btn){btn.style.background='';btn.style.color=''}
+    return
+  }
+  if(!mapObj){ alert("Calculez d'abord l'itinéraire.") ; return }
+  const key=await _getTomtomKey()
+  if(!key){ alert('Trafic temps réel indisponible pour le moment.'); return }
+  await _addDepTrafficLayer()
+  depTrafficOn=true
+  if(btn){btn.style.background='#FFE0B2';btn.style.color='#E65100'}
+}
 let mapMarkers={}, building=false, cmEditId=null, techRouteOrder={}, _dragId=null
 let validated={}, failed={}
 let _techExpanded=new Set()
@@ -1765,6 +1796,7 @@ async function calcMap(){
   if(!mapObj){
     mapObj=L.map("dep-map",{center:[48.7,2.5],zoom:7,zoomControl:true})
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap",maxZoom:19}).addTo(mapObj)
+    if(depTrafficOn)_addDepTrafficLayer()
   } else {
     mapObj.eachLayer(l=>{if(l instanceof L.Marker||l instanceof L.Polyline||l instanceof L.GeoJSON)mapObj.removeLayer(l)})
     mapObj.invalidateSize()

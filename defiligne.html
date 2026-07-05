@@ -268,6 +268,7 @@ tr:hover td{background:var(--bg)}
         <input type="time" id="dep-time" value="08:00" title="Heure de départ" style="width:auto;font-size:13px;padding:6px 10px" oninput="_schedDepMap()"/>
         <button onclick="depNow()" title="Utiliser l'heure actuelle (Paris)" style="padding:6px 10px;font-size:12px;border-radius:8px;border:1.5px solid var(--blue);background:#E3F2FD;color:#1565C0;cursor:pointer;font-family:inherit;font-weight:600;white-space:nowrap">🕐 Maintenant</button>
         <button id="dep-refresh-btn" onclick="_schedDepMap()" title="Recalculer les ETAs et l'itinéraire" style="padding:6px 10px;font-size:12px;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:var(--dark);cursor:pointer;font-family:inherit;font-weight:600;white-space:nowrap;display:flex;align-items:center;gap:4px"><span id="dep-refresh-ic">🔄</span> Recalculer</button>
+        <button id="dep-traffic-btn" onclick="toggleDepTrafficLayer()" title="Afficher/masquer le trafic temps réel (TomTom)" style="padding:6px 10px;font-size:12px;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:var(--dark);cursor:pointer;font-family:inherit;font-weight:600;white-space:nowrap">🚦 Trafic</button>
         <div style="position:relative;display:inline-block">
           <button id="dep-tech-btn" onclick="toggleDepTechDropdown(event)" style="padding:6px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;font-size:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:8px;min-width:160px;white-space:nowrap">
             <span id="dep-tech-label" style="flex:1;text-align:left">Tous les techniciens</span>
@@ -1919,8 +1920,38 @@ let depRouteLines={}  // {techId: L.GeoJSON layer} pour mise à jour sans recalc
 let _dragId=null,_dragTechId=null
 // Map state
 let mapObj=null,rGroup=null,gcache={},building=false
+let _tomtomKey=null,depTrafficLayer=null,depTrafficOn=false
 try{const g=localStorage.getItem('optiq_gcache');if(g){const p=JSON.parse(g);if(p&&typeof p==='object')gcache=p}}catch(e){}
 const TODAY=_todayParis()
+
+// ── Couche trafic temps réel (TomTom) sur la carte de départ ─────────────────
+async function _getTomtomKey(){
+  if(_tomtomKey!==null) return _tomtomKey
+  try{ const r=await fetch('/api/config'); const d=await r.json(); _tomtomKey=d.tomtomKey||'' }
+  catch(e){ _tomtomKey='' }
+  return _tomtomKey
+}
+async function _addDepTrafficLayer(){
+  if(!depMapObj||depTrafficLayer) return
+  const key=await _getTomtomKey()
+  if(!key) return
+  depTrafficLayer=L.tileLayer(`https://api.tomtom.com/traffic/map/4/tile/flow/relative/{z}/{x}/{y}.png?key=${key}`,{maxZoom:22,opacity:.7}).addTo(depMapObj)
+}
+async function toggleDepTrafficLayer(){
+  const btn=document.getElementById('dep-traffic-btn')
+  if(depTrafficLayer){
+    depMapObj?.removeLayer(depTrafficLayer)
+    depTrafficLayer=null; depTrafficOn=false
+    if(btn){btn.style.background='#fff';btn.style.color='var(--dark)'}
+    return
+  }
+  if(!depMapObj){ alert('Calculez d\'abord l\'itinéraire du jour.'); return }
+  const key=await _getTomtomKey()
+  if(!key){ alert('Clé TomTom non configurée (variable TOMTOM_KEY côté Netlify).'); return }
+  await _addDepTrafficLayer()
+  depTrafficOn=true
+  if(btn){btn.style.background='#FFE0B2';btn.style.color='#E65100'}
+}
 const WEEK=(()=>{
   const d=new Date();d.setHours(12,0,0,0)
   const day=d.getDay();const mon=new Date(d)
@@ -2904,6 +2935,7 @@ async function initDepMap(){
     depMapObj=L.map("dep-mapid",{center:[48.7,2.5],zoom:7})
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap",maxZoom:19}).addTo(depMapObj)
     depRGroup=L.layerGroup().addTo(depMapObj)
+    if(depTrafficOn)_addDepTrafficLayer()
   }else{depRGroup.clearLayers();depMapObj.invalidateSize()}
   depMarkers={}
   depRouteLines={}
