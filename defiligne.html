@@ -2405,6 +2405,7 @@ function saveRouteOrder(date){
       if(ord.length) stored[`${t.id}_${date}`]=ord.map(iv=>iv.id)
     })
     localStorage.setItem("optiq_route_order",JSON.stringify(stored))
+    if(isDeployedApp) sbUpsert('app_state',{key:'optiq_route_order',value:stored}).catch(()=>{})
   }catch(e){}
 }
 function loadRouteOrder(date){
@@ -2421,6 +2422,19 @@ function loadRouteOrder(date){
         }
       }
     })
+  }catch(e){}
+}
+// Récupère l'ordre de tournée depuis le cloud (posé par l'admin ou le technicien
+// sur un autre appareil) et le fusionne dans le cache localStorage avant lecture.
+async function pullRouteOrderFromCloud(){
+  if(!isDeployedApp) return
+  try{
+    const rows=await sbGet('app_state?key=eq.optiq_route_order&select=value')
+    const cloudStored=rows?.[0]?.value
+    if(cloudStored&&typeof cloudStored==='object'){
+      const local=JSON.parse(localStorage.getItem("optiq_route_order")||"{}")
+      localStorage.setItem("optiq_route_order",JSON.stringify({...local,...cloudStored}))
+    }
   }catch(e){}
 }
 
@@ -8380,6 +8394,25 @@ function initCloud(){
             if(curView==='dashboard') rDash()
           })
           .subscribe()
+
+        // Canal ordre de tournée — partagé avec l'app technicien (drag & drop, verrouillage)
+        sbClient.channel('route-order-sync')
+          .on('postgres_changes',{
+            event:'*', schema:'public', table:'app_state',
+            filter:'key=eq.optiq_route_order'
+          }, payload => {
+            const val = payload.new?.value
+            if(!val || typeof val !== 'object') return
+            try{
+              const local=JSON.parse(localStorage.getItem('optiq_route_order')||'{}')
+              localStorage.setItem('optiq_route_order', JSON.stringify({...local, ...val}))
+            }catch(e){}
+            if(curView==='depart') _schedDepMap()
+          })
+          .subscribe()
+
+        // Chargement initial de l'ordre de tournée (posé par l'admin ou le tech sur un autre appareil)
+        pullRouteOrderFromCloud()
 
         // Chargement initial de la progression des tournées
         sbGet('app_state?key=eq.optiq_tour_progress&select=value')

@@ -907,12 +907,25 @@ function saveTechAddresses(){
 }
 function saveVF(){saveIvs()} // état dérivé de iv.status, persisté via saveIvs
 
-// ── Ordre de tournée partagé admin ↔ tech ──
+// ── Ordre de tournée partagé admin ↔ tech (via Supabase app_state) ──
 function saveRouteOrder(date){
   try{
     const stored=JSON.parse(localStorage.getItem("optiq_route_order")||"{}")
     stored[`${curTech}_${date}`]=techRouteOrder[date]||[]
     localStorage.setItem("optiq_route_order",JSON.stringify(stored))
+    if(_sbClient) _sbClient.from('app_state').upsert({key:'optiq_route_order',value:stored},{onConflict:'key'}).then(()=>{}).catch(()=>{})
+  }catch(e){}
+}
+// Récupère l'ordre de tournée depuis le cloud (posé par l'admin ou par ce technicien
+// sur un autre appareil) et le fusionne dans le cache localStorage avant lecture.
+async function pullRouteOrderFromCloud(){
+  if(!_sbClient) return
+  try{
+    const {data}=await _sbClient.from('app_state').select('value').eq('key','optiq_route_order').single()
+    if(data?.value&&typeof data.value==='object'){
+      const local=JSON.parse(localStorage.getItem('optiq_route_order')||'{}')
+      localStorage.setItem('optiq_route_order',JSON.stringify({...local,...data.value}))
+    }
   }catch(e){}
 }
 // Calcul ETAs sans Leaflet — même logique que initDepMap() côté admin
@@ -1861,7 +1874,9 @@ async function calcMap(){
   let orderedPts=pts
   const[sh,sm]=depStartTime().split(':').map(Number)
   if(pts.length>1){
-    // 1. Charger l'ordre admin depuis localStorage (partagé admin ↔ tech)
+    // 1. Récupérer l'ordre le plus récent depuis Supabase (posé par l'admin ou ce
+    // technicien sur un autre appareil), puis charger depuis le cache local fusionné
+    await pullRouteOrderFromCloud()
     loadRouteOrder(date)
     const storedIds=techRouteOrder[date]
     const byId=Object.fromEntries(pts.map(p=>[p.iv.id,p]))
@@ -3360,6 +3375,25 @@ document.addEventListener('DOMContentLoaded', async () => {
       _setSbDot('#f59e0b', 'Connecté — aucune donnée cloud')
     }
   } catch(e) { _setSbDot('#ef4444', 'Erreur chargement : ' + e.message) }
+
+  // Charger l'ordre de tournée le plus récent (posé par l'admin ou un autre appareil)
+  await pullRouteOrderFromCloud()
+
+  // Écouter les changements d'ordre de tournée en temps réel (drag & drop admin, etc.)
+  _sbClient.channel('tech-route-order-sync')
+    .on('postgres_changes', {
+      event: '*', schema: 'public', table: 'app_state',
+      filter: 'key=eq.optiq_route_order'
+    }, payload => {
+      const val = payload.new?.value
+      if (!val || typeof val !== 'object') return
+      try{
+        const local=JSON.parse(localStorage.getItem('optiq_route_order')||'{}')
+        localStorage.setItem('optiq_route_order', JSON.stringify({...local, ...val}))
+      }catch(e){}
+      if(mapObj&&!building) calcMap()
+    })
+    .subscribe()
 
   // Écouter les modifications du dispatch en temps réel (WebSocket)
   _sbClient.channel('tech-app-sync')
