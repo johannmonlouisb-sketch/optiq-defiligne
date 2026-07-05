@@ -49,7 +49,7 @@ export default async (request) => {
     return json({ ok: false, error: 'Body JSON invalide' }, 400)
   }
 
-  const secret = process.env.AUTH_SECRET || 'optitechx-dev-secret-changeme'
+  const secret = process.env.AUTH_SECRET
   const { type } = body
 
   // ── Authentification Technicien (PIN) ──────────────────────────────────
@@ -66,21 +66,9 @@ export default async (request) => {
     return json({ ok: true, token, nom: entry.nom, role: 'tech' })
   }
 
-  // ── Authentification Admin ─────────────────────────────────────────────
-  if (type === 'admin') {
-    const { username, password } = body
-    if (!username || !password) return json({ ok: false, error: 'Identifiant et mot de passe requis' }, 400)
-
-    const adminUser = process.env.ADMIN_USER || 'defiligne'
-    const adminPass = process.env.ADMIN_PASS || '7802'
-
-    if (username !== adminUser || password !== adminPass) return json({ ok: false, error: 'Identifiants incorrects' }, 401)
-
-    const token = signToken({ nom: username, role: 'admin', exp: Date.now() + 12 * 3600 * 1000 }, secret)
-    return json({ ok: true, token, nom: username, role: 'admin' })
-  }
-
-  return json({ ok: false, error: 'type doit être "tech" ou "admin"' }, 400)
+  // L'authentification admin passe désormais par Supabase Auth (voir login.html) —
+  // cette route ne gère plus que les techniciens.
+  return json({ ok: false, error: 'type doit être "tech"' }, 400)
 }
 
 export const config = { path: '/api/auth/login' }

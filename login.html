@@ -387,9 +387,9 @@ body::after{
     <!-- ── ADMIN ─────────────────────────────── -->
     <div class="section" id="sec-admin">
       <div class="field">
-        <input type="text" id="adm-user" placeholder=" "
+        <input type="email" id="adm-user" placeholder=" "
           autocomplete="username" autocorrect="off" autocapitalize="none" spellcheck="false">
-        <label>Identifiant</label>
+        <label>Email</label>
       </div>
       <div class="field">
         <input type="password" id="adm-pass" placeholder=" "
@@ -410,7 +410,15 @@ body::after{
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+// ── Supabase Auth ───────────────────────────────────────────────────────────
+const SB_URL = 'https://yjcmfoxvyxzgixnrvcnn.supabase.co'
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9' +
+  '.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlqY21mb3h2eXh6Z2l4bnJ2Y25uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwNjYwNzMsImV4cCI6MjA5MTY0MjA3M30' +
+  '.1aR7ZdyBMjqhb9DhpZgXOxvaw0FcPYfeWqlKAOoyHeg'
+const sb = window.supabase.createClient(SB_URL, SB_KEY)
+
 // ── Config ────────────────────────────────────────────────────────────────
 const KEY_SUB = {'2':'ABC','3':'DEF','4':'GHI','5':'JKL','6':'MNO','7':'PQRS','8':'TUV','9':'WXYZ','0':'+'}
 const PIN_LEN = 4
@@ -592,19 +600,25 @@ function pinError() {
 
 // ── Login admin ───────────────────────────────────────────────────────────
 async function loginAdmin() {
-  const username = document.getElementById('adm-user').value.trim()
+  const email = document.getElementById('adm-user').value.trim()
   const password = document.getElementById('adm-pass').value
-  if (!username || !password) { showMsg('Tous les champs sont requis'); return }
+  if (!email || !password) { showMsg('Tous les champs sont requis'); return }
   const btn = document.getElementById('btn-adm-login')
   btn.disabled = true; btn.innerHTML = '<div class="spin"></div>Vérification…'
   try {
-    const r = await fetch('/api/auth/login', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ type:'admin', username, password })
-    })
-    const d = await r.json()
-    if (!r.ok || !d.ok) { showMsg(d.error || 'Identifiants incorrects') }
-    else { saveSession(d); showMsg('Accès autorisé','success'); setTimeout(() => location.href='/defiligne', 700) }
+    // 1) Authentification Supabase (mot de passe haché, vérifié côté serveur)
+    const { data, error } = await sb.auth.signInWithPassword({ email, password })
+    if (error || !data?.user) { showMsg('Identifiants incorrects'); return }
+
+    // 2) Vérifier le rôle admin
+    const { data: prof } = await sb.from('profiles').select('role').eq('id', data.user.id).single()
+    if (prof?.role !== 'admin') {
+      await sb.auth.signOut()
+      showMsg('Ce compte n\'a pas les droits admin')
+      return
+    }
+    showMsg('Accès autorisé','success')
+    setTimeout(() => location.href='/defiligne', 700)
   } catch { showMsg('Erreur réseau — réessayez') }
   finally { btn.disabled=false; btn.innerHTML='Se connecter' }
 }

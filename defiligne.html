@@ -5565,7 +5565,7 @@ function autoSaveSettings(immediate=false){
   _settingsSaveTimer = setTimeout(async ()=>{
     showParamStatus('saving')
     try{
-      const r = await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(buildSettingsPayload())})
+      const r = await fetch('/api/settings',{method:'POST',headers:await sbAuthHeaders({'Content-Type':'application/json'}),body:JSON.stringify(buildSettingsPayload())})
       if(!r.ok) throw new Error(`HTTP ${r.status}`)
       showParamStatus('saved')
     }catch(e){
@@ -5594,7 +5594,7 @@ function showParamStatus(status){
 async function loadSettings(){
   if(!isDeployedApp) return
   try{
-    const r = await fetch('/api/settings')
+    const r = await fetch('/api/settings', { headers: await sbAuthHeaders() })
     if(!r.ok) return
     const s = await r.json()
     if(!s || !Object.keys(s).length) return
