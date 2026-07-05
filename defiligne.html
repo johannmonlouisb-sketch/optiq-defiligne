@@ -129,12 +129,15 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--blue);border-col
 #dep-right{display:flex;flex-direction:column;gap:8px;overflow-y:auto;min-height:0}
 #dep-list{display:flex;flex-direction:column;gap:8px}
 .dep-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px;cursor:pointer;transition:all 0.15s;border-left:4px solid var(--blue)}
-.dep-card.done{border-left-color:#4CAF50;opacity:0.65}
+.dep-card.done{border-left-color:#4CAF50;opacity:0.72}
 .dep-card:hover:not(.done){box-shadow:0 2px 12px rgba(0,0,0,0.1)}
 .dep-card.drag-over{outline:2px dashed var(--blue);background:var(--blueLight,#EFF6FF)}
 .dep-num{width:32px;height:32px;background:var(--blue);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0}
 .dep-card.done .dep-num{background:#4CAF50}
 .dep-drag{color:#ccc;font-size:18px;cursor:grab;flex-shrink:0;user-select:none;-webkit-user-select:none;padding:0 2px;line-height:1;align-self:center}
+.dep-card.mini{padding:8px 14px}
+.dep-card.mini .dep-body{display:none}
+.dep-card.mini .dep-addr{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* PRÉVISIONS */
 .prev-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px 15px;margin-bottom:8px;border-left:3px solid}
 .prev-urgent{border-left-color:#C62828}
@@ -1906,6 +1909,7 @@ let depot="7 rue des entrepreneurs, 78540 Vernouillet"
 let fStatus="all",fTech=0,fClient="",fMode="all"
 let depValidated={}
 let depFailed={}
+let _depExpanded=new Set()
 let depMapObj=null,depRGroup=null,depMarkers={}
 let depSelectedTechs=[]
 let depTechDropdownOpen=false
@@ -2716,52 +2720,57 @@ function rDepart(){
         const endMin=iv.timeEnd?parseInt(iv.timeEnd.split(":")[0])*60+parseInt(iv.timeEnd.split(":")[1]):null
         const late=endMin&&!done&&!fail&&iv.date===date&&nowMin>endMin
         const isFirst=techIdx===0
-        html+=`<div class="dep-card ${done||fail?"done":""}" id="dc-${iv.id}"
+        const _mini=(done||fail)&&!_depExpanded.has(iv.id)
+        html+=`<div class="dep-card ${done||fail?"done":""} ${_mini?"mini":""}" id="dc-${iv.id}"
           style="border-left-color:${done?"#4CAF50":fail?"#C62828":techCol}"
           draggable="true"
           ondragstart="_dragId=${iv.id};_dragTechId=${iv.techId};event.dataTransfer.effectAllowed='move'"
           ondragover="event.preventDefault();if(${iv.techId}===_dragTechId)this.classList.add('drag-over')"
           ondragleave="this.classList.remove('drag-over')"
-          ondrop="event.preventDefault();this.classList.remove('drag-over');dropDepCard(${iv.id})">
-          <div style="display:flex;gap:10px;align-items:flex-start">
+          ondrop="event.preventDefault();this.classList.remove('drag-over');dropDepCard(${iv.id})"
+          ${_mini?`onclick="toggleDepMini(${iv.id})"`:""}>
+          <div style="display:flex;gap:10px;align-items:${_mini?"center":"flex-start"}">
             <div class="dep-drag" onclick="event.stopPropagation()" title="Déplacer">☰</div>
             <div class="dep-num" style="background:${done?"#4CAF50":fail?"#C62828":techCol}">${done?"✓":fail?"✗":techIdx+1}</div>
             <div style="flex:1;min-width:0">
-              <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:${_mini?0:2}px">
                 <span style="font-weight:600;font-size:14px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${iv.client}</span>
-                ${!isFirst&&!done&&!fail?`<button onclick="event.stopPropagation();setFirstDepIv(${iv.id},${iv.techId})" title="Commencer par cette intervention"
+                ${!_mini&&!isFirst&&!done&&!fail?`<button onclick="event.stopPropagation();setFirstDepIv(${iv.id},${iv.techId})" title="Commencer par cette intervention"
                   style="background:none;border:1.5px solid #f59e0b;border-radius:6px;padding:2px 7px;font-size:11px;cursor:pointer;color:#f59e0b;flex-shrink:0;font-family:inherit;white-space:nowrap">☆ 1er</button>`
-                  :isFirst&&!done&&!fail?`<span style="font-size:11px;font-weight:700;color:#f59e0b;flex-shrink:0">⭐ 1er</span>`:''}
+                  :!_mini&&isFirst&&!done&&!fail?`<span style="font-size:11px;font-weight:700;color:#f59e0b;flex-shrink:0">⭐ 1er</span>`:''}
               </div>
-              <div style="font-size:12px;color:var(--gray);margin-bottom:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📍 ${iv.addr}</div>
-              <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:5px">
-                ${tBdg(iv.type)}${sBdg(iv.status)}
-                <span style="font-size:11px;color:var(--gray)">⏱ ${fmtMin(dur(iv.type,iv.form))}</span>
-              </div>
-              ${equipHTML_dep(iv)}
-              ${iv.notionTime&&iv.timeStart?`<div style="font-size:11px;font-weight:700;color:#92400E;background:#FFFBEB;padding:4px 9px;border-radius:6px;border:1px solid #F59E0B;margin-bottom:5px">🔔 Heure Notion imposée : <strong>${iv.timeStart}</strong></div>`:""}
-              ${depETAs[iv.id]?`<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:5px">
-                ${depETAs[iv.id]?.travelMin?`<span style="font-size:11px;padding:2px 7px;border-radius:100px;background:#E3F2FD;color:#1565C0">🚗 ${fmtMin(depETAs[iv.id].travelMin)}</span>`:''}
-                ${depETAs[iv.id]?`<span style="font-size:11px;font-weight:600;padding:2px 7px;border-radius:100px;background:#E8F5E9;color:#2E7D32">🕐 ${depETAs[iv.id].eta} → ${depETAs[iv.id].leave}</span>`:''}
-              </div>`:''}
-              ${iv.notes?`<div style="font-size:12px;color:var(--orange);background:#FFF3E0;padding:5px 9px;border-radius:6px;margin-bottom:5px">📝 ${iv.notes}</div>`:""}
-              ${(iv.commercial||iv.nSerie)?`<div style="font-size:11px;background:#F8F9FA;border:1px solid #E9ECEF;padding:5px 9px;border-radius:6px;margin-bottom:5px;display:flex;gap:10px;flex-wrap:wrap">
-                ${iv.commercial?`<span>💼 <strong>${iv.commercial}</strong></span>`:""}
-                ${iv.nSerie?`<span style="color:var(--gray)">🔢 S/N : <strong>${iv.nSerie}</strong></span>`:""}
-              </div>`:""}
-              ${(iv.contact||iv.cphone||iv.cemail)?`<div style="font-size:12px;background:#F3E5F5;padding:5px 9px;border-radius:6px;margin-bottom:5px">
-                ${iv.contact?`👤 <strong>${iv.contact}</strong> `:""}${iv.cphone?`📞 <a href="tel:${iv.cphone}" style="color:var(--blue)">${iv.cphone}</a>`:""}
-                ${iv.cemail?`<br>✉️ <a href="mailto:${iv.cemail}" style="color:var(--blue)">${iv.cemail}</a>`:""}
-              </div>`:""}
-              <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap" onclick="event.stopPropagation()">
-                <button onclick="valDep(${iv.id})" style="flex:1;min-width:90px;padding:9px;border-radius:8px;border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:500;background:${done?"#4CAF50":"var(--bg)"};color:${done?"#fff":"var(--dark)"}">
-                  ${done?"✅ Validé":"☐ Valider"}
-                </button>
-                <button onclick="failDep(${iv.id})" style="flex:1;min-width:80px;padding:9px;border-radius:8px;border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:500;background:${fail?"#C62828":"var(--bg)"};color:${fail?"#fff":"var(--dark)"}">
-                  ${fail?"❌ Échec":"✕ Échec"}
-                </button>
-                <a href="https://waze.com/ul?q=${encodeURIComponent(iv.addr)}&navigate=yes" target="_blank" class="bg" style="display:inline-flex;align-items:center;gap:4px;text-decoration:none;padding:9px 12px;font-size:13px;border-radius:8px;background:#05C8F7;color:#fff;border:none" title="Waze"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M20.54 6.63C19.26 3.1 15.97 1 12.25 1 7.32 1 3.28 4.81 3.28 9.65c0 2.17.8 4.24 2.25 5.85l.12 3.55 3.36-1.49c1 .29 2.01.44 3.02.44.11 0 .22 0 .33-.01l.03.01c.67 0 1.33-.07 1.97-.2l3.62 1.61-.13-3.74c1.44-1.35 2.34-3.11 2.5-5.02.03-.35.05-.69.05-1.02 0-.67-.08-1.35-.22-2h-.02l-.64 2.5z"/></svg> Waze</a>
-                <button class="bicon" onclick="editIv(${iv.id})" style="padding:9px">✏️</button>
+              ${_mini?`<div class="dep-addr" style="font-size:11px;color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📍 ${iv.addr}</div>`:''}
+              <div class="dep-body">
+                <div style="font-size:12px;color:var(--gray);margin-bottom:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📍 ${iv.addr}</div>
+                <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:5px">
+                  ${tBdg(iv.type)}${sBdg(iv.status)}
+                  <span style="font-size:11px;color:var(--gray)">⏱ ${fmtMin(dur(iv.type,iv.form))}</span>
+                </div>
+                ${equipHTML_dep(iv)}
+                ${iv.notionTime&&iv.timeStart?`<div style="font-size:11px;font-weight:700;color:#92400E;background:#FFFBEB;padding:4px 9px;border-radius:6px;border:1px solid #F59E0B;margin-bottom:5px">🔔 Heure Notion imposée : <strong>${iv.timeStart}</strong></div>`:""}
+                ${depETAs[iv.id]?`<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:5px">
+                  ${depETAs[iv.id]?.travelMin?`<span style="font-size:11px;padding:2px 7px;border-radius:100px;background:#E3F2FD;color:#1565C0">🚗 ${fmtMin(depETAs[iv.id].travelMin)}</span>`:''}
+                  ${depETAs[iv.id]?`<span style="font-size:11px;font-weight:600;padding:2px 7px;border-radius:100px;background:#E8F5E9;color:#2E7D32">🕐 ${depETAs[iv.id].eta} → ${depETAs[iv.id].leave}</span>`:''}
+                </div>`:''}
+                ${iv.notes?`<div style="font-size:12px;color:var(--orange);background:#FFF3E0;padding:5px 9px;border-radius:6px;margin-bottom:5px">📝 ${iv.notes}</div>`:""}
+                ${(iv.commercial||iv.nSerie)?`<div style="font-size:11px;background:#F8F9FA;border:1px solid #E9ECEF;padding:5px 9px;border-radius:6px;margin-bottom:5px;display:flex;gap:10px;flex-wrap:wrap">
+                  ${iv.commercial?`<span>💼 <strong>${iv.commercial}</strong></span>`:""}
+                  ${iv.nSerie?`<span style="color:var(--gray)">🔢 S/N : <strong>${iv.nSerie}</strong></span>`:""}
+                </div>`:""}
+                ${(iv.contact||iv.cphone||iv.cemail)?`<div style="font-size:12px;background:#F3E5F5;padding:5px 9px;border-radius:6px;margin-bottom:5px">
+                  ${iv.contact?`👤 <strong>${iv.contact}</strong> `:""}${iv.cphone?`📞 <a href="tel:${iv.cphone}" style="color:var(--blue)">${iv.cphone}</a>`:""}
+                  ${iv.cemail?`<br>✉️ <a href="mailto:${iv.cemail}" style="color:var(--blue)">${iv.cemail}</a>`:""}
+                </div>`:""}
+                <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap" onclick="event.stopPropagation()">
+                  <button onclick="valDep(${iv.id})" style="flex:1;min-width:90px;padding:9px;border-radius:8px;border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:500;background:${done?"#4CAF50":"var(--bg)"};color:${done?"#fff":"var(--dark)"}">
+                    ${done?"✅ Validé":"☐ Valider"}
+                  </button>
+                  <button onclick="failDep(${iv.id})" style="flex:1;min-width:80px;padding:9px;border-radius:8px;border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:500;background:${fail?"#C62828":"var(--bg)"};color:${fail?"#fff":"var(--dark)"}">
+                    ${fail?"❌ Échec":"✕ Échec"}
+                  </button>
+                  <a href="https://waze.com/ul?q=${encodeURIComponent(iv.addr)}&navigate=yes" target="_blank" class="bg" style="display:inline-flex;align-items:center;gap:4px;text-decoration:none;padding:9px 12px;font-size:13px;border-radius:8px;background:#05C8F7;color:#fff;border:none" title="Waze"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M20.54 6.63C19.26 3.1 15.97 1 12.25 1 7.32 1 3.28 4.81 3.28 9.65c0 2.17.8 4.24 2.25 5.85l.12 3.55 3.36-1.49c1 .29 2.01.44 3.02.44.11 0 .22 0 .33-.01l.03.01c.67 0 1.33-.07 1.97-.2l3.62 1.61-.13-3.74c1.44-1.35 2.34-3.11 2.5-5.02.03-.35.05-.69.05-1.02 0-.67-.08-1.35-.22-2h-.02l-.64 2.5z"/></svg> Waze</a>
+                  <button class="bicon" onclick="editIv(${iv.id})" style="padding:9px">✏️</button>
+                </div>
               </div>
             </div>
           </div>
@@ -2774,7 +2783,7 @@ function rDepart(){
 
 function valDep(id){
   depValidated[id]=!depValidated[id]
-  if(depValidated[id]){depFailed[id]=false;updSt(id,"completed")}
+  if(depValidated[id]){depFailed[id]=false;updSt(id,"completed");_depExpanded.delete(id)}
   else updSt(id,"pending")
   updateDepMarker(id)
   rDepart()
@@ -2782,9 +2791,15 @@ function valDep(id){
 
 function failDep(id){
   depFailed[id]=!depFailed[id]
-  if(depFailed[id]){depValidated[id]=false;updSt(id,"not_responded")}
+  if(depFailed[id]){depValidated[id]=false;updSt(id,"not_responded");_depExpanded.delete(id)}
   else updSt(id,"pending")
   updateDepMarker(id)
+  rDepart()
+}
+
+function toggleDepMini(id){
+  if(_depExpanded.has(id))_depExpanded.delete(id)
+  else _depExpanded.add(id)
   rDepart()
 }
 
@@ -5602,8 +5617,7 @@ async function loadSettings(){
   }catch(e){
     console.warn('loadSettings error:', e.message)
   }
-  // Vérifier l'auth après chargement des credentials réels
-  if(!_admAuthValid()) _showAdmLogin()
+  // (auth vérifiée en amont dans boot() via requireAdmin)
 }
 function deleteTech(id){
   const t=TECHS.find(t=>t.id===id); if(!t)return
@@ -8725,8 +8739,19 @@ const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9' +
   '.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlqY21mb3h2eXh6Z2l4bnJ2Y25uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwNjYwNzMsImV4cCI6MjA5MTY0MjA3M30' +
   '.1aR7ZdyBMjqhb9DhpZgXOxvaw0FcPYfeWqlKAOoyHeg'
 
+// Client Supabase global (auth + data). Réutilisé partout.
+const sb = window.supabase.createClient(SB_URL, SB_KEY)
+
+// En-têtes REST authentifiés : utilise le token de session si connecté (respecte RLS),
+// sinon retombe sur la clé anon. À utiliser dans sbGet/sbUpsert.
+async function sbAuthHeaders(extra){
+  let token = SB_KEY
+  try{ const { data:{ session } } = await sb.auth.getSession(); if(session?.access_token) token = session.access_token }catch(e){}
+  return { 'apikey':SB_KEY, 'Authorization':`Bearer ${token}`, ...(extra||{}) }
+}
+
 async function sbGet(path){
-  const r = await fetch(`${SB_URL}/rest/v1/${path}`,{headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`}})
+  const r = await fetch(`${SB_URL}/rest/v1/${path}`,{headers:await sbAuthHeaders()})
   const t = await r.text()
   if(!r.ok) throw new Error(`SB ${r.status}`)
   return t ? JSON.parse(t) : []
@@ -8735,7 +8760,7 @@ async function sbGet(path){
 async function sbUpsert(table, data){
   const r = await fetch(`${SB_URL}/rest/v1/${table}`,{
     method:'POST',
-    headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+    headers:await sbAuthHeaders({'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'}),
     body:JSON.stringify(data)
   })
   if(!r.ok){ const t=await r.text(); throw new Error(`SB POST ${r.status}: ${t.substring(0,100)}`) }
@@ -9294,21 +9319,20 @@ function showNotionPanel(){
 // ════════════════════════════════════════════════════════
 // AUTH ADMIN — vérifie la session issue de login.html
 // ════════════════════════════════════════════════════════
-const ADM_SESSION_MS = 12 * 60 * 60 * 1000  // 12h (cohérent avec auth.js)
-
-function _admAuthValid(){
+// Vérifie la session Supabase (JWT vérifié côté serveur) + le rôle admin.
+// Redirige vers /login si non connecté ou non-admin.
+async function requireAdmin(){
   try{
-    const s=JSON.parse(localStorage.getItem('optiq_session')||'null')
-    return s?.role==='admin' && (Date.now()-s.savedAt)<ADM_SESSION_MS
-  }catch(e){return false}
+    const { data:{ session } } = await sb.auth.getSession()
+    if(!session){ location.href='/login'; return false }
+    const { data: prof } = await sb.from('profiles').select('role').eq('id', session.user.id).single()
+    if(prof?.role !== 'admin'){ await sb.auth.signOut(); location.href='/login'; return false }
+    return true
+  }catch(e){ location.href='/login'; return false }
 }
-function _showAdmLogin(){
-  // Redirige vers la page de connexion unifiée
-  location.href='/login'
-}
-function admLogout(){
+async function admLogout(){
   if(!confirm('Se déconnecter de l\'espace admin ?')) return
-  localStorage.removeItem('optiq_session')
+  try{ await sb.auth.signOut() }catch(e){}
   location.href='/login'
 }
 
@@ -9334,6 +9358,7 @@ async function _warmTechDepotCoords(){
 
 // ── Init au chargement de la page ────────────────────────────────────────────
 ;(async function boot(){
+  if(!(await requireAdmin())) return   // bloque l'accès si non connecté / non-admin
   await loadSettings()
   initCloud()
   _warmTechDepotCoords()         // sans await — arrière-plan

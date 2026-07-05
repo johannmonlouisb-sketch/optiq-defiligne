@@ -81,6 +81,8 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
 .dc.open .dc-detail{display:block}
 /* Boutons val/echec TOUJOURS visibles */
 .dc-btns{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:4px 10px 8px}
+/* Carte minimisée après validation */
+.dc.mini .dc-tags,.dc.mini .dc-btns,.dc.mini .dc-detail,.dc.mini .dc-extra{display:none!important}
 .vbtn{border:none;border-radius:9px;padding:9px 6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:4px;transition:all .15s}
 .vbtn:active{transform:scale(.95)}
 .vbtn-v{background:var(--greenLt);color:var(--green)}
@@ -641,6 +643,8 @@ let curTech=1, curTab="depart", planSel=TODAY(), gCache={}, mapObj=null, mapRout
 try{const g=localStorage.getItem('optiq_gcache');if(g){const p=JSON.parse(g);if(p&&typeof p==='object')gCache=p}}catch(e){}
 let mapMarkers={}, building=false, cmEditId=null, techRouteOrder={}, _dragId=null
 let validated={}, failed={}
+let _techExpanded=new Set()
+let _techDetailOpen=new Set()
 let techETAs={}  // { [ivId]: {eta:"08:32", leave:"08:47"} }
 let techRouteLegDurations=[], etaRefreshTimer=null, _nextDestAddr='', _routeOrderedPts=[]
 let tourStartTime=null, tourTimer=null, tourRunning=false, tourneesData={}
@@ -1330,26 +1334,29 @@ function renderDepart(){
     // Afficher avertissement dépassement créneau (buffer 30min)
     const etaLate=techETAs[iv.id]?.late
     const workMin=dur(iv.type,iv.form)
-    return `<div class="dc ${done?"vdone":fail?"vfail":""}" id="dc-${iv.id}"
+    const _mini=(done||fail)&&!_techExpanded.has(iv.id)
+    const _open=!_mini&&_techDetailOpen.has(iv.id)
+    const _cls=`dc${done?" vdone":fail?" vfail":""}${_mini?" mini":""}${_open?" open":""}`
+    return `<div class="${_cls}" id="dc-${iv.id}"
       draggable="true"
       ondragstart="_dragId=${iv.id};event.dataTransfer.effectAllowed='move'"
       ondragover="event.preventDefault();this.classList.add('drag-over')"
       ondragleave="this.classList.remove('drag-over')"
       ondrop="event.preventDefault();this.classList.remove('drag-over');dropCard(${iv.id})"
-      onclick="focusClient(${iv.id})">
+      onclick="${_mini?`toggleTechMini(${iv.id})`:`focusClient(${iv.id})`}">
       <div class="dc-top">
         <div class="dc-drag" onclick="event.stopPropagation()" title="Déplacer l'ordre">☰</div>
         <div class="dc-num" style="background:${col}">${lbl}</div>
         <div class="dc-info">
           <div style="display:flex;align-items:center;gap:6px">
             <div class="dc-client" style="flex:1">${iv.client}</div>
-            ${idx===0&&!done&&!fail?`<span style="font-size:11px;font-weight:700;color:#f59e0b">⭐</span>`
-              :!done&&!fail?`<button onclick="event.stopPropagation();setFirstTechIv(${iv.id})" style="background:none;border:1.5px solid #f59e0b;border-radius:6px;padding:1px 6px;font-size:10px;cursor:pointer;color:#f59e0b;font-family:inherit;white-space:nowrap">☆ 1er</button>`:""}
+            ${!_mini&&idx===0&&!done&&!fail?`<span style="font-size:11px;font-weight:700;color:#f59e0b">⭐</span>`
+              :!_mini&&!done&&!fail?`<button onclick="event.stopPropagation();setFirstTechIv(${iv.id})" style="background:none;border:1.5px solid #f59e0b;border-radius:6px;padding:1px 6px;font-size:10px;cursor:pointer;color:#f59e0b;font-family:inherit;white-space:nowrap">☆ 1er</button>`:""}
           </div>
           <div class="dc-addr">📍 ${iv.addr}</div>
-          ${iv.contact?`<div style="font-size:11px;color:var(--blue);margin-top:2px">👤 ${iv.contact}${iv.cphone?` <a href="tel:${iv.cphone}" onclick="event.stopPropagation()" style="color:var(--blue)">📞</a>`:""}</div>`:""}
+          ${!_mini&&iv.contact?`<div style="font-size:11px;color:var(--blue);margin-top:2px">👤 ${iv.contact}${iv.cphone?` <a href="tel:${iv.cphone}" onclick="event.stopPropagation()" style="color:var(--blue)">📞</a>`:""}</div>`:""}
         </div>
-        <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0" onclick="event.stopPropagation()">
+        ${!_mini?`<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0" onclick="event.stopPropagation()">
           <a href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(iv.addr)}"
              target="_blank" style="text-decoration:none;font-size:20px;line-height:1;display:block;text-align:center" title="Google Maps">🗺️</a>
           <a href="https://waze.com/ul?q=${encodeURIComponent(iv.addr)}&navigate=yes"
@@ -1357,7 +1364,7 @@ function renderDepart(){
             <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M20.54 6.63C19.26 3.1 15.97 1 12.25 1 7.32 1 3.28 4.81 3.28 9.65c0 2.17.8 4.24 2.25 5.85l.12 3.55 3.36-1.49c1 .29 2.01.44 3.02.44.11 0 .22 0 .33-.01l.03.01c.67 0 1.33-.07 1.97-.2l3.62 1.61-.13-3.74c1.44-1.35 2.34-3.11 2.5-5.02.03-.35.05-.69.05-1.02 0-.67-.08-1.35-.22-2h-.02l-.64 2.5z"/></svg>
             Waze
           </a>
-        </div>
+        </div>`:``}
       </div>
       <div class="dc-tags">
         ${travelMin!==null?travelStatus
@@ -1374,8 +1381,10 @@ function renderDepart(){
         ${done?`<span class="tag tag-ok">✅ Kizeo sync</span>`:""}
         ${fail?`<span class="tag tag-err">✗ Échec</span>`:""}
       </div>
-      ${equipHTML(iv)}
-      ${iv.notes?`<div style="padding:2px 10px 5px;font-size:11px;color:var(--orange);background:#FFF8E1;margin:0 6px;border-radius:6px">📝 ${iv.notes}</div>`:""}
+      <div class="dc-extra">
+        ${equipHTML(iv)}
+        ${iv.notes?`<div style="padding:2px 10px 5px;font-size:11px;color:var(--orange);background:#FFF8E1;margin:0 6px;border-radius:6px">📝 ${iv.notes}</div>`:""}
+      </div>
       <!-- BOUTONS VALIDATION — toujours visibles -->
       <div class="dc-btns" onclick="event.stopPropagation()">
         <button class="vbtn vbtn-v ${done?"active":""}" onclick="validateIv(${iv.id})">
@@ -1401,25 +1410,17 @@ function renderDepart(){
     </div>`
   }).join("")
   updateBadges()
-  // Rouvrir les éléments ouverts
-  document.querySelectorAll(".dc").forEach(el=>{
-    const det=el.querySelector(".dc-detail")
-    if(det) det.style.display="none"
-  })
 }
 
 function focusClient(id){
-  // Highlight dans la liste
   document.querySelectorAll(".dc").forEach(el=>el.classList.remove("sel"))
   const card=document.getElementById("dc-"+id)
   if(card){
     card.classList.add("sel")
     card.scrollIntoView({block:"nearest",behavior:"smooth"})
-    // Toggle détail
-    const det=document.getElementById("dcd-"+id)
-    if(det) det.style.display=det.style.display==="block"?"none":"block"
+    if(_techDetailOpen.has(id)){_techDetailOpen.delete(id);card.classList.remove("open")}
+    else{_techDetailOpen.add(id);card.classList.add("open")}
   }
-  // Focus carte
   if(mapMarkers[id]&&mapObj){
     mapObj.panTo(mapMarkers[id].getLatLng(),{animate:true})
     mapMarkers[id].openPopup()
@@ -1437,6 +1438,7 @@ async function validateIv(id){
   validated[id]=!wasValidated
   if(validated[id]){
     failed[id]=false
+    _techExpanded.delete(id);_techDetailOpen.delete(id)
     // Enregistre l'heure de départ effective (pour couleur trajet live du prochain stop)
     if(!window._actualDepartures) window._actualDepartures={}
     window._actualDepartures[id]=Date.now()
@@ -1458,6 +1460,7 @@ async function failIv(id){
   failed[id]=!wasFailed
   if(failed[id]){
     validated[id]=false
+    _techExpanded.delete(id);_techDetailOpen.delete(id)
     updIvStatus(id,"not_responded")
     pushToKizeo(id,"not_responded")
     await updateIvHybrid(id, {status: "not_responded"})
@@ -1468,6 +1471,12 @@ async function failIv(id){
   }
   saveVF();updateMarkerCol(id);renderDepart()
   if(tourRunning) saveTourProgress('running')
+}
+
+function toggleTechMini(id){
+  if(_techExpanded.has(id))_techExpanded.delete(id)
+  else _techExpanded.add(id)
+  renderDepart()
 }
 
 function updIvStatus(id,status){
