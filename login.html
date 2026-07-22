@@ -382,6 +382,9 @@ body::after{
       <div class="lbl">Code PIN</div>
       <div class="pin-row" id="pin-dots"></div>
       <div class="keypad" id="keypad"></div>
+      <label style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:14px;font-size:13px;color:var(--gray,#757575);cursor:pointer;user-select:none">
+        <input type="checkbox" id="tech-remember" checked style="width:15px;height:15px"/> Rester connecté
+      </label>
     </div>
 
     <!-- ── ADMIN ─────────────────────────────── -->
@@ -412,6 +415,17 @@ body::after{
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+// ── Session technicien déjà valide ("Rester connecté") → sauter l'écran de code ──
+;(function _skipLoginIfRemembered(){
+  try{
+    const s = JSON.parse(localStorage.getItem('optiq_session')||'null')
+    if(!s?.token || s.role!=='tech' || !s.nom) return
+    const TECH_AUTH_DURATION_MS = 2*60*60*1000 // doit rester alignée avec AUTH_DURATION_MS dans tech.html
+    const stillValid = s.remember || (Date.now()-(s.savedAt||0) < TECH_AUTH_DURATION_MS)
+    if(stillValid) location.href = '/tech'
+  }catch(e){}
+})()
+
 // ── Supabase Auth ───────────────────────────────────────────────────────────
 const SB_URL = 'https://yjcmfoxvyxzgixnrvcnn.supabase.co'
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9' +
@@ -586,7 +600,11 @@ async function loginTech() {
     })
     const d = await r.json()
     if (!r.ok || !d.ok) { pinError(); showMsg(d.error || 'Code PIN incorrect') }
-    else { saveSession(d); showMsg('Accès autorisé','success'); setTimeout(() => location.href='/tech', 700) }
+    else {
+      const remember = document.getElementById('tech-remember')?.checked !== false
+      saveSession(d, remember)
+      showMsg('Accès autorisé','success'); setTimeout(() => location.href='/tech', 700)
+    }
   } catch { showMsg('Erreur réseau — réessayez'); pinError() }
   finally { isLoading = false }
 }
@@ -624,9 +642,9 @@ async function loginAdmin() {
 }
 
 // ── Session / Init ────────────────────────────────────────────────────────
-function saveSession(data) {
+function saveSession(data, remember) {
   localStorage.setItem('optiq_session', JSON.stringify({
-    token:data.token, nom:data.nom, role:data.role, savedAt:Date.now()
+    token:data.token, nom:data.nom, role:data.role, savedAt:Date.now(), remember:!!remember
   }))
 }
 

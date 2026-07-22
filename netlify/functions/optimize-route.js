@@ -41,6 +41,13 @@ async function fetchOsrmMatrix(depot, stops) {
     const r = await fetch(`${OSRM_TABLE}${coords}?annotations=distance,duration`, { signal: AbortSignal.timeout(8000) })
     const d = await r.json()
     if (d.code !== 'Ok' || !d.distances || !d.durations) return null
+    // OSRM renvoie `null` pour une paire de points qu'il n'arrive pas à relier au réseau
+    // routier (adresse mal géocodée, coord. isolée...). Un `null` non filtré se comporte
+    // comme 0 dans les comparaisons JS et ferait croire à l'algorithme qu'un trajet est
+    // gratuit — la matrice entière est alors invalide, on retombe sur l'estimation Haversine.
+    const hasNull = d.distances.some(row => row.some(v => v == null))
+                 || d.durations.some(row => row.some(v => v == null))
+    if (hasNull) return null
     return {
       distKm: d.distances.map(row => row.map(v => v / 1000)),
       durMin: d.durations.map(row => row.map(v => v / 60))

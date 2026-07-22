@@ -266,6 +266,10 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
         <button class="pin-btn pin-btn-del" onclick="pinDel()">⌫</button>
       </div>
 
+      <label style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:20px;font-size:13px;color:rgba(255,255,255,.75);cursor:pointer;user-select:none">
+        <input type="checkbox" id="pin-remember" checked style="width:16px;height:16px;accent-color:#fff"/> Rester connecté
+      </label>
+
       <div id="pin-error" style="color:#FF8A80;font-size:13px;font-weight:600;margin-top:16px;min-height:20px"></div>
     </div>
 
@@ -499,6 +503,13 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
           <button class="btn btn-gray btn-sm" style="width:100%" onclick="exportJournee()">Exporter ma journée (.txt)</button>
         </div>
 
+        <!-- Cache adresses -->
+        <div class="card" style="margin:0 0 12px">
+          <div style="font-size:14px;font-weight:700;margin-bottom:10px">📍 Cache d'adresses</div>
+          <div style="font-size:12px;color:var(--gray);margin-bottom:10px">Si un trajet calculé semble incorrect (adresse mal localisée), vide ce cache puis recalcule l'itinéraire.</div>
+          <button class="btn btn-gray btn-sm" style="width:100%" id="btn-clear-gcache" onclick="clearTechGeoCache()">🗑️ Effacer le cache d'adresses</button>
+        </div>
+
         <!-- Déconnexion -->
         <div class="card" style="margin:0 0 20px">
           <button onclick="logout()" style="width:100%;padding:12px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer">🔒 Se déconnecter</button>
@@ -616,7 +627,8 @@ const TYPES={
 let ivs=[]
 try{const s=localStorage.getItem("optiq_ivs_data");if(s){const p=JSON.parse(s);if(Array.isArray(p))ivs=p}}catch(e){}
 let _saveIvsTimer = null
-let _sbMyLastTs = null // updated_at de notre dernier envoi pour filtrer l'echo Realtime
+let _sbMyLastTs = null // updated_at de notre dernier envoi (pré-check bon marché du poll)
+let _lastSavedIvsJson = null // contenu exact de notre dernier envoi (détection d'écho fiable, sans course)
 function saveIvs(){
   try{localStorage.setItem("optiq_ivs_data",JSON.stringify(ivs))}catch(e){}
   clearTimeout(_saveIvsTimer)
@@ -624,9 +636,10 @@ function saveIvs(){
     _saveIvsTimer = null // ← reset : on n'est plus "en train de sauvegarder"
     if(!_sbClient) return
     try{
-      await _sbClient.from('app_state').upsert({key:'optiq_ivs_data',value:ivs},{onConflict:'key'})
-      // Lire le nouveau updated_at pour ignorer l'echo Realtime de notre propre save
-      const {data} = await _sbClient.from('app_state').select('updated_at').eq('key','optiq_ivs_data').single()
+      // Armé AVANT l'envoi réseau : même si l'écho Realtime arrive très vite, il sera reconnu
+      _lastSavedIvsJson = JSON.stringify(ivs)
+      // .select() chaîné : récupère updated_at dans la même requête, pas d'aller-retour séparé
+      const {data} = await _sbClient.from('app_state').upsert({key:'optiq_ivs_data',value:ivs},{onConflict:'key'}).select('updated_at').single()
       if(data?.updated_at) _sbMyLastTs = data.updated_at
       _sbLastSync = new Date().toLocaleTimeString('fr-FR')
       _setSbDot('#22c55e', `Envoyé ${_sbLastSync} · ${ivs.length} interv.`)
@@ -642,6 +655,27 @@ function _cleanBadCoords(){ivs.forEach(iv=>{if(iv.lat&&iv.lng&&!isFrance(iv.lat,
 let curTech=1, curTab="depart", planSel=TODAY(), gCache={}, mapObj=null, mapRoute=null
 // Charger le cache géocodes depuis localStorage (persist les adresses entre sessions)
 try{const g=localStorage.getItem('optiq_gcache');if(g){const p=JSON.parse(g);if(p&&typeof p==='object')gCache=p}}catch(e){}
+
+// ── Cache de géocodage partagé admin ↔ tech (via Supabase app_state) ─────────
+let _gcacheSaveTimer=null,_gcacheSavingUntil=0
+function pushGcacheToCloud(){
+  if(!_sbClient) return
+  clearTimeout(_gcacheSaveTimer)
+  _gcacheSaveTimer=setTimeout(()=>{
+    _gcacheSavingUntil=Date.now()+5000 // ignore les échos realtime de ce save pendant 5s
+    _sbClient.from('app_state').upsert({key:'optiq_gcache',value:gCache},{onConflict:'key'}).then(()=>{}).catch(()=>{})
+  },2000) // debounce large : le géocodage d'une tournée peut ajouter beaucoup d'adresses d'affilée
+}
+async function pullGcacheFromCloud(){
+  if(!_sbClient) return
+  try{
+    const {data}=await _sbClient.from('app_state').select('value').eq('key','optiq_gcache').single()
+    if(data?.value&&typeof data.value==='object'){
+      gCache={...data.value,...gCache}
+      try{localStorage.setItem('optiq_gcache',JSON.stringify(gCache))}catch(e){}
+    }
+  }catch(e){}
+}
 
 // ── Couche trafic temps réel (TomTom) sur la carte de tournée ────────────────
 let _tomtomKey=null,depTrafficLayer=null,depTrafficOn=false
@@ -728,12 +762,15 @@ function refreshLiveETAs(){
   _routeOrderedPts.forEach((p,idx)=>{
     curMin+=techRouteLegDurations[idx]?.trafficDurationMin||0
     if(p.iv.timeStart){const[th,tm]=p.iv.timeStart.split(':').map(Number);if(curMin<th*60+tm)curMin=th*60+tm}
-    if(curMin<nowMin&&!validated[p.iv.id]&&!failed[p.iv.id]) curMin=nowMin
+    if(tourRunning&&curMin<nowMin&&!validated[p.iv.id]&&!failed[p.iv.id]) curMin=nowMin
     techETAs[p.iv.id]={eta:toHHMM(curMin),leave:toHHMM(curMin+dur(p.iv.type,p.iv.form))}
     curMin+=dur(p.iv.type,p.iv.form)
     if(!validated[p.iv.id]&&!failed[p.iv.id]) lastLeaveMin=curMin
   })
-  window._tourEndETA=toHHMM(lastLeaveMin)
+  // Ajouter le trajet retour (dépôt ou adresse d'arrivée) si le round-trip est activé —
+  // c'est le dernier leg de la matrice, après tous les arrêts
+  const returnLegMin=techRouteLegDurations[_routeOrderedPts.length]?.trafficDurationMin||0
+  window._tourEndETA=toHHMM(lastLeaveMin+returnLegMin)
   renderDepart()
 }
 function startLiveETAs(){
@@ -908,12 +945,18 @@ function saveTechAddresses(){
 function saveVF(){saveIvs()} // état dérivé de iv.status, persisté via saveIvs
 
 // ── Ordre de tournée partagé admin ↔ tech (via Supabase app_state) ──
+let _routeOrderSavingUntil=0 // fenêtre pendant laquelle on ignore les échos realtime de notre propre save
 function saveRouteOrder(date){
   try{
     const stored=JSON.parse(localStorage.getItem("optiq_route_order")||"{}")
-    stored[`${curTech}_${date}`]=techRouteOrder[date]||[]
+    const ord=techRouteOrder[date]||[]
+    if(ord.length) stored[`${curTech}_${date}`]=ord
+    else delete stored[`${curTech}_${date}`] // ordre vidé → ne pas laisser une valeur périmée
     localStorage.setItem("optiq_route_order",JSON.stringify(stored))
-    if(_sbClient) _sbClient.from('app_state').upsert({key:'optiq_route_order',value:stored},{onConflict:'key'}).then(()=>{}).catch(()=>{})
+    if(_sbClient){
+      _routeOrderSavingUntil=Date.now()+5000 // ignore les échos realtime de ce save pendant 5s
+      _sbClient.from('app_state').upsert({key:'optiq_route_order',value:stored},{onConflict:'key'}).then(()=>{}).catch(()=>{})
+    }
   }catch(e){}
 }
 // Récupère l'ordre de tournée depuis le cloud (posé par l'admin ou par ce technicien
@@ -1496,7 +1539,7 @@ async function validateIv(id){
     updIvStatus(id,"pending")
   }
   saveVF();updateMarkerCol(id);renderDepart()
-  if(tourRunning) saveTourProgress('running')
+  saveTourProgress(tourRunning?'running':'done')
 }
 
 async function failIv(id){
@@ -1514,7 +1557,7 @@ async function failIv(id){
     updIvStatus(id,"pending")
   }
   saveVF();updateMarkerCol(id);renderDepart()
-  if(tourRunning) saveTourProgress('running')
+  saveTourProgress(tourRunning?'running':'done')
 }
 
 function toggleTechMini(id){
@@ -1725,31 +1768,25 @@ async function _geocodeAddok(q){
 }
 
 // ── Moteur 2 : Photon / Komoot (meilleur pour noms d'entreprises) ────────────
+// Identique à la version admin (defiligne.html) — garder les deux alignées.
 async function _geocodePhoton(q){
   try{
     await new Promise(r=>setTimeout(r,250))
-    // bbox France stricte + filtre countrycodes pour éviter résultats hors France
-    const r=await fetch('https://photon.komoot.io/api/?q='+encodeURIComponent(q)+'&limit=5&lang=fr&bbox=-5.15,41.33,9.57,51.09')
+    const r=await fetch('https://photon.komoot.io/api/?q='+encodeURIComponent(q)+'&limit=1&lang=fr&bbox=-5.1,41.3,9.6,51.1')
     const d=await r.json()
-    // Prendre le premier résultat DANS les limites de la France
-    for(const f of d.features||[]){
-      const[lng,lat]=f.geometry.coordinates
-      if(isFrance(lat,lng)) return{lat,lng}
-    }
+    if(d.features?.[0]){const[lng,lat]=d.features[0].geometry.coordinates;return{lat,lng}}
   }catch(e){}
   return null
 }
 
 // ── Moteur 3 : Nominatim (dernier recours) ────────────────────────────────────
+// Identique à la version admin (defiligne.html) — garder les deux alignées.
 async function _geocodeNominatim(q){
   try{
     await new Promise(r=>setTimeout(r,1100))
-    const r=await fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(q)+'&format=json&limit=3&countrycodes=fr')
+    const r=await fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(q)+'&format=json&limit=1&countrycodes=fr')
     const d=await r.json()
-    for(const item of d||[]){
-      const lat=parseFloat(item.lat),lng=parseFloat(item.lon)
-      if(isFrance(lat,lng)) return{lat,lng}
-    }
+    if(d[0]) return{lat:parseFloat(d[0].lat),lng:parseFloat(d[0].lon)}
   }catch(e){}
   return null
 }
@@ -1764,6 +1801,7 @@ async function geocode(addr){
   if(c){
     gCache[addr]=c
     try{localStorage.setItem('optiq_gcache',JSON.stringify(gCache))}catch(e){}
+    pushGcacheToCloud()
   }
   return c||null
 }
@@ -2499,6 +2537,18 @@ async function syncKizeo(){
 }
 
 // ════════════════════════════════════════════
+// CACHE ADRESSES
+// ════════════════════════════════════════════
+function clearTechGeoCache(){
+  gCache={}
+  try{localStorage.setItem('optiq_gcache',JSON.stringify(gCache))}catch(e){}
+  toast('📍 Cache d\'adresses vidé — recalcul de l\'itinéraire...','#1565C0',2500)
+  techETAs={}; _routeOrderedPts=[]; techRouteLegDurations=[]
+  if(mapObj){ mapObj.remove(); mapObj=null }
+  calcMap()
+}
+
+// ════════════════════════════════════════════
 // EXPORT JOURNÉE
 // ════════════════════════════════════════════
 function exportJournee(){
@@ -2959,21 +3009,35 @@ function startNotionPolling(){
 // ════════════════════════════════════════════
 // AUTH / LOGIN
 // ════════════════════════════════════════════
-const AUTH_DURATION_MS = 12 * 60 * 60 * 1000  // session valide 12h
+const AUTH_DURATION_MS = 2 * 60 * 60 * 1000  // session valide 2h d'INACTIVITÉ (sauf "rester connecté")
 
 function _getAuth(){
   try{const a=JSON.parse(localStorage.getItem('tech_auth')||'null');return a}catch(e){return null}
 }
-function _setAuth(id){
-  localStorage.setItem('tech_auth',JSON.stringify({id,ts:Date.now()}))
+function _setAuth(id,remember){
+  const prev=_getAuth()
+  localStorage.setItem('tech_auth',JSON.stringify({id,ts:Date.now(),remember:remember!==undefined?!!remember:!!prev?.remember}))
 }
 function _clearAuth(){
   localStorage.removeItem('tech_auth')
 }
 function _authValid(){
   const a=_getAuth()
-  return a && a.id && (Date.now()-a.ts)<AUTH_DURATION_MS
+  if(!a||!a.id) return false
+  if(a.remember) return true // "Rester connecté" — pas d'expiration tant qu'on ne se déconnecte pas
+  return (Date.now()-a.ts)<AUTH_DURATION_MS
 }
+// Prolonge la session active (appelé périodiquement pendant l'utilisation) : sans ça,
+// une session non "rester connecté" expirerait 2h après la connexion même en usage continu.
+let _lastAuthTouch=0
+function _touchAuthActivity(){
+  const now=Date.now()
+  if(now-_lastAuthTouch<60000) return // au plus 1x/min, inutile de réécrire à chaque clic
+  _lastAuthTouch=now
+  const a=_getAuth()
+  if(a?.id) localStorage.setItem('tech_auth',JSON.stringify({...a,ts:now}))
+}
+;['click','touchstart','keydown'].forEach(ev=>document.addEventListener(ev,_touchAuthActivity,{passive:true}))
 
 let _loginTechId = null
 let _pinVal = ''
@@ -3045,7 +3109,8 @@ function _submitPin(){
   const tc=TECHS.find(t=>t.id===_loginTechId)
   const expectedCode=tc?.code || TECHS_DEFAULT.find(t=>t.id===_loginTechId)?.code || ''
   if(_pinVal===expectedCode){
-    _setAuth(_loginTechId)
+    const remember=document.getElementById('pin-remember')?.checked!==false
+    _setAuth(_loginTechId,remember)
     curTech=_loginTechId
     localStorage.setItem('tech_id',_loginTechId)
     hideLogin()
@@ -3129,10 +3194,10 @@ try{
   try{
     const s=JSON.parse(localStorage.getItem('optiq_session')||'null')
     if(!s?.token||s.role!=='tech'||!s.nom) return
-    if(Date.now()-(s.savedAt||0)>AUTH_DURATION_MS) return
+    if(!s.remember&&Date.now()-(s.savedAt||0)>AUTH_DURATION_MS) return
     const tc=TECHS.find(t=>t.name.toLowerCase()===s.nom.toLowerCase())
     if(!tc) return
-    _setAuth(tc.id)
+    _setAuth(tc.id,s.remember)
     curTech=tc.id
     localStorage.setItem('tech_id',tc.id)
   }catch(e){}
@@ -3145,6 +3210,9 @@ if(!_authValid()){
   // Restaurer le technicien depuis l'auth sauvegardée
   const _a=_getAuth()
   if(_a?.id){ curTech=_a.id; localStorage.setItem('tech_id',_a.id) }
+  // Restaurer l'état "tournée en cours" (sinon tourRunning retombe à false après un simple
+  // rechargement de page, et les validations suivantes ne remontent plus au suivi admin)
+  _restoreTourState()
   updateTopbar()
   goTab(curTab)
   updateBadges()
@@ -3387,11 +3455,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     }, payload => {
       const val = payload.new?.value
       if (!val || typeof val !== 'object') return
+      if (Date.now() < _routeOrderSavingUntil) return // écho probable de notre propre save récent
       try{
         const local=JSON.parse(localStorage.getItem('optiq_route_order')||'{}')
         localStorage.setItem('optiq_route_order', JSON.stringify({...local, ...val}))
       }catch(e){}
       if(mapObj&&!building) calcMap()
+    })
+    .subscribe()
+
+  // Charger le cache de géocodage le plus récent (posé par l'admin ou un autre appareil)
+  await pullGcacheFromCloud()
+
+  // Écouter les changements du cache de géocodage en temps réel
+  _sbClient.channel('tech-gcache-sync')
+    .on('postgres_changes', {
+      event: '*', schema: 'public', table: 'app_state',
+      filter: 'key=eq.optiq_gcache'
+    }, payload => {
+      const val = payload.new?.value
+      if (!val || typeof val !== 'object') return
+      if (Date.now() < _gcacheSavingUntil) return // écho probable de notre propre save récent
+      gCache={...gCache,...val}
+      try{localStorage.setItem('optiq_gcache',JSON.stringify(gCache))}catch(e){}
     })
     .subscribe()
 
@@ -3403,8 +3489,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }, payload => {
       const newVal = payload.new?.value
       if (!Array.isArray(newVal)) return
-      if (_saveIvsTimer) return // save encore en debounce
-      if (payload.new?.updated_at && payload.new.updated_at === _sbMyLastTs) return // echo de notre propre save
+      if (_saveIvsTimer) return // une sauvegarde locale est en attente — ne pas l'écraser
+      if (JSON.stringify(newVal) === _lastSavedIvsJson) return // echo de notre propre save (comparaison de valeur, pas de course possible)
       _applyRemoteIvs(newVal, 'WS')
     })
     .subscribe(status => {

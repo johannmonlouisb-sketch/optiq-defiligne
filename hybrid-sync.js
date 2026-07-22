@@ -12,12 +12,15 @@ async function updateIvHybrid(id, data) {
   saveIvs()
 
   // 2. Envoyer à Notion — checkboxes Terminer/Echec + Commercial si technicien changé
+  // Les checkboxes reflètent l'état ACTUEL (iv.status), pas le paramètre figé à l'appel :
+  // ce push peut prendre plusieurs secondes, et l'utilisateur a pu changer d'avis entre-temps.
   if (iv.notionId) {
     try {
       const props = {}
       if (data.status !== undefined) {
-        props['Terminer'] = { checkbox: data.status === 'completed' }
-        props['Echec']    = { checkbox: data.status === 'not_responded' }
+        const current = ivs.find(i => i.id === id)
+        props['Terminer'] = { checkbox: current?.status === 'completed' }
+        props['Echec']    = { checkbox: current?.status === 'not_responded' }
       }
       if (data.techId) {
         const techName = TB(data.techId)?.name
@@ -36,8 +39,9 @@ async function updateIvHybrid(id, data) {
   // typeof-check : updateIntervention vit dans supabase-realtime.js, pas toujours chargé
   if (supabase && typeof updateIntervention === 'function') {
     try {
+      const current = ivs.find(i => i.id === id)
       await updateIntervention(id, {
-        status: data.status,
+        status: current?.status ?? data.status,
         tech_id: data.techId,
         notes: data.notes
       })
@@ -57,14 +61,17 @@ async function validateIvHybrid(id) {
   iv.status = 'completed'
   saveIvs()
 
-  // Sync Notion — Terminer=true, Echec=false
+  // Sync Notion — Terminer/Echec calculés depuis l'état ACTUEL (pas figés à l'appel) :
+  // ce push peut prendre plusieurs secondes, et si l'utilisateur a annulé la validation
+  // entre-temps, on ne veut pas réaffirmer un "Terminé" devenu obsolète sur Notion.
   if (iv.notionId) {
     try {
+      const current = ivs.find(i => i.id === id)
       await notionCall('update_page', {
         pageId: iv.notionId,
         properties: {
-          'Terminer': { checkbox: true },
-          'Echec':    { checkbox: false }
+          'Terminer': { checkbox: current?.status === 'completed' },
+          'Echec':    { checkbox: current?.status === 'not_responded' }
         }
       })
     } catch (e) {
@@ -72,10 +79,11 @@ async function validateIvHybrid(id) {
     }
   }
 
-  // Sync Supabase
+  // Sync Supabase — idem, on relit l'état actuel juste avant l'envoi
   if (supabase && typeof updateIntervention === 'function') {
     try {
-      await updateIntervention(id, { status: 'completed' })
+      const current = ivs.find(i => i.id === id)
+      await updateIntervention(id, { status: current?.status || 'completed' })
       console.log('✓ Validation sync Supabase:', id)
     } catch (e) {
       console.warn('Supabase validation failed:', e.message)

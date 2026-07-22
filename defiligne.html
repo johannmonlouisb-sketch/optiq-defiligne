@@ -1916,12 +1916,36 @@ let depSelectedTechs=[]
 let depTechDropdownOpen=false
 let depRouteOrder={}  // {techId:[iv,...]} ordre optimisé de la dernière carte calculée
 let depETAs={}        // {ivId:{eta:"08:32",leave:"08:47"}} calculé lors du dernier initDepMap
+let depTourEnd={}      // {techId:"18:24"} heure de retour au dépôt estimée (trajet retour inclus)
 let depRouteLines={}  // {techId: L.GeoJSON layer} pour mise à jour sans recalcul complet
 let _dragId=null,_dragTechId=null
 // Map state
 let mapObj=null,rGroup=null,gcache={},building=false
 let _tomtomKey=null,depTrafficLayer=null,depTrafficOn=false
+let _routeOrderSavingUntil=0 // fenêtre pendant laquelle on ignore les échos realtime de notre propre save
 try{const g=localStorage.getItem('optiq_gcache');if(g){const p=JSON.parse(g);if(p&&typeof p==='object')gcache=p}}catch(e){}
+
+// ── Cache de géocodage partagé admin ↔ tech (via Supabase app_state) ─────────
+let _gcacheSaveTimer=null,_gcacheSavingUntil=0
+function pushGcacheToCloud(){
+  if(!isDeployedApp) return
+  clearTimeout(_gcacheSaveTimer)
+  _gcacheSaveTimer=setTimeout(()=>{
+    _gcacheSavingUntil=Date.now()+5000 // ignore les échos realtime de ce save pendant 5s
+    sbUpsert('app_state',{key:'optiq_gcache',value:gcache}).catch(()=>{})
+  },2000) // debounce large : le géocodage d'une tournée peut ajouter beaucoup d'adresses d'affilée
+}
+async function pullGcacheFromCloud(){
+  if(!isDeployedApp) return
+  try{
+    const rows=await sbGet('app_state?key=eq.optiq_gcache&select=value')
+    const cloudVal=rows?.[0]?.value
+    if(cloudVal&&typeof cloudVal==='object'){
+      gcache={...cloudVal,...gcache}
+      try{localStorage.setItem('optiq_gcache',JSON.stringify(gcache))}catch(e){}
+    }
+  }catch(e){}
+}
 const TODAY=_todayParis()
 
 // ── Couche trafic temps réel (TomTom) sur la carte de départ ─────────────────
@@ -2403,9 +2427,13 @@ function saveRouteOrder(date){
     TECHS.forEach(t=>{
       const ord=(depRouteOrder[t.id]||[]).filter(iv=>iv.date===date)
       if(ord.length) stored[`${t.id}_${date}`]=ord.map(iv=>iv.id)
+      else delete stored[`${t.id}_${date}`] // ordre vidé (reset/déverrouillage) → ne pas laisser une valeur périmée
     })
     localStorage.setItem("optiq_route_order",JSON.stringify(stored))
-    if(isDeployedApp) sbUpsert('app_state',{key:'optiq_route_order',value:stored}).catch(()=>{})
+    if(isDeployedApp){
+      _routeOrderSavingUntil=Date.now()+5000 // ignore les échos realtime de ce save pendant 5s
+      sbUpsert('app_state',{key:'optiq_route_order',value:stored}).catch(()=>{})
+    }
   }catch(e){}
 }
 function loadRouteOrder(date){
@@ -2450,6 +2478,18 @@ function setRouteLock(techId,date,val){
     else delete s[_routeLockKey(techId,date)]
     localStorage.setItem("optiq_route_lock",JSON.stringify(s))
   }catch(e){}
+}
+// Efface l'ordre sauvegardé pour ce technicien/jour et force une ré-optimisation
+// complète depuis zéro (utile si l'ordre a été figé par une ancienne version
+// de l'algorithme et n'a jamais été recalculé depuis).
+function resetRouteOrder(techId,date){
+  if(!confirm("Effacer l'ordre sauvegardé et relancer une optimisation complète pour ce technicien ?")) return
+  setRouteLock(techId,date,false)
+  depRouteOrder[techId]=(depRouteOrder[techId]||[]).filter(iv=>iv.date!==date)
+  saveRouteOrder(date)
+  ivs.filter(i=>i.date===date&&i.techId===techId).forEach(i=>delete depETAs[i.id])
+  _schedDepMap()
+  rDepart()
 }
 function toggleRouteLock(techId){
   const date=selDate
@@ -2735,11 +2775,12 @@ function rDepart(){
       const locked=isRouteLocked(tid,date)
       // ── En-tête du groupe technicien ──
       const isAbsent=isTechAbsent(tid,date)
-      html+=`<div class="dep-grp-hdr" style="display:flex;align-items:center;gap:8px;padding:8px 4px 4px;flex-shrink:0${isAbsent?';opacity:.5':''}">
+      html+=`<div class="dep-grp-hdr" style="display:flex;align-items:center;gap:8px;padding:8px 4px 4px;flex-wrap:wrap;row-gap:6px;flex-shrink:0${isAbsent?';opacity:.5':''}">
         ${ava(tc.init,26,techCol)}
         <span style="font-weight:700;font-size:13px;color:${techCol}">${tc.name}</span>
         <span style="font-size:11px;color:var(--gray)">${techIvs.length} intervention${techIvs.length>1?'s':''}</span>
-        <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
+        ${depTourEnd[tid]?`<span style="font-size:11px;font-weight:700;color:#E65100;background:#FFF3E0;padding:2px 8px;border-radius:20px;white-space:nowrap">🏁 Fin ~${depTourEnd[tid]}</span>`:''}
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
           <button onclick="toggleTechAbsent(${tid},'${date}')"
             style="padding:4px 10px;font-size:12px;border-radius:7px;border:1.5px solid ${isAbsent?'#C62828':'var(--border)'};background:${isAbsent?'#FFEBEE':'#fff'};color:${isAbsent?'#C62828':'var(--gray)'};cursor:pointer;font-family:inherit;font-weight:600">
             ${isAbsent?'🚫 Absent':'Absent'}
@@ -2751,6 +2792,10 @@ function rDepart(){
           <button onclick="toggleRouteLock(${tid})" title="${locked?'Déverrouiller l\'ordre':'Verrouiller l\'ordre'}"
             style="padding:4px 10px;font-size:12px;border-radius:7px;border:1.5px solid ${locked?"#16a34a":"var(--border)"};background:${locked?"#f0fdf4":"#fff"};color:${locked?"#16a34a":"var(--gray)"};cursor:pointer;font-family:inherit;font-weight:600">
             ${locked?"🔒 Verrouillé":"🔓 Libre"}
+          </button>
+          <button onclick="resetRouteOrder(${tid},'${date}')" title="Effacer l'ordre sauvegardé et relancer une optimisation complète"
+            style="padding:4px 10px;font-size:12px;border-radius:7px;border:1.5px solid var(--border);background:#fff;color:var(--gray);cursor:pointer;font-family:inherit;font-weight:600">
+            🔄 Réoptimiser
           </button>
         </div>
       </div>`
@@ -2962,6 +3007,7 @@ async function initDepMap(){
   const activeTechs=techIds.map(id=>TB(id)).filter(t=>dayIvs.some(i=>i.techId===t.id))
   const[depSH,depSM]=(document.getElementById('dep-time')?.value||'08:00').split(':').map(Number)
   depETAs={}
+  depTourEnd={}
   const totalSteps=dayIvs.length+activeTechs.length
   let stepsDone=0
   const warnEl=document.getElementById("dep-map-msg")
@@ -3133,6 +3179,9 @@ async function initDepMap(){
             depETAs[iv.id]={eta:toHM(curMin),leave:toHM(curMin+wm),travelMin:data.legs[idx]?.trafficDurationMin||0}
             curMin+=wm
           })
+          // Retour dépôt : dernier leg de la matrice (après le dernier arrêt)
+          const returnLegMin=data.legs[routeOrd.length]?.trafficDurationMin||0
+          depTourEnd[tech.id]=toHM(curMin+returnLegMin)
         }
         routeOk=true
       }
@@ -3149,8 +3198,9 @@ async function initDepMap(){
           if(depRouteLines[tech.id])depRGroup.removeLayer(depRouteLines[tech.id])
           depRouteLines[tech.id]=L.geoJSON(data.routes[0].geometry,{style:{color:techCol,weight:5,opacity:.85}}).addTo(depRGroup)
           // ETAs approximatives depuis la durée totale répartie proportionnellement
+          // (routeOrd.length+1 segments : dépôt→stop1, ..., dernier stop→retour dépôt)
           if(routeOrd.length){
-            const legMin=Math.round(data.routes[0].duration/60/routeOrd.length)
+            const legMin=Math.round(data.routes[0].duration/60/(routeOrd.length+1))
             let curMin=_effStartMin
             routeOrd.forEach(({iv})=>{
               curMin+=legMin
@@ -3159,6 +3209,7 @@ async function initDepMap(){
               depETAs[iv.id]={eta:toHM(curMin),leave:toHM(curMin+wm),travelMin:legMin}
               curMin+=wm
             })
+            depTourEnd[tech.id]=toHM(curMin+legMin)
           }
         }
       }catch(e2){}
@@ -5746,6 +5797,7 @@ async function geocode(addr){
   if(c){
     gcache[addr]=c
     try{localStorage.setItem('optiq_gcache',JSON.stringify(gcache))}catch(e){}
+    pushGcacheToCloud()
   }
   return c||null
 }
@@ -8182,6 +8234,7 @@ let cloudSaveTimer = null
 let _cloudUpdatedAt = null
 let _pullInProgress = false   // verrou : empêche cloudPoll d'écraser ivs pendant un pull Notion
 let _savePending    = false   // verrou : empêche cloudPoll d'écraser ivs pendant un cloudSave en cours
+let _lastSavedIvsJson = null  // contenu exact de notre dernier envoi (détection d'écho WebSocket fiable, sans course)
 
 async function cloudLoad(){
   if(!isDeployed) return false
@@ -8240,6 +8293,8 @@ function cloudSave(immediate = false){
       if(el) el.innerHTML = `💾 <span style="color:#1B5E20">Sauvegardé · ${ivs.length}</span>`
     } catch(e){ console.warn('Save error:', e) }
     if(isDeployed){
+      // Armé AVANT l'envoi réseau : même si l'écho Realtime arrive très vite, il sera reconnu
+      _lastSavedIvsJson = JSON.stringify(ivs)
       sbUpsert('app_state', {key:'optiq_ivs_data', value:ivs}).then(async ()=>{
         const el = document.getElementById('cloud-status')
         if(el) el.innerHTML = `☁️ <span style="color:#1B5E20">Cloud · ${ivs.length}</span>`
@@ -8335,7 +8390,8 @@ function initCloud(){
           }, payload => {
             const newVal = payload.new?.value
             if(!Array.isArray(newVal)) return
-            if(payload.new?.updated_at === _cloudUpdatedAt) return // ignore notre propre save
+            if(_savePending) return // une sauvegarde locale est en cours — ne pas l'écraser
+            if(JSON.stringify(newVal) === _lastSavedIvsJson) return // echo de notre propre save (comparaison de valeur, pas de course possible)
             ivs = newVal
             nextId = Math.max(0, ...ivs.map(i=>i.id||0)) + 1
             _cloudUpdatedAt = payload.new?.updated_at || null
@@ -8403,6 +8459,7 @@ function initCloud(){
           }, payload => {
             const val = payload.new?.value
             if(!val || typeof val !== 'object') return
+            if(Date.now() < _routeOrderSavingUntil) return // écho probable de notre propre save récent
             try{
               const local=JSON.parse(localStorage.getItem('optiq_route_order')||'{}')
               localStorage.setItem('optiq_route_order', JSON.stringify({...local, ...val}))
@@ -8413,6 +8470,23 @@ function initCloud(){
 
         // Chargement initial de l'ordre de tournée (posé par l'admin ou le tech sur un autre appareil)
         pullRouteOrderFromCloud()
+
+        // Canal cache de géocodage — partagé avec l'app technicien
+        sbClient.channel('gcache-sync')
+          .on('postgres_changes',{
+            event:'*', schema:'public', table:'app_state',
+            filter:'key=eq.optiq_gcache'
+          }, payload => {
+            const val = payload.new?.value
+            if(!val || typeof val !== 'object') return
+            if(Date.now() < _gcacheSavingUntil) return // écho probable de notre propre save récent
+            gcache={...gcache,...val}
+            try{localStorage.setItem('optiq_gcache',JSON.stringify(gcache))}catch(e){}
+          })
+          .subscribe()
+
+        // Chargement initial du cache de géocodage (posé par l'admin ou le tech sur un autre appareil)
+        pullGcacheFromCloud()
 
         // Chargement initial de la progression des tournées
         sbGet('app_state?key=eq.optiq_tour_progress&select=value')
@@ -9414,6 +9488,7 @@ async function _warmTechDepotCoords(){
         t.depotLat=found.lat; t.depotLng=found.lng
         gcache[t.depotAddr]=found
         try{localStorage.setItem('optiq_gcache',JSON.stringify(gcache))}catch(e){}
+        pushGcacheToCloud()
         saveTechDepots()
       }
     }catch(e){}
