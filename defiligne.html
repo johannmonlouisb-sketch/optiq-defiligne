@@ -3963,7 +3963,7 @@ async function pushMaterielToNotion(iv){
 // PRÉVISIONS
 // ═══════════════════════════════════════════════════════
 // ── filtre prévisions ──
-let prevFilter = "all"  // all | overdue | urgent | soon | ok
+let prevFilter = "all"  // all | overdue | urgent | soon | planned | ok
 let prevSearch = ""
 let prevTech   = 0
 // Filtres de période (par défaut : 3 prochains mois)
@@ -3976,11 +3976,11 @@ let prevMonth    = 0
     const s=localStorage.getItem("optiq_prev_period")
     if(s){const p=JSON.parse(s);prevDateFrom=p.from||"";prevDateTo=p.to||"";prevYear=p.year||0;prevMonth=p.month||0}
   }catch(e){}
-  // Défaut : 3 prochains mois si aucun filtre sauvegardé
+  // Défaut : 12 prochains mois si aucun filtre sauvegardé
   if(!prevDateFrom&&!prevDateTo&&!prevYear&&!prevMonth){
     const today=new Date()
     prevDateFrom=today.toISOString().split("T")[0]
-    const end=new Date(today);end.setMonth(end.getMonth()+3)
+    const end=new Date(today);end.setFullYear(end.getFullYear()+1)
     prevDateTo=end.toISOString().split("T")[0]
   }
 })()
@@ -4003,6 +4003,10 @@ function setPrevPeriod(preset){
   } else if(preset==="3months"){
     prevDateFrom=iso(today)
     const end=new Date(today);end.setMonth(end.getMonth()+3)
+    prevDateTo=iso(end)
+  } else if(preset==="12months"){
+    prevDateFrom=iso(today)
+    const end=new Date(today);end.setFullYear(end.getFullYear()+1)
     prevDateTo=iso(end)
   } else if(preset==="year"){
     prevDateFrom=iso(new Date(today.getFullYear(),0,1))
@@ -4046,12 +4050,14 @@ function rPrev(){
   })
 
   const all=Object.values(lastMaint).map(iv=>{
-    const nextDate=addYears(iv.date,1)
+    // Priorité : pma Kizeo (date réelle planifiée) > date dernière intervention + 1 an
+    const nextDate=(iv.pma&&iv.pma>iv.date)?iv.pma:addYears(iv.date,1)
     const days=daysUntil(nextDate)
     let urgency="ok"
     if(days<0)urgency="overdue"
     else if(days<=30)urgency="urgent"
     else if(days<=90)urgency="soon"
+    else if(days<=365)urgency="planned"
     return{...iv,nextDate,days,urgency}
   }).sort((a,b)=>a.days-b.days)
 
@@ -4071,10 +4077,11 @@ function rPrev(){
     })
   }
 
-  const overdue=periodFiltered.filter(f=>f.urgency==="overdue")
-  const urgent= periodFiltered.filter(f=>f.urgency==="urgent")
-  const soon=   periodFiltered.filter(f=>f.urgency==="soon")
-  const ok=     periodFiltered.filter(f=>f.urgency==="ok")
+  const overdue =periodFiltered.filter(f=>f.urgency==="overdue")
+  const urgent  =periodFiltered.filter(f=>f.urgency==="urgent")
+  const soon    =periodFiltered.filter(f=>f.urgency==="soon")
+  const planned =periodFiltered.filter(f=>f.urgency==="planned")
+  const ok      =periodFiltered.filter(f=>f.urgency==="ok")
 
   // ── Filtres urgence / tech / recherche ────────────────────
   let list=periodFiltered
@@ -4105,6 +4112,7 @@ function rPrev(){
   const isWeek=()=>{const today=new Date();const mon=new Date(today);mon.setDate(today.getDate()-today.getDay()+1);const sun=new Date(mon);sun.setDate(mon.getDate()+6);return prevDateFrom===mon.toISOString().split("T")[0]&&prevDateTo===sun.toISOString().split("T")[0]}
   const isMth=()=>{const t=new Date();return prevDateFrom===new Date(t.getFullYear(),t.getMonth(),1).toISOString().split("T")[0]&&prevDateTo===new Date(t.getFullYear(),t.getMonth()+1,0).toISOString().split("T")[0]}
   const is3m=()=>{const t=new Date();const e=new Date(t);e.setMonth(e.getMonth()+3);return prevDateFrom===t.toISOString().split("T")[0]&&prevDateTo===e.toISOString().split("T")[0]}
+  const is12m=()=>{const t=new Date();const e=new Date(t);e.setFullYear(e.getFullYear()+1);return prevDateFrom===t.toISOString().split("T")[0]&&prevDateTo===e.toISOString().split("T")[0]}
   const isYr=()=>{const t=new Date();return prevDateFrom===new Date(t.getFullYear(),0,1).toISOString().split("T")[0]&&prevDateTo===new Date(t.getFullYear(),11,31).toISOString().split("T")[0]}
 
   document.getElementById("d-prev").innerHTML=`
@@ -4122,7 +4130,8 @@ function rPrev(){
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
       <button style="${qbStyle(isWeek())}" onclick="setPrevPeriod('week')">Cette semaine</button>
       <button style="${qbStyle(isMth())}"  onclick="setPrevPeriod('month')">Ce mois</button>
-      <button style="${qbStyle(is3m())}"   onclick="setPrevPeriod('3months')">3 prochains mois</button>
+      <button style="${qbStyle(is3m())}"   onclick="setPrevPeriod('3months')">3 mois</button>
+      <button style="${qbStyle(is12m())}"  onclick="setPrevPeriod('12months')">12 mois</button>
       <button style="${qbStyle(isYr())}"   onclick="setPrevPeriod('year')">Cette année</button>
       ${!prevYear&&!prevDateFrom&&!prevDateTo?`<button style="${qbStyle(true)}" onclick="">Tout afficher</button>`:`<button style="${qbStyle(false)}" onclick="prevDateFrom='';prevDateTo='';prevYear=0;prevMonth=0;savePrevPeriod();rPrev()">✕ Toutes dates</button>`}
     </div>
@@ -4172,9 +4181,13 @@ function rPrev(){
       <p style="font-size:11px;color:var(--gray)">🟡 30–90 jours</p>
       <p style="font-size:24px;font-weight:700;color:#1B5E20">${soon.length}</p>
     </div>
-    <div class="surf" style="${kpiStyle(prevFilter==="ok","#1565C0")}" onclick="prevFilter='ok';rPrev()">
-      <p style="font-size:11px;color:var(--gray)">🟢 &gt; 90 jours</p>
-      <p style="font-size:24px;font-weight:700;color:#1565C0">${ok.length}</p>
+    <div class="surf" style="${kpiStyle(prevFilter==="planned","#1565C0")}" onclick="prevFilter='planned';rPrev()">
+      <p style="font-size:11px;color:var(--gray)">🔵 90j–1 an</p>
+      <p style="font-size:24px;font-weight:700;color:#1565C0">${planned.length}</p>
+    </div>
+    <div class="surf" style="${kpiStyle(prevFilter==="ok","#388E3C")}" onclick="prevFilter='ok';rPrev()">
+      <p style="font-size:11px;color:var(--gray)">🟢 &gt; 1 an</p>
+      <p style="font-size:24px;font-weight:700;color:#388E3C">${ok.length}</p>
     </div>
     <div style="display:flex;gap:8px;margin-left:auto">
       <button class="bb bsm" onclick="openSmartPlan()" style="background:#C62828;border-color:#C62828">🚨 Planifier les retards</button>
@@ -4209,7 +4222,7 @@ function prevCard(f){
     :f.days<=90?`<span style="font-weight:600;color:#1B5E20">dans ${f.days}j</span>`
     :`<span style="color:var(--gray)">dans ${f.days}j</span>`
 
-  const borderCol=f.urgency==="overdue"?"#C62828":f.urgency==="urgent"?"#E65100":f.urgency==="soon"?"#F9A825":"#1565C0"
+  const borderCol=f.urgency==="overdue"?"#C62828":f.urgency==="urgent"?"#E65100":f.urgency==="soon"?"#F9A825":f.urgency==="planned"?"#1565C0":"#9E9E9E"
 
   // Chercher si déjà planifiée
   const alreadyPlanned=ivs.find(i=>i.client===f.client&&i.addr===f.addr&&i.date===f.nextDate&&i.status!=="completed")
@@ -4347,8 +4360,8 @@ function buildSmartPlan(){
 
   // ── 2. Retards sans planification future ──
   const overdue = Object.values(lastMaint)
-    .map(iv=>({...iv, nextDate:addYears(iv.date,1), daysLate:Math.abs(Math.min(0,daysUntil(addYears(iv.date,1))))}))
-    .filter(iv=>daysUntil(addYears(iv.date,1))<0)
+    .map(iv=>{const nd=(iv.pma&&iv.pma>iv.date)?iv.pma:addYears(iv.date,1);return{...iv,nextDate:nd,daysLate:Math.abs(Math.min(0,daysUntil(nd)))}})
+    .filter(iv=>daysUntil(iv.nextDate)<0)
     .filter(iv=>!ivs.find(i=>i.client===iv.client&&i.addr===iv.addr&&i.status==="pending"&&i.date>=TODAY))
     .sort((a,b)=>b.daysLate-a.daysLate)
 
