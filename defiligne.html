@@ -170,6 +170,31 @@ tr:hover td{background:var(--bg)}
   #dep-mapid{height:260px}
   .kpig{grid-template-columns:repeat(2,1fr)}
   .g2{grid-template-columns:1fr}
+  .g3{grid-template-columns:repeat(2,1fr)}
+  /* La plupart des grilles de stats (3/4/5 colonnes) sont générées en style inline dans
+     les templates JS — trop nombreuses pour être toutes reclassées, donc on les cible ici
+     par le contenu littéral de l'attribut style plutôt que par classe */
+  [style*="grid-template-columns:repeat(3,1fr)"],
+  [style*="grid-template-columns:repeat(4,1fr)"],
+  [style*="grid-template-columns:repeat(5,1fr)"]{
+    grid-template-columns:repeat(2,1fr) !important;
+  }
+  /* Tableaux larges : défilement horizontal contenu plutôt que débordement de toute la page */
+  table{ display:block; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  #topbar{ padding:10px 12px; flex-wrap:wrap; row-gap:8px; }
+  /* Barres d'outils/filtres en style inline flex qui ne prévoyaient pas le wrap */
+  .fbar{ row-gap:8px; }
+  /* Lignes "infos à gauche / badges à droite" (cartes interventions, en-têtes de section...) :
+     très répandues en style inline, débordent si elles ne passent pas à la ligne sur mobile */
+  [style*="justify-content:space-between"]{ flex-wrap:wrap !important; row-gap:6px; }
+}
+@media(max-width:480px){
+  /* Sur téléphone étroit, même 2 colonnes reste souvent trop serré pour ces cartes de stats */
+  [style*="grid-template-columns:repeat(2,1fr)"]{ grid-template-columns:1fr !important; }
+  .kpig{ grid-template-columns:1fr; }
+  .g3{ grid-template-columns:1fr; }
+  body{ font-size:14px; }
+  .md{ padding:16px; }
 }
 /* CSV DROP */
 #csv-drop,#mcsv-drop{border:2px dashed var(--border);border-radius:10px;padding:30px;text-align:center;cursor:pointer;transition:all 0.15s;color:var(--gray)}
@@ -2628,14 +2653,24 @@ function getEquip(iv){
   }
   if(iv.electrodeDate){
     const dL=Math.round((new Date(iv.electrodeDate+"T12:00:00")-new Date())/86400000)
-    if(dL<90) items.push({icon:"⚡",text:`Électrodes exp. ${fd(iv.electrodeDate)}`,col:dL<0?"#C62828":"#E65100",bg:dL<0?"#FFEBEE":"#FFF3E0"})
+    const lvl=iv.urgenceElectrodes||''
+    const urg=lvl==="expired"||dL<0?{col:"#C62828",bg:"#FFEBEE"}:lvl==="critical"||dL<30?{col:"#E65100",bg:"#FFF3E0"}:lvl==="urgent"||dL<90?{col:"#F57F17",bg:"#FFFDE7"}:{col:"#555",bg:"#F5F5F5"}
+    items.push({icon:"🔌",text:`Électrodes${(lvl==="expired"||dL<0)?" PÉRIMÉES":` exp. ${fd(iv.electrodeDate)}`}`,...urg})
+  } else if(iv.urgenceElectrodes&&iv.urgenceElectrodes!=="ok"&&iv.urgenceElectrodes!=="unknown"){
+    items.push({icon:"🔌",text:"Électrodes",...urgCol(iv.urgenceElectrodes)})
   }
   if(iv.prochaineExpiration){
     const dL=Math.round((new Date(iv.prochaineExpiration+"T12:00:00")-new Date())/86400000)
     const urg=dL<0?{col:"#C62828",bg:"#FFEBEE"}:dL<30?{col:"#E65100",bg:"#FFF3E0"}:dL<90?{col:"#F57F17",bg:"#FFFDE7"}:{col:"#1565C0",bg:"#E3F2FD"}
     items.push({icon:"⏰",text:`Prochaine exp. ${fd(iv.prochaineExpiration)}`,  ...urg})
   }
-  if(iv.batChange) items.push({icon:"🔋",text:"Batterie"+(iv.batDate?` (exp. ${fd(iv.batDate)})`:""),col:"#1B5E20",bg:"#F1F8E9"})
+  if(iv.batDate){
+    const dL=Math.round((new Date(iv.batDate+"T12:00:00")-new Date())/86400000)
+    const urg=dL<0?{col:"#C62828",bg:"#FFEBEE"}:dL<90?{col:"#E65100",bg:"#FFF3E0"}:{col:"#1B5E20",bg:"#F1F8E9"}
+    items.push({icon:"🔋",text:`Batterie (exp. ${fd(iv.batDate)})`,...urg})
+  } else if(iv.batChange){
+    items.push({icon:"🔋",text:"Batterie",col:"#1B5E20",bg:"#F1F8E9"})
+  }
   if(inst&&!iv.padPak) items.push({icon:"⚡",text:"Pad Pak neuf (fourni)",col:"#2E7D32",bg:"#E8F5E9"})
   if(inst&&!iv.batChange) items.push({icon:"🔋",text:"Batterie neuve (fournie)",col:"#2E7D32",bg:"#E8F5E9"})
   return items
@@ -2843,9 +2878,10 @@ function rDepart(){
                   ${depETAs[iv.id]?`<span style="font-size:11px;font-weight:600;padding:2px 7px;border-radius:100px;background:#E8F5E9;color:#2E7D32">🕐 ${depETAs[iv.id].eta} → ${depETAs[iv.id].leave}</span>`:''}
                 </div>`:''}
                 ${iv.notes?`<div style="font-size:12px;color:var(--orange);background:#FFF3E0;padding:5px 9px;border-radius:6px;margin-bottom:5px">📝 ${iv.notes}</div>`:""}
-                ${(iv.commercial||iv.nSerie)?`<div style="font-size:11px;background:#F8F9FA;border:1px solid #E9ECEF;padding:5px 9px;border-radius:6px;margin-bottom:5px;display:flex;gap:10px;flex-wrap:wrap">
+                ${(iv.commercial||iv.nSerie||iv.dateFin)?`<div style="font-size:11px;background:#F8F9FA;border:1px solid #E9ECEF;padding:5px 9px;border-radius:6px;margin-bottom:5px;display:flex;gap:10px;flex-wrap:wrap">
                   ${iv.commercial?`<span>💼 <strong>${iv.commercial}</strong></span>`:""}
                   ${iv.nSerie?`<span style="color:var(--gray)">🔢 S/N : <strong>${iv.nSerie}</strong></span>`:""}
+                  ${iv.dateFin?`<span style="color:#1B5E20">✅ Fin : <strong>${fd(iv.dateFin)}</strong></span>`:""}
                 </div>`:""}
                 ${(iv.contact||iv.cphone||iv.cemail)?`<div style="font-size:12px;background:#F3E5F5;padding:5px 9px;border-radius:6px;margin-bottom:5px">
                   ${iv.contact?`👤 <strong>${iv.contact}</strong> `:""}${iv.cphone?`📞 <a href="tel:${iv.cphone}" style="color:var(--blue)">${iv.cphone}</a>`:""}
@@ -3990,16 +4026,22 @@ function applyPrevYearMonth(){
   savePrevPeriod();rPrev()
 }
 
+// Normalise une chaîne pour le regroupement client/adresse : insensible à la casse et
+// aux espaces (simples, doubles, manquants) — corrige les variantes de saisie Notion
+// ("PREUILLY-SUR-CLAISE" vs "Preuilly-sur-Claise", "Rue37290" vs "Rue 37290"...) sans
+// fusionner des clients au nom réellement différent.
+function _normKey(s){ return (s||'').toUpperCase().replace(/\s+/g,' ').trim() }
+
 function rPrev(){
   const sqFocused=document.activeElement?.id==="prev-sq"
   // Dernière maintenance connue par client+addr
   const lastMaint={}
   ivs.filter(i=>i.status==="completed").forEach(i=>{
-    const key=i.client+"||"+i.addr
+    const key=_normKey(i.client)+"||"+_normKey(i.addr)
     if(!lastMaint[key]||i.date>lastMaint[key].date) lastMaint[key]={...i}
   })
   ivs.filter(i=>i.type==="installation"&&i.status==="completed").forEach(i=>{
-    const key=i.client+"||"+i.addr
+    const key=_normKey(i.client)+"||"+_normKey(i.addr)
     if(!lastMaint[key]) lastMaint[key]={...i}
   })
 
@@ -5137,6 +5179,7 @@ function editIv(id){
   document.getElementById("m-timestart").value=iv.timeStart||""
   document.getElementById("m-timeend").value=iv.timeEnd||""
   window._editIvOrigTimeStart=iv.timeStart||"" // mémoriser pour détecter une saisie manuelle
+  window._editIvOrigDate=iv.date||"" // idem pour la date : ne pousser vers Notion que si vraiment changée ici
   // Auto-suggestion pad pak si maintenance (pas installation) - changement tous les 2 ans
   if(iv.type!=="installation"&&!iv.padPak){
     const age=iv.date?(new Date()-new Date(iv.date+"T12:00:00"))/(1000*60*60*24*365):0
@@ -5193,7 +5236,13 @@ function saveEdit(){
     // userSetTime : sticky — reste vrai si déjà manuellement saisi ; passe à vrai si l'heure a changé
     const _newTime=document.getElementById("m-timestart").value||""
     const userSetTime=prev?.userSetTime===true||(_newTime!==(window._editIvOrigTimeStart||""))
-    ivs=ivs.map(i=>i.id===id?{...i,...obj,userSetTime}:i)
+    // dateTouched : NON persistant (contrairement à userSetTime) — reflète uniquement
+    // "la date a-t-elle changé pendant CETTE édition". Ne la pousser vers Notion que si
+    // oui, sinon un push déclenché par un autre champ écraserait une reprogrammation faite
+    // directement dans Notion avec la copie locale (potentiellement périmée). La rendre
+    // persistante recréerait le bug dès la 2e édition suivant une reprogrammation légitime.
+    const dateTouched=obj.date!==(window._editIvOrigDate||"")
+    ivs=ivs.map(i=>i.id===id?{...i,...obj,userSetTime,dateTouched}:i)
     // Si une installation vient d'être marquée terminée → créer maintenance auto
     if(prev&&prev.type==="installation"&&obj.status==="completed"&&prev.status!=="completed"){
       autoMaintFromInstall({...prev,...obj})
@@ -5257,7 +5306,9 @@ function autoSaveField(){
   const _prevAf=ivs.find(i=>i.id===id)
   const _newTimeAf=document.getElementById("m-timestart").value||""
   const _userSetTimeAf=_prevAf?.userSetTime===true||(_newTimeAf!==(window._editIvOrigTimeStart||""))
-  ivs=ivs.map(i=>i.id===id?{...i,...obj,userSetTime:_userSetTimeAf}:i)
+  // dateTouched : non persistant, cf. saveEdit() — reflète juste la session d'édition en cours
+  const _dateTouchedAf=obj.date!==(window._editIvOrigDate||"")
+  ivs=ivs.map(i=>i.id===id?{...i,...obj,userSetTime:_userSetTimeAf,dateTouched:_dateTouchedAf}:i)
   const ind=document.getElementById("np-saved")
   if(ind){ind.classList.add("show");clearTimeout(ind._t);ind._t=setTimeout(()=>ind.classList.remove("show"),1800)}
   cloudSave()
@@ -8377,8 +8428,15 @@ function initCloud(){
 
   // Sync cross-device : Supabase Realtime (WebSocket instantané)
   if(isDeployed){
-    cloudLoad().then(loaded=>{
-      if(loaded){ updateSbCount(); SV(curView) }
+    // Attend une promesse au maximum `ms` — évite qu'un réseau lent/instable (mobile)
+    // ne bloque indéfiniment l'affichage en attendant une réponse du cloud qui ne vient pas
+    const _withTimeout = (p, ms) => Promise.race([p, new Promise(r=>setTimeout(r, ms))])
+
+    cloudLoad().then(async loaded=>{
+      // Rendu de la vue courante différé après la récupération de l'ordre de tournée
+      // et du cache d'adresses (plus bas) — sinon sur un appareil qui n'a pas encore
+      // ces données locales, un rendu immédiat de "Départ" peut recalculer et sauvegarder
+      // un ordre "à l'aveugle" qui écrase celui posé depuis un autre appareil.
 
       // WebSocket Realtime — push instantané sur tous les appareils
       try{
@@ -8469,7 +8527,7 @@ function initCloud(){
           .subscribe()
 
         // Chargement initial de l'ordre de tournée (posé par l'admin ou le tech sur un autre appareil)
-        pullRouteOrderFromCloud()
+        await _withTimeout(pullRouteOrderFromCloud(), 4000)
 
         // Canal cache de géocodage — partagé avec l'app technicien
         sbClient.channel('gcache-sync')
@@ -8486,7 +8544,11 @@ function initCloud(){
           .subscribe()
 
         // Chargement initial du cache de géocodage (posé par l'admin ou le tech sur un autre appareil)
-        pullGcacheFromCloud()
+        await _withTimeout(pullGcacheFromCloud(), 4000)
+
+        // Maintenant que l'ordre de tournée et le cache d'adresses sont à jour localement,
+        // on peut sans risque rendre/recalculer la vue courante
+        if(loaded){ updateSbCount(); SV(curView) }
 
         // Chargement initial de la progression des tournées
         sbGet('app_state?key=eq.optiq_tour_progress&select=value')
@@ -8890,7 +8952,7 @@ async function sbAuthHeaders(extra){
 }
 
 async function sbGet(path){
-  const r = await fetch(`${SB_URL}/rest/v1/${path}`,{headers:await sbAuthHeaders()})
+  const r = await fetch(`${SB_URL}/rest/v1/${path}`,{headers:await sbAuthHeaders(),signal:AbortSignal.timeout(10000)})
   const t = await r.text()
   if(!r.ok) throw new Error(`SB ${r.status}`)
   return t ? JSON.parse(t) : []
@@ -8900,7 +8962,8 @@ async function sbUpsert(table, data){
   const r = await fetch(`${SB_URL}/rest/v1/${table}`,{
     method:'POST',
     headers:await sbAuthHeaders({'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'}),
-    body:JSON.stringify(data)
+    body:JSON.stringify(data),
+    signal:AbortSignal.timeout(10000)
   })
   if(!r.ok){ const t=await r.text(); throw new Error(`SB POST ${r.status}: ${t.substring(0,100)}`) }
 }
@@ -8981,6 +9044,7 @@ function enrichIvWithKizeo(iv, site){
     padPakDatePed:    site.padPakDatePed || '',
     batDate:          iv.batDate || site.batDate || '',
     electrodeDate:    site.electrodeDate || '',
+    dateFin:          site.dateFin || '',
     padPak:           iv.padPak || needPadPak,
     batChange:        iv.batChange || !!needBat,
     urgencePadPak:    site.urgencePadPak || '',
@@ -9031,8 +9095,23 @@ function notionPageToIv(page, existingIds){
   const addrSiege = nProp(p, 'Adresse Siéges')
   const addr    = addrSite || addrSiege || ''
   const dateStr = nProp(p, 'Date intervention')
-  const timeMatch = dateStr.match(/T(\d{2}:\d{2})/)
-  const plannedStart = timeMatch ? timeMatch[1] : ''
+  // Notion renvoie souvent minuit UTC par défaut quand aucune heure n'a jamais été
+  // volontairement saisie (ex: "2026-06-01T00:00:00.000+00:00"). Sans conversion de
+  // fuseau, ça se lisait comme "00:00" littéral et était traité comme une vraie heure
+  // de RDV imposée. On convertit en heure de Paris et on rejette les horaires nocturnes
+  // implausibles (avant 6h / après 21h) — aucun client ne reçoit un technicien à 2h du matin.
+  let plannedStart = ''
+  if (/T\d{2}:\d{2}/.test(dateStr)) {
+    const _d = new Date(dateStr)
+    if (!isNaN(_d)) {
+      const _paris = _d.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit', timeZone:'Europe/Paris', hour12:false})
+      const _m = _paris.match(/(\d{1,2})\D+(\d{2})/)
+      if (_m) {
+        const _h = parseInt(_m[1])
+        if (_h >= 6 && _h < 21) plannedStart = _m[1].padStart(2,'0')+':'+_m[2]
+      }
+    }
+  }
 
   if(!client || !dateStr) return null
 
@@ -9174,7 +9253,10 @@ async function pullFromNotion(dateFrom, dateTo, mode='merge'){
 
     let added=0, updated=0
     pages.forEach(page=>{
-      const iv = notionPageToIv(page, existingMap)
+      // Une page Notion malformée ne doit jamais interrompre le traitement des suivantes
+      let iv
+      try{ iv = notionPageToIv(page, existingMap) }
+      catch(e){ console.warn('Page Notion ignorée (erreur parsing):', page.id, e.message); return }
       if(!iv) return
       const existIdx = ivs.findIndex(i=>i.notionId===page.id)
       if(existIdx>=0){
@@ -9211,9 +9293,15 @@ async function pullFromNotion(dateFrom, dateTo, mode='merge'){
       }
     })
 
-    // Enrichissement depuis la DB Kizeo (DAE, PAD PAK, batterie, urgences…)
+    // Enrichissement depuis la DB Kizeo (DAE, PAD PAK, batterie, urgences…) — non bloquant :
+    // une panne ici ne doit jamais empêcher la sauvegarde des interventions déjà récupérées
+    // de Notion (sinon un simple échec Kizeo annule tout le pull, silencieusement)
     if(statusEl) statusEl.innerHTML = '⏳ Enrichissement depuis la base Kizeo...'
-    ivs = await enrichIvsWithKizeo(ivs)
+    try{
+      ivs = await enrichIvsWithKizeo(ivs)
+    }catch(e){
+      console.warn('Enrichissement Kizeo échoué (non bloquant, le pull Notion est quand même sauvegardé):', e.message)
+    }
 
     cloudSave()
     updateSbCount()
@@ -9341,13 +9429,17 @@ function _buildNotionPropsUpdate(iv){
   const typeMap={maintenance_simple:'Annuel',maintenance_complex:'PAD PAK',installation:'Installation',tele_maintenance:'Télémaintenance'}
   const props={
     'Société':           {title:[{text:{content:(iv.client||'').substring(0,2000)}}]},
-    'Date intervention': {date:{start:(iv.userSetTime&&iv.timeStart)?iv.date+'T'+iv.timeStart+':00':iv.date}},
     'Adresse Site':      _rt(iv.addr),
     'Technicien':        {select:{name:tech?tech.name:''}},
     'INTERVENTION':      {multi_select:[{name:typeMap[iv.type]||'Annuel'}]},
     'Terminer':          {checkbox:iv.status==='completed'},
     'Echec':             {checkbox:iv.status==='not_responded'},
   }
+  // Date : uniquement si modifiée explicitement dans l'appli (dateTouched). Sinon, un push
+  // déclenché par un champ sans rapport (notes, technicien...) écraserait silencieusement
+  // une reprogrammation faite directement dans Notion avec la copie locale, possiblement périmée.
+  if(iv.dateTouched)
+    props['Date intervention'] = {date:{start:(iv.userSetTime&&iv.timeStart)?iv.date+'T'+iv.timeStart+':00':iv.date}}
   // Contenu : ne pas envoyer si vide (évite d'écraser des infos Notion non encore importées)
   if(iv.notes)   props['INFO ']           = _rt(iv.notes)
   if(iv.contact) props['Contact site']    = _rt(iv.contact)
@@ -9365,8 +9457,29 @@ async function pushIvToNotion(iv){
   if(!isDeployedApp) return
   if(iv.notionId){
     try{
-      await notionCall('update_page',{pageId:iv.notionId,properties:_buildNotionPropsUpdate(iv)})
-      showToast('☁️ Notion mis à jour','#1B5E20')
+      // Garde-fou anti-écrasement : si la date vient d'être modifiée dans l'appli, vérifier
+      // juste avant l'envoi qu'elle n'a pas AUSSI été changée directement dans Notion depuis
+      // l'ouverture de la fiche (le bureau tape parfois directement dans Notion). Sans ça, on
+      // écraserait silencieusement une reprogrammation faite côté Notion avec notre valeur,
+      // potentiellement périmée de plusieurs minutes/heures.
+      let props=_buildNotionPropsUpdate(iv)
+      if(iv.dateTouched){
+        try{
+          const fresh=await notionCall('get_page',{pageId:iv.notionId})
+          const notionDate=(nProp(fresh.properties||{},'Date intervention')||'').substring(0,10)
+          const origDate=(window._editIvOrigDate||'').substring(0,10)
+          if(notionDate && origDate && notionDate!==origDate && notionDate!==iv.date){
+            const keep=confirm(`⚠️ La date de "${iv.client}" a été changée directement dans Notion depuis l'ouverture de la fiche (actuellement : ${notionDate} dans Notion).\n\nÉcraser quand même avec ${iv.date} ?`)
+            if(!keep){
+              const {['Date intervention']:_omit, ...rest}=props
+              props=rest
+              showToast('☁️ Notion mis à jour (date conservée, changement Notion respecté)','#E65100')
+            }
+          }
+        }catch(e){ console.warn('Vérif conflit date Notion:',e.message) }
+      }
+      await notionCall('update_page',{pageId:iv.notionId,properties:props})
+      if(props['Date intervention']!==undefined || !iv.dateTouched) showToast('☁️ Notion mis à jour','#1B5E20')
     }catch(e){
       console.warn('Notion update:',e.message)
       showToast('⚠️ Notion : '+e.message,'#E65100')
@@ -9515,7 +9628,9 @@ async function silentPollNotionAdmin(){
   if(now - _adminLastPollTs < 55000) return
   _adminLastPollTs = now
   try{
-    const result = await pullFromNotion(_parisToday(), _parisDatePlus(30), 'merge')
+    // -7j : rattrape les interventions terminées récemment dans Notion sans avoir été
+    // explicitement "pull" (ex: saisie directe dans Notion, webhook Kizeo)
+    const result = await pullFromNotion(_parisDatePlus(-7), _parisDatePlus(30), 'merge')
     const el = document.getElementById('cloud-status')
     if(el && !result?.error){
       const hm = new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})
@@ -9536,7 +9651,9 @@ function startAdminNotionPolling(){
   if(location.protocol==='file:'||location.hostname==='localhost') return
   const el=document.getElementById('cloud-status')
   if(el) el.innerHTML='🔄 <span style="color:#1565C0">Synchronisation Notion...</span>'
-  const from=_parisToday()
+  // -180j au chargement de la page (une seule fois) : rattrape les interventions terminées
+  // dans Notion sans jamais avoir été "pull" — l'auto-sync habituel ne regardait que le futur
+  const from=_parisDatePlus(-180)
   const to=_parisDatePlus(30)
   const result=await pullFromNotion(from, to)
   if(el){

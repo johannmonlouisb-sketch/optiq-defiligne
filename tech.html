@@ -1288,10 +1288,13 @@ function getEquip(iv){
   }
 
   // Électrodes
-  if(iv.urgenceElectrodes&&iv.urgenceElectrodes!=="ok"&&iv.urgenceElectrodes!=="unknown"){
-    const urg=urgCol(iv.urgenceElectrodes)
-    const exp=iv.electrodeDate?` (exp. ${fd(iv.electrodeDate)})`:""
-    items.push({icon:"🔌",text:`Électrodes${iv.urgenceElectrodes==="expired"?" PÉRIMÉES":exp}`,...urg})
+  if(iv.electrodeDate){
+    const dL=Math.round((new Date(iv.electrodeDate+"T12:00:00")-new Date())/86400000)
+    const lvl=iv.urgenceElectrodes||''
+    const urg=lvl==="expired"||dL<0?{col:"#C62828",bg:"#FFEBEE"}:lvl==="critical"||dL<30?{col:"#E65100",bg:"#FFF3E0"}:lvl==="urgent"||dL<90?{col:"#F57F17",bg:"#FFFDE7"}:{col:"#555",bg:"#F5F5F5"}
+    items.push({icon:"🔌",text:`Électrodes${(lvl==="expired"||dL<0)?" PÉRIMÉES":` (exp. ${fd(iv.electrodeDate)})`}`,...urg})
+  } else if(iv.urgenceElectrodes&&iv.urgenceElectrodes!=="ok"&&iv.urgenceElectrodes!=="unknown"){
+    items.push({icon:"🔌",text:"Électrodes",...urgCol(iv.urgenceElectrodes)})
   }
 
   // Prochaine expiration globale (Kizeo)
@@ -1302,9 +1305,12 @@ function getEquip(iv){
   }
 
   // Batterie
-  if(iv.batChange){
-    const exp=iv.batDate?` (exp. ${fd(iv.batDate)})`:""
-    items.push({icon:"🔋",text:"Batterie"+exp,col:"#1B5E20",bg:"#F1F8E9"})
+  if(iv.batDate){
+    const dL=Math.round((new Date(iv.batDate+"T12:00:00")-new Date())/86400000)
+    const urg=dL<0?{col:"#C62828",bg:"#FFEBEE"}:dL<90?{col:"#E65100",bg:"#FFF3E0"}:{col:"#1B5E20",bg:"#F1F8E9"}
+    items.push({icon:"🔋",text:`Batterie (exp. ${fd(iv.batDate)})`,...urg})
+  } else if(iv.batChange){
+    items.push({icon:"🔋",text:"Batterie",col:"#1B5E20",bg:"#F1F8E9"})
   }
 
   // Installation : mentionner batterie + pad pak inclus SEULEMENT si pas déjà signalés
@@ -2445,6 +2451,7 @@ function showMatFiche(ivId){
     ${exRow("🔌","Électrodes",iv.electrodeDate,iv.urgenceElectrodes)}
     ${iv.prochaineExpiration?exRow("⏰","Prochaine expiration globale",iv.prochaineExpiration,""):""}
     ${iv.pma?row("📅","Prochaine maintenance annuelle",fd(iv.pma)):""}
+    ${iv.dateFin?row("✅","Date fin intervention",fd(iv.dateFin)):""}
     ${iv.commercial||iv.kizeoVille?sect("Informations"):""}
     ${iv.commercial?row("💼","Commercial",iv.commercial):""}
     ${iv.kizeoAddr||iv.kizeoVille?row("📮","Adresse site (Kizeo)",[iv.kizeoAddr,iv.kizeoCodePostal,iv.kizeoVille].filter(Boolean).join(", ")):""}
@@ -2644,6 +2651,7 @@ function enrichIvWithKizeo(iv,site){
     padPakDatePed: site.padPakDatePed||'',
     batDate:     iv.batDate||site.batDate||'',
     electrodeDate: site.electrodeDate||'',
+    dateFin:       site.dateFin||'',
     padPak:      iv.padPak||needPadPak,
     batChange:   iv.batChange||!!needBat,
     urgencePadPak:    site.urgencePadPak||'',
@@ -2764,7 +2772,14 @@ function normalizeHHMM(s){
       // toLocaleTimeString peut retourner "09 h 30" sur certains Windows → parser avec regex souple
       const raw=d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:TZ,hour12:false})
       const mt=raw.match(/(\d{1,2})\D+(\d{2})/)
-      if(mt) return mt[1].padStart(2,'0')+':'+mt[2]
+      if(mt){
+        const h=parseInt(mt[1])
+        // Notion renvoie souvent minuit UTC par défaut quand aucune heure n'a jamais été
+        // volontairement saisie — une fois converti en heure de Paris ça tombe la nuit.
+        // Rejeter ces horaires implausibles plutôt que de les traiter comme un vrai RDV.
+        if(h>=6&&h<21) return mt[1].padStart(2,'0')+':'+mt[2]
+        return ''
+      }
     }
   }
   // Regex souple : "9h30", "09:30", "9H30", "09 h 30", "9 h 30"

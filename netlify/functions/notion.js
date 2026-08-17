@@ -231,6 +231,7 @@ exports.handler = async (event) => {
             padPakDatePed:    nP(p, 'Expiration PAD PAK Pédiatrique'),
             batDate:          nP(p, 'Expiration Batterie'),
             electrodeDate:    nP(p, 'Expiration Électrodes'),
+            dateFin:          nP(p, 'Date fin intervention'),
             prochaineExpiration: nP(p, 'Prochaine Expiration'),
             pma:              nP(p, 'Prochaine Maintenance Annuelle'),
             derniereIntervention: nP(p, 'Dernière Intervention Kizeo'),
