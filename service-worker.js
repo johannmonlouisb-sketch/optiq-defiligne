@@ -71,7 +71,7 @@ self.addEventListener('fetch', event => {
           caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()))
         }
         return response
-      })
+      }).catch(() => new Response('', { status: 504, statusText: 'Offline' }))
     })
   )
 })
