@@ -10126,7 +10126,18 @@ function getDaeFromStr(s){
 // côté serveur — on attache le token de session Supabase Auth de l'admin connecté.
 async function _apiAuthHeaders(){
   let token=''
-  try{ const {data:{session}}=await sb.auth.getSession(); token=session?.access_token||'' }catch(e){}
+  try{
+    let { data:{ session } } = await sb.auth.getSession()
+    // Le token Supabase expire (1h par défaut) — un onglet resté ouvert
+    // longtemps (arrière-plan throttled par le navigateur) peut manquer le
+    // refresh auto du SDK. Refresh proactif si expiré/bientôt expiré, pour
+    // éviter un 401 "Authentification requise" sur /api/notion, /api/kizeo...
+    if (session?.expires_at && session.expires_at * 1000 - Date.now() < 60000) {
+      const { data: refreshed } = await sb.auth.refreshSession()
+      session = refreshed?.session || session
+    }
+    token = session?.access_token || ''
+  }catch(e){}
   return token?{'Authorization':`Bearer ${token}`}:{}
 }
 async function notionCall(action, extra={}){

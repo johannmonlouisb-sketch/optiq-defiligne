@@ -324,7 +324,13 @@ const _SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9' +
 const _sb = window.supabase.createClient(_SB_URL, _SB_KEY)
 async function _authHeaders(){
   try{
-    const {data:{session}}=await _sb.auth.getSession()
+    let {data:{session}}=await _sb.auth.getSession()
+    // Refresh proactif si le token est expiré/bientôt expiré (onglet resté
+    // ouvert longtemps) — évite un 401 sur /api/rapport-planning etc.
+    if (session?.expires_at && session.expires_at * 1000 - Date.now() < 60000) {
+      const { data: refreshed } = await _sb.auth.refreshSession()
+      session = refreshed?.session || session
+    }
     return session?.access_token?{'Authorization':`Bearer ${session.access_token}`}:{}
   }catch(e){ return {} }
 }
