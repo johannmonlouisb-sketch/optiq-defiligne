@@ -2,6 +2,7 @@
 // Proxy Notion uniquement (résout CORS) — Supabase est appelé directement depuis le navigateur
 
 const CORS = {
+  'Cache-Control': 'no-store',
   'Access-Control-Allow-Origin': 'https://optitechx.netlify.app',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Content-Type': 'application/json'

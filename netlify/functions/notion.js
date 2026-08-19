@@ -13,6 +13,7 @@ const crypto = require('crypto')
 const NOTION_VERSION = '2022-06-28'
 const NOTION_BASE    = 'https://api.notion.com/v1'
 const CORS = {
+  'Cache-Control': 'no-store',
   'Access-Control-Allow-Origin': 'https://optitechx.netlify.app',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Content-Type': 'application/json'

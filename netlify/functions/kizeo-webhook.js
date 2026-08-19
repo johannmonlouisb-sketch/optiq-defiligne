@@ -15,7 +15,8 @@ const SB_URL   = (process.env.SUPABASE_URL || '').replace(/\/rest\/v1\/?$/, '').
 const SB_ANON  = process.env.SUPABASE_ANON_KEY
 const WEBHOOK_SECRET = process.env.KIZEO_WEBHOOK_SECRET
 
-const CORS = { 'Content-Type': 'application/json' }
+const CORS = {
+  'Cache-Control': 'no-store', 'Content-Type': 'application/json' }
 
 function fieldVal(fields, ...keys) {
   for (const k of keys) {

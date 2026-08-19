@@ -140,6 +140,7 @@ async function verifyAdmin(authHeader) {
 // ── Handler principal ─────────────────────────────────────────────────────────
 exports.handler = async (event) => {
   const cors = {
+    'Cache-Control': 'no-store',
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': 'https://optitechx.netlify.app',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',

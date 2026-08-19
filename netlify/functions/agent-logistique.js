@@ -5,6 +5,7 @@
 // Si anomalies → appelle Groq llama-3.3-70b pour suggestions redistribution
 
 const CORS = {
+  'Cache-Control': 'no-store',
   'Access-Control-Allow-Origin':  'https://optitechx.netlify.app',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',

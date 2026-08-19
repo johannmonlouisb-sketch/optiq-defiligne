@@ -9,6 +9,7 @@ const { analyzeBatch }      = require('./agent-logistique')
 const { optimizeWithVroom } = require('./agent-optimiseur-vroom')
 
 const CORS = {
+  'Cache-Control': 'no-store',
   'Access-Control-Allow-Origin':  'https://optitechx.netlify.app',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
