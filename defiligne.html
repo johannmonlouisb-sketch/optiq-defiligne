@@ -2320,7 +2320,7 @@ async function _fetchNotionMonth(ym){
     const dateTo=ym+'-'+String(lastDay).padStart(2,'0')
     const res=await fetch('/api/notion',{
       method:'POST',
-      headers:{'Content-Type':'application/json', ...(await _notionAuthHeaders())},
+      headers:{'Content-Type':'application/json', ...(await _apiAuthHeaders())},
       body:JSON.stringify({action:'fetch_archive',dateFrom,dateTo})
     })
     if(!res.ok) throw new Error('HTTP '+res.status)
@@ -9130,8 +9130,8 @@ async function pushTodayToKizeo(){
     }else{
       const resp = await fetch("/api/kizeo",{
         method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({action:"push_batch",token:window.kizeoCfg.token,formId:window.kizeoCfg.formId,data:toSend})
+        headers:{"Content-Type":"application/json", ...(await _apiAuthHeaders())},
+        body:JSON.stringify({action:"push_batch",formId:window.kizeoCfg.formId,data:toSend})
       })
       const result = await resp.json()
       const ok = result.results?.filter(r=>r.status===200||r.status===201).length||0
@@ -9158,7 +9158,7 @@ async function autoDetectKizeoUsers(){
       // Simulation
       users=[{id:101,name:"Cindy D"},{id:102,name:"Priscillia M"},{id:103,name:"Yaniss B"}]
     }else{
-      const resp=await fetch("/api/kizeo",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"get_users",token:window.kizeoCfg.token,formId:""})})
+      const resp=await fetch("/api/kizeo",{method:"POST",headers:{"Content-Type":"application/json", ...(await _apiAuthHeaders())},body:JSON.stringify({action:"get_users",formId:""})})
       const data=await resp.json()
       users=data.users||[]
     }
@@ -10122,10 +10122,9 @@ function getDaeFromStr(s){
   return ''
 }
 
-// ── Appel proxy Notion ─────────────────────────────────────────
-// SÉCURITÉ : /api/notion exige désormais une identité vérifiée côté serveur —
-// on attache le token de session Supabase Auth de l'admin connecté.
-async function _notionAuthHeaders(){
+// SÉCURITÉ : /api/notion, /api/kizeo etc. exigent désormais une identité vérifiée
+// côté serveur — on attache le token de session Supabase Auth de l'admin connecté.
+async function _apiAuthHeaders(){
   let token=''
   try{ const {data:{session}}=await sb.auth.getSession(); token=session?.access_token||'' }catch(e){}
   return token?{'Authorization':`Bearer ${token}`}:{}
@@ -10133,7 +10132,7 @@ async function _notionAuthHeaders(){
 async function notionCall(action, extra={}){
   const r = await fetch(NOTION_ENDPOINT, {
     method:'POST',
-    headers:{'Content-Type':'application/json', ...(await _notionAuthHeaders())},
+    headers:{'Content-Type':'application/json', ...(await _apiAuthHeaders())},
     body: JSON.stringify({action, ...extra})
   })
   if(!r.ok) throw new Error(`Notion ${r.status}: ${await r.text()}`)
