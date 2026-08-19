@@ -17,29 +17,35 @@
 --   total à toutes les données (interventions, stock...) — cf. section
 --   "INSCRIPTIONS SUPABASE" plus bas.
 --
--- Vérifié empiriquement (tests curl avec la seule clé anon, sans session)
--- avant d'écrire ce script : l'écriture anon sur une clé app_state non
--- whitelistée échoue déjà (RLS correcte), de même que l'écriture anon sur
--- kizeo_sites. Les anciennes policies totalement ouvertes définies dans
--- supabase/schema.sql (USING(true) sans restriction) ne sont PAS actives
--- actuellement — mais ce script les supprime quand même par sécurité, au
--- cas où elles seraient un jour recréées par erreur (schema.sql ne doit
--- plus jamais être exécuté tel quel sur cette base : il fait aussi un
--- DROP TABLE ... CASCADE sur des tables contenant des données réelles).
+-- Chaque bloc ci-dessous est protégé par `to_regclass(...)` : si une table
+-- n'existe pas encore sur ce projet (ex. articles_stock/mouvements_stock —
+-- module Stock pas encore installé via supabase-stock-articles-setup.sql),
+-- le bloc est simplement ignoré au lieu de faire échouer TOUTE la requête
+-- (le SQL Editor exécute le script en une seule transaction : une erreur
+-- sur une table annule aussi tout ce qui a déjà réussi avant elle dans le
+-- même Run). Le script est aussi rejouable sans erreur (chaque create policy
+-- est précédé d'un drop if exists du même nom).
 -- ═══════════════════════════════════════════════════════════════════════
 
 -- 1) app_state — accès complet réservé aux admins réels (pas "authenticated") ----
-drop policy if exists "authenticated read app_state"  on public.app_state;
-drop policy if exists "authenticated write app_state" on public.app_state;
--- Filet de sécurité : anciennes policies fully-open de supabase/schema.sql,
--- si jamais elles existent encore sous un nom différent.
-drop policy if exists "anon_read_state"  on public.app_state;
-drop policy if exists "anon_write_state" on public.app_state;
-
-create policy "admin full app_state"
-  on public.app_state for all
-  using ( exists (select 1 from public.profiles where id = auth.uid() and role = 'admin') )
-  with check ( exists (select 1 from public.profiles where id = auth.uid() and role = 'admin') );
+do $$
+begin
+  if to_regclass('public.app_state') is not null then
+    execute 'drop policy if exists "authenticated read app_state"  on public.app_state';
+    execute 'drop policy if exists "authenticated write app_state" on public.app_state';
+    -- Filet de sécurité : anciennes policies fully-open de supabase/schema.sql,
+    -- si jamais elles existent encore sous un nom différent.
+    execute 'drop policy if exists "anon_read_state"  on public.app_state';
+    execute 'drop policy if exists "anon_write_state" on public.app_state';
+    execute 'drop policy if exists "admin full app_state" on public.app_state';
+    execute $p$
+      create policy "admin full app_state"
+        on public.app_state for all
+        using ( exists (select 1 from public.profiles where id = auth.uid() and role = 'admin') )
+        with check ( exists (select 1 from public.profiles where id = auth.uid() and role = 'admin') )
+    $p$;
+  end if;
+end $$;
 
 -- Les policies anon existantes (clés précises : optiq_ivs_data, optiq_route_order,
 -- optiq_tour_progress, optiq_mat_prep, optiq_gcache, optiq_dae_stock) sont
@@ -56,42 +62,66 @@ create policy "admin full app_state"
 -- pour leur définition actuelle).
 
 -- 2) kizeo_sites — même correctif (si la table existe sur ce projet) --------------
-drop policy if exists "authenticated read kizeo_sites"  on public.kizeo_sites;
-drop policy if exists "authenticated write kizeo_sites" on public.kizeo_sites;
-drop policy if exists "anon_read_kizeo"  on public.kizeo_sites;
-drop policy if exists "anon_write_kizeo" on public.kizeo_sites;
+do $$
+begin
+  if to_regclass('public.kizeo_sites') is not null then
+    execute 'drop policy if exists "authenticated read kizeo_sites"  on public.kizeo_sites';
+    execute 'drop policy if exists "authenticated write kizeo_sites" on public.kizeo_sites';
+    execute 'drop policy if exists "anon_read_kizeo"  on public.kizeo_sites';
+    execute 'drop policy if exists "anon_write_kizeo" on public.kizeo_sites';
+    execute 'drop policy if exists "admin full kizeo_sites" on public.kizeo_sites';
+    execute $p$
+      create policy "admin full kizeo_sites"
+        on public.kizeo_sites for all
+        using ( exists (select 1 from public.profiles where id = auth.uid() and role = 'admin') )
+        with check ( exists (select 1 from public.profiles where id = auth.uid() and role = 'admin') )
+    $p$;
+  end if;
+end $$;
 
-create policy "admin full kizeo_sites"
-  on public.kizeo_sites for all
-  using ( exists (select 1 from public.profiles where id = auth.uid() and role = 'admin') )
-  with check ( exists (select 1 from public.profiles where id = auth.uid() and role = 'admin') );
-
--- 3) articles_stock / mouvements_stock — même correctif ---------------------------
--- (créées cette session, cf. supabase-stock-articles-setup.sql — la quantité en
--- stock n'est de toute façon jamais modifiable directement, ni par anon ni par un
+-- 3) articles_stock / mouvements_stock — même correctif, si ces tables existent --
+-- (module Stock consommables — installé via supabase-stock-articles-setup.sql ;
+-- ignoré ici tant que ce n'est pas fait sur ce projet. La quantité en stock
+-- n'est de toute façon jamais modifiable directement, ni par anon ni par un
 -- compte authentifié non-admin : seul le trigger SECURITY DEFINER la modifie).
-drop policy if exists "admin full articles_stock" on public.articles_stock;
-create policy "admin full articles_stock"
-  on public.articles_stock for all
-  using ( exists (select 1 from public.profiles where id = auth.uid() and role = 'admin') )
-  with check ( exists (select 1 from public.profiles where id = auth.uid() and role = 'admin') );
+do $$
+begin
+  if to_regclass('public.articles_stock') is not null then
+    execute 'drop policy if exists "admin full articles_stock" on public.articles_stock';
+    execute $p$
+      create policy "admin full articles_stock"
+        on public.articles_stock for all
+        using ( exists (select 1 from public.profiles where id = auth.uid() and role = 'admin') )
+        with check ( exists (select 1 from public.profiles where id = auth.uid() and role = 'admin') )
+    $p$;
+  end if;
 
-drop policy if exists "admin full mouvements_stock" on public.mouvements_stock;
-create policy "admin full mouvements_stock"
-  on public.mouvements_stock for all
-  using ( exists (select 1 from public.profiles where id = auth.uid() and role = 'admin') )
-  with check ( exists (select 1 from public.profiles where id = auth.uid() and role = 'admin') );
+  if to_regclass('public.mouvements_stock') is not null then
+    execute 'drop policy if exists "admin full mouvements_stock" on public.mouvements_stock';
+    execute $p$
+      create policy "admin full mouvements_stock"
+        on public.mouvements_stock for all
+        using ( exists (select 1 from public.profiles where id = auth.uid() and role = 'admin') )
+        with check ( exists (select 1 from public.profiles where id = auth.uid() and role = 'admin') )
+    $p$;
+  end if;
+end $$;
 -- Les policies anon (lecture + création, pas de suppression/modification directe
 -- de quantité) sont conservées telles quelles — nécessaires aux techniciens qui
 -- scannent depuis le terrain, cf. supabase-stock-articles-setup.sql.
 
 -- 4) interventions / techniciens (tables non utilisées activement, cf.
 --    supabase/schema.sql — Notion reste la source de vérité) : on retire leur
---    lecture publique par précaution, elles ne servent à rien aujourd'hui et ne
---    doivent pas devenir un point d'exposition oublié si elles sont peuplées
---    un jour par erreur.
-drop policy if exists "anon_read_iv"    on public.interventions;
-drop policy if exists "anon_read_techs" on public.techniciens;
+--    lecture publique par précaution, si ces tables existent sur ce projet.
+do $$
+begin
+  if to_regclass('public.interventions') is not null then
+    execute 'drop policy if exists "anon_read_iv" on public.interventions';
+  end if;
+  if to_regclass('public.techniciens') is not null then
+    execute 'drop policy if exists "anon_read_techs" on public.techniciens';
+  end if;
+end $$;
 
 -- ── Vérification ──────────────────────────────────────────────────────────────
 select schemaname, tablename, policyname, cmd
