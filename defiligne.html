@@ -134,6 +134,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--blue);border-col
 .dep-card.done{border-left-color:#4CAF50;opacity:0.72}
 .dep-card:hover:not(.done){box-shadow:0 2px 12px rgba(0,0,0,0.1)}
 .dep-card.drag-over{outline:2px dashed var(--blue);background:var(--blueLight,#EFF6FF)}
+.dep-card.sel{outline:2px solid var(--blue);background:var(--blueLight,#EFF6FF)}
 .dep-num{width:32px;height:32px;background:var(--blue);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0}
 .dep-card.done .dep-num{background:#4CAF50}
 .dep-drag{color:#ccc;font-size:18px;cursor:grab;flex-shrink:0;user-select:none;-webkit-user-select:none;padding:0 2px;line-height:1;align-self:center}
@@ -2920,7 +2921,7 @@ function rDepart(){
           ondragover="event.preventDefault();if(${iv.techId}===_dragTechId)this.classList.add('drag-over')"
           ondragleave="this.classList.remove('drag-over')"
           ondrop="event.preventDefault();this.classList.remove('drag-over');dropDepCard(${iv.id})"
-          ${_mini?`onclick="toggleDepMini(${iv.id})"`:""}>
+          onclick="focusDepCard(${iv.id})">
           <div style="display:flex;gap:10px;align-items:${_mini?"center":"flex-start"}">
             <div class="dep-drag" onclick="event.stopPropagation()" title="Déplacer">☰</div>
             <div class="dep-num" style="background:${done?"#4CAF50":fail?"#C62828":techCol}">${done?"✓":fail?"✗":techIdx+1}</div>
@@ -2994,6 +2995,23 @@ function toggleDepMini(id){
   if(_depExpanded.has(id))_depExpanded.delete(id)
   else _depExpanded.add(id)
   rDepart()
+}
+
+// Clic sur une carte intervention → centre la carte sur son marqueur (même
+// comportement que focusClient() côté tech.html).
+function focusDepCard(id){
+  if(depValidated[id]||depFailed[id]){
+    if(_depExpanded.has(id))_depExpanded.delete(id)
+    else _depExpanded.add(id)
+    rDepart()
+  }
+  document.querySelectorAll('.dep-card').forEach(el=>el.classList.remove('sel'))
+  const card=document.getElementById('dc-'+id)
+  if(card){card.classList.add('sel');card.scrollIntoView({block:'nearest',behavior:'smooth'})}
+  if(depMarkers[id]&&depMapObj){
+    depMapObj.panTo(depMarkers[id].getLatLng(),{animate:true})
+    depMarkers[id].openPopup()
+  }
 }
 
 function updateDepMarker(id){
