@@ -303,12 +303,31 @@ input:focus,select:focus{outline:2px solid var(--blue);border-color:var(--blue);
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const API_RAPPORT   = '/api/rapport-planning'
 const API_TRAITER   = '/api/traiter-planning'
 const POLL_INTERVAL = 15000
 
 let lastReport = null
+
+// SÉCURITÉ : rapport-planning.js et traiter-planning.js exigent désormais une
+// session admin. Cette page n'a pas son propre écran de connexion — elle
+// réutilise la session Supabase Auth déjà ouverte dans l'onglet admin
+// (defiligne.html), partagée automatiquement via localStorage (même origine,
+// même client Supabase). Si l'admin ne s'est pas connecté via /defiligne
+// avant d'ouvrir cette page, les appels échoueront avec une erreur claire.
+const _SB_URL = 'https://yjcmfoxvyxzgixnrvcnn.supabase.co'
+const _SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9' +
+  '.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlqY21mb3h2eXh6Z2l4bnJ2Y25uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwNjYwNzMsImV4cCI6MjA5MTY0MjA3M30' +
+  '.1aR7ZdyBMjqhb9DhpZgXOxvaw0FcPYfeWqlKAOoyHeg'
+const _sb = window.supabase.createClient(_SB_URL, _SB_KEY)
+async function _authHeaders(){
+  try{
+    const {data:{session}}=await _sb.auth.getSession()
+    return session?.access_token?{'Authorization':`Bearer ${session.access_token}`}:{}
+  }catch(e){ return {} }
+}
 
 document.addEventListener('DOMContentLoaded', () => {
   const today  = new Date()
@@ -328,7 +347,7 @@ async function fetchReport() {
   const dot = document.getElementById('refresh-dot')
   dot.className = 'loading'
   try {
-    const r   = await fetch(API_RAPPORT, { cache: 'no-store' })
+    const r   = await fetch(API_RAPPORT, { cache: 'no-store', headers: await _authHeaders() })
     if (!r.ok) throw new Error(r.status)
     lastReport = await r.json()
     dot.className = ''
@@ -630,7 +649,7 @@ async function runAnalysis() {
 
   try {
     const r = await fetch(API_TRAITER, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...(await _authHeaders()) },
       body: JSON.stringify({ dateFrom: from, dateTo: to, tech: tech || undefined, updateNotion: upd })
     })
     let d

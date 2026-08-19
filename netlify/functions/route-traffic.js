@@ -7,8 +7,53 @@
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Content-Type': 'application/json'
+}
+
+// SÉCURITÉ : consomme TOMTOM_KEY / GOOGLE_MAPS_KEY (clés payantes) — réservé
+// aux utilisateurs identifiés (admin ou technicien).
+const crypto = require('crypto')
+async function verifyAdmin(authHeader) {
+  const token = (authHeader || '').startsWith('Bearer ') ? authHeader.slice(7) : null
+  const SB_URL = process.env.SUPABASE_URL
+  const SB_ANON = process.env.SUPABASE_ANON_KEY
+  if (!token || !SB_URL || !SB_ANON) return false
+  try {
+    const userRes = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: SB_ANON, Authorization: `Bearer ${token}` } })
+    if (!userRes.ok) return false
+    const user = await userRes.json()
+    if (!user?.id) return false
+    const profRes = await fetch(`${SB_URL}/rest/v1/profiles?id=eq.${user.id}&select=role`, { headers: { apikey: SB_ANON, Authorization: `Bearer ${token}` } })
+    if (!profRes.ok) return false
+    const rows = await profRes.json()
+    return rows?.[0]?.role === 'admin'
+  } catch { return false }
+}
+function verifyTechToken(authHeader) {
+  const token  = (authHeader || '').startsWith('Bearer ') ? authHeader.slice(7) : null
+  const secret = process.env.AUTH_SECRET
+  if (!token || !secret) return false
+  const parts = token.split('.')
+  if (parts.length !== 2) return false
+  const [dataB64, sig] = parts
+  let data
+  try { data = Buffer.from(dataB64, 'base64url').toString() } catch { return false }
+  const expected = crypto.createHmac('sha256', secret).update(data).digest('hex')
+  let sigBuf, expBuf
+  try { sigBuf = Buffer.from(sig, 'hex'); expBuf = Buffer.from(expected, 'hex') } catch { return false }
+  if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) return false
+  let payload
+  try { payload = JSON.parse(data) } catch { return false }
+  if (payload.role !== 'tech' || !payload.nom) return false
+  if (!payload.exp || Date.now() > payload.exp) return false
+  return true
+}
+async function authenticate(event) {
+  const authHeader = event.headers?.authorization || event.headers?.Authorization || ''
+  if (await verifyAdmin(authHeader)) return true
+  if (verifyTechToken(authHeader)) return true
+  return false
 }
 
 const OSRM_BASE   = 'https://router.project-osrm.org/route/v1/driving/'
@@ -171,6 +216,7 @@ async function routeTomTom(waypoints, key) {
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: CORS, body: '' }
   if (event.httpMethod !== 'POST')    return { statusCode: 405, headers: CORS, body: JSON.stringify({ error: 'POST only' }) }
+  if (!(await authenticate(event))) return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'Authentification requise' }) }
 
   let body
   try { body = JSON.parse(event.body) }

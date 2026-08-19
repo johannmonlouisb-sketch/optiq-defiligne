@@ -119,15 +119,36 @@ const TOOLS = [
   },
 ];
 
+// SÉCURITÉ : réservé aux administrateurs (session Supabase Auth + profiles.role='admin').
+async function verifyAdmin(authHeader) {
+  const token = (authHeader || '').startsWith('Bearer ') ? authHeader.slice(7) : null
+  const SB_URL = process.env.SUPABASE_URL
+  const SB_ANON = process.env.SUPABASE_ANON_KEY
+  if (!token || !SB_URL || !SB_ANON) return false
+  try {
+    const userRes = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: SB_ANON, Authorization: `Bearer ${token}` } })
+    if (!userRes.ok) return false
+    const user = await userRes.json()
+    if (!user?.id) return false
+    const profRes = await fetch(`${SB_URL}/rest/v1/profiles?id=eq.${user.id}&select=role`, { headers: { apikey: SB_ANON, Authorization: `Bearer ${token}` } })
+    if (!profRes.ok) return false
+    const rows = await profRes.json()
+    return rows?.[0]?.role === 'admin'
+  } catch { return false }
+}
+
 // ── Handler principal ─────────────────────────────────────────────────────────
 exports.handler = async (event) => {
   const cors = {
     'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Origin': 'https://optitechx.netlify.app',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   };
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: cors, body: '' };
   if (event.httpMethod !== 'POST')   return { statusCode: 405, headers: cors, body: 'Method Not Allowed' };
+
+  const authHeader = event.headers?.authorization || event.headers?.Authorization || '';
+  if (!(await verifyAdmin(authHeader))) return { statusCode: 403, headers: cors, body: JSON.stringify({ error: 'Réservé aux administrateurs' }) };
 
   if (!GROQ_API_KEY) return { statusCode: 500, headers: cors, body: JSON.stringify({ error: 'GROQ_API_KEY manquante — configurez-la dans Netlify' }) };
 

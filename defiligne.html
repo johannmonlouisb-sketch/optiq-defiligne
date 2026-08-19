@@ -3036,7 +3036,7 @@ async function refreshDepETAs(techId, startHHMM){
   const tech=TB(techId)
   const dc=gcache[tech?.depotAddr||depot]||{lat:window.dispatchCfg?.depotLat||48.96,lng:window.dispatchCfg?.depotLng||1.97}
   try{
-    const res=await fetch('/api/optimize-route',{method:'POST',headers:{'Content-Type':'application/json'},
+    const res=await fetch('/api/optimize-route',{method:'POST',headers:{'Content-Type':'application/json', ...(await _apiAuthHeaders())},
       body:JSON.stringify({techs:[{id:techId,depot:dc,startH:sh,startMin:sm,stops}]})})
     if(!res.ok) return
     const data=await res.json()
@@ -3185,7 +3185,7 @@ async function initDepMap(){
           duration:dur(x.iv.type,x.iv.form),
           timeWindow:(x.iv.timeStart||x.iv.timeEnd)?{start:x.iv.timeStart||"00:00",end:x.iv.timeEnd||"23:59"}:null
         }))}]}
-        const res=await fetch('/api/optimize-route',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+        const res=await fetch('/api/optimize-route',{method:'POST',headers:{'Content-Type':'application/json', ...(await _apiAuthHeaders())},body:JSON.stringify(payload)})
         if(res.ok){
           const data=await res.json()
           const r=data.results?.[tech.id]
@@ -3257,7 +3257,7 @@ async function initDepMap(){
     try{
       const allP=[dc,...routeOrd.map(x=>x.coords),dc]
       const depHH=`${String(_effSH).padStart(2,'0')}:${String(_effSM).padStart(2,'0')}`
-      const res=await fetch('/api/route-traffic',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({waypoints:allP,departureHHMM:depHH})})
+      const res=await fetch('/api/route-traffic',{method:'POST',headers:{'Content-Type':'application/json', ...(await _apiAuthHeaders())},body:JSON.stringify({waypoints:allP,departureHHMM:depHH})})
       if(res.ok){
         const data=await res.json()
         totalKm+=Math.round(data.totalDistanceKm||0)
@@ -5407,7 +5407,7 @@ async function buildAIPlan() {
   for (const { tech, interventions } of perTech) {
     try {
       const r = await fetch('/api/agent-planning', {
-        method: 'POST', headers: {'Content-Type':'application/json'},
+        method: 'POST', headers: {'Content-Type':'application/json', ...(await _apiAuthHeaders())},
         body: JSON.stringify({ techName: tech.name, interventions, dates, writeToNotion: false })
       })
       _aiPlanResults.push({ tech, data: await r.json(), dates, interventions })
@@ -5491,7 +5491,7 @@ async function applyAIPlan() {
   for (const { tech, interventions, dates } of _aiPlanResults) {
     try {
       const r = await fetch('/api/agent-planning', {
-        method: 'POST', headers: {'Content-Type':'application/json'},
+        method: 'POST', headers: {'Content-Type':'application/json', ...(await _apiAuthHeaders())},
         body: JSON.stringify({ techName: tech.name, interventions, dates, writeToNotion: true })
       })
       const d = await r.json()
@@ -7439,7 +7439,7 @@ async function _calcRouteInner(){
         duration:dur(x.iv.type,x.iv.form),
         timeWindow:(x.iv.timeStart||x.iv.timeEnd)?{start:x.iv.timeStart||"00:00",end:x.iv.timeEnd||"23:59"}:null
       }))}]}
-      const rr=await fetch('/api/optimize-route',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+      const rr=await fetch('/api/optimize-route',{method:'POST',headers:{'Content-Type':'application/json', ...(await _apiAuthHeaders())},body:JSON.stringify(payload)})
       if(rr.ok){
         const rd=await rr.json()
         const res=rd.results?.[selTech||0]
@@ -7513,7 +7513,7 @@ async function _calcRouteInner(){
     let routeOk=false
     try{
       const res=await fetch('/api/route-traffic',{
-        method:'POST',headers:{'Content-Type':'application/json'},
+        method:'POST',headers:{'Content-Type':'application/json', ...(await _apiAuthHeaders())},
         body:JSON.stringify({waypoints:allPts,departureHHMM:startHHMM})
       })
       if(res.ok){
@@ -10621,7 +10621,7 @@ async function sendChat() {
   try {
     const res = await fetch('/api/agent-directif', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(await _apiAuthHeaders()) },
       body: JSON.stringify({ messages: _chatHistory }),
     });
     const data = await res.json();
@@ -10655,7 +10655,7 @@ async function confirmChatPlan() {
   try {
     const res = await fetch('/api/agent-directif', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(await _apiAuthHeaders()) },
       body: JSON.stringify({ confirmPlan: true, plan: _chatPendingPlan }),
     });
     const data = await res.json();
