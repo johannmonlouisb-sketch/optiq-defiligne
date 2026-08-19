@@ -23,18 +23,46 @@ const COL_MAP = {
   dateDebut: "Début intervention : Date et Heure",
 };
 
+// SÉCURITÉ : import en masse réservé à l'admin (session Supabase Auth avec
+// profiles.role = 'admin'), jamais à un technicien ni à un appelant anonyme.
+async function verifyAdmin(authHeader) {
+  const token = (authHeader || '').startsWith('Bearer ') ? authHeader.slice(7) : null;
+  const SB_URL = process.env.SUPABASE_URL;
+  const SB_ANON = process.env.SUPABASE_ANON_KEY;
+  if (!token || !SB_URL || !SB_ANON) return false;
+  try {
+    const userRes = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: SB_ANON, Authorization: `Bearer ${token}` } });
+    if (!userRes.ok) return false;
+    const user = await userRes.json();
+    if (!user?.id) return false;
+    const profRes = await fetch(`${SB_URL}/rest/v1/profiles?id=eq.${user.id}&select=role`, { headers: { apikey: SB_ANON, Authorization: `Bearer ${token}` } });
+    if (!profRes.ok) return false;
+    const rows = await profRes.json();
+    return rows?.[0]?.role === 'admin';
+  } catch { return false; }
+}
+
 exports.handler = async (event) => {
   const headers = {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   };
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers, body: 'Method Not Allowed' };
 
+  const authHeader = event.headers?.authorization || event.headers?.Authorization || '';
+  if (!(await verifyAdmin(authHeader))) {
+    return { statusCode: 403, headers, body: JSON.stringify({ error: 'Réservé aux administrateurs' }) };
+  }
+
   try {
     const { csvContent, dryRun = false } = JSON.parse(event.body || '{}');
     if (!csvContent) return { statusCode: 400, headers, body: JSON.stringify({ error: 'csvContent requis' }) };
+    const MAX_CSV_BYTES = 5 * 1024 * 1024;
+    if (Buffer.byteLength(csvContent, 'utf8') > MAX_CSV_BYTES) {
+      return { statusCode: 413, headers, body: JSON.stringify({ error: `Fichier trop volumineux (max ${MAX_CSV_BYTES / 1024 / 1024} Mo)` }) };
+    }
 
     const records = parseKizeoBase(csvContent);
     const urgencyBreakdown = getBreakdown(records);

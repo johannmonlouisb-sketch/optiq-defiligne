@@ -3,8 +3,27 @@
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Content-Type': 'application/json'
+}
+
+// SÉCURITÉ : renvoie des PII (contact, téléphone, email de sites clients) —
+// réservé à l'admin (seul appelant réel observé : defiligne.html).
+async function verifyAdmin(authHeader) {
+  const token = (authHeader || '').startsWith('Bearer ') ? authHeader.slice(7) : null
+  const SB_URL = process.env.SUPABASE_URL
+  const SB_ANON = process.env.SUPABASE_ANON_KEY
+  if (!token || !SB_URL || !SB_ANON) return false
+  try {
+    const userRes = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: SB_ANON, Authorization: `Bearer ${token}` } })
+    if (!userRes.ok) return false
+    const user = await userRes.json()
+    if (!user?.id) return false
+    const profRes = await fetch(`${SB_URL}/rest/v1/profiles?id=eq.${user.id}&select=role`, { headers: { apikey: SB_ANON, Authorization: `Bearer ${token}` } })
+    if (!profRes.ok) return false
+    const rows = await profRes.json()
+    return rows?.[0]?.role === 'admin'
+  } catch { return false }
 }
 
 async function fetchNotionKizeo() {
@@ -98,6 +117,12 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return {
     statusCode: 405, headers: CORS,
     body: JSON.stringify({ error: 'Method not allowed' })
+  }
+
+  const authHeader = event.headers?.authorization || event.headers?.Authorization || ''
+  if (!(await verifyAdmin(authHeader))) return {
+    statusCode: 403, headers: CORS,
+    body: JSON.stringify({ error: 'Réservé aux administrateurs' })
   }
 
   let body = {}

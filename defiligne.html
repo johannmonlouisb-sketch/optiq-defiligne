@@ -9911,7 +9911,7 @@ async function fetchKizeoSites(){
 
 async function syncKizeoToSupabase(){
   try{
-    const r = await fetch('/api/supabase',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'kizeo_fetch_notion'})})
+    const r = await fetch('/api/supabase',{method:'POST',headers:{'Content-Type':'application/json', ...(await _apiAuthHeaders())},body:JSON.stringify({action:'kizeo_fetch_notion'})})
     const d = await r.json()
     if(!d.sites?.length) return {error:'Aucun site Notion'}
     for(let i=0;i<d.sites.length;i+=100) await sbUpsert('kizeo_sites', d.sites.slice(i,i+100))
@@ -10720,7 +10720,7 @@ async function kizeoImport(dryRun) {
   try {
     const res = await fetch('/.netlify/functions/kizeo-base-import', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(await _apiAuthHeaders()) },
       body: JSON.stringify({ csvContent: kizeoCsvContent, dryRun }),
     });
     if (!dryRun) {
