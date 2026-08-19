@@ -11,7 +11,7 @@ const CORS = {
 // réservé à l'admin (seul appelant réel observé : defiligne.html).
 async function verifyAdmin(authHeader) {
   const token = (authHeader || '').startsWith('Bearer ') ? authHeader.slice(7) : null
-  const SB_URL = process.env.SUPABASE_URL
+  const SB_URL = (process.env.SUPABASE_URL || '').replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '')
   const SB_ANON = process.env.SUPABASE_ANON_KEY
   if (!token || !SB_URL || !SB_ANON) return false
   try {
