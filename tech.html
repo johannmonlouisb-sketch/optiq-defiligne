@@ -683,12 +683,15 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
 // ════════════════════════════════════════════
 // DONNÉES — synchronisées avec l'app admin
 // ════════════════════════════════════════════
+// SÉCURITÉ : plus de champ "code" ici — le PIN n'est plus jamais comparé côté client
+// (voir _submitPin), donc plus aucune raison d'exposer des codes, même par défaut,
+// dans le code source public de cette page.
 const TECHS_DEFAULT=[
-  {id:1,name:"Cindy",     init:"CI",vehicle:"Renault Trafic", conso:7.5,avail:true, color:"#1565C0",depotAddr:"7 rue des entrepreneurs, 78540 Vernouillet",code:"1111"},
-  {id:2,name:"Priscillia",init:"PR",vehicle:"Citroën Jumpy",  conso:7.0,avail:true, color:"#7B1FA2",depotAddr:"7 rue des entrepreneurs, 78540 Vernouillet",code:"2222"},
-  {id:3,name:"Yaniss",    init:"YA",vehicle:"Peugeot Expert", conso:6.8,avail:true, color:"#00695C",depotAddr:"7 rue des entrepreneurs, 78540 Vernouillet",code:"3333"},
-  {id:4,name:"Nathan",    init:"NA",vehicle:"—",              conso:7.0,avail:true, color:"#B71C1C",depotAddr:"7 rue des entrepreneurs, 78540 Vernouillet",code:"4444"},
-  {id:5,name:"Johann",    init:"JO",vehicle:"—",              conso:7.0,avail:true, color:"#E65100",depotAddr:"7 rue des entrepreneurs, 78540 Vernouillet",code:"5555"},
+  {id:1,name:"Cindy",     init:"CI",vehicle:"Renault Trafic", conso:7.5,avail:true, color:"#1565C0",depotAddr:"7 rue des entrepreneurs, 78540 Vernouillet"},
+  {id:2,name:"Priscillia",init:"PR",vehicle:"Citroën Jumpy",  conso:7.0,avail:true, color:"#7B1FA2",depotAddr:"7 rue des entrepreneurs, 78540 Vernouillet"},
+  {id:3,name:"Yaniss",    init:"YA",vehicle:"Peugeot Expert", conso:6.8,avail:true, color:"#00695C",depotAddr:"7 rue des entrepreneurs, 78540 Vernouillet"},
+  {id:4,name:"Nathan",    init:"NA",vehicle:"—",              conso:7.0,avail:true, color:"#B71C1C",depotAddr:"7 rue des entrepreneurs, 78540 Vernouillet"},
+  {id:5,name:"Johann",    init:"JO",vehicle:"—",              conso:7.0,avail:true, color:"#E65100",depotAddr:"7 rue des entrepreneurs, 78540 Vernouillet"},
 ]
 let TECHS=TECHS_DEFAULT
 try{
@@ -3560,9 +3563,10 @@ async function notionCall(action,extra={},attempt=1){
   const MAX=3, DELAYS=[0,1500,4000]
   try{
     if(attempt>1) await new Promise(r=>setTimeout(r,DELAYS[attempt-1]))
+    const authTok=_getAuth()?.token
     const r=await fetch(NOTION_ENDPOINT,{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{'Content-Type':'application/json', ...(authTok?{'Authorization':`Bearer ${authTok}`}:{})},
       body:JSON.stringify({action,...extra})
     })
     if(r.status===429||r.status>=500){
@@ -3796,9 +3800,15 @@ const AUTH_DURATION_MS = 2 * 60 * 60 * 1000  // session valide 2h d'INACTIVITÉ 
 function _getAuth(){
   try{const a=JSON.parse(localStorage.getItem('tech_auth')||'null');return a}catch(e){return null}
 }
-function _setAuth(id,remember){
+// token : le JWT HMAC signé par /api/auth/login — nécessaire pour que les appels
+// serveur (notion.js) puissent vérifier réellement l'identité du technicien.
+function _setAuth(id,remember,token){
   const prev=_getAuth()
-  localStorage.setItem('tech_auth',JSON.stringify({id,ts:Date.now(),remember:remember!==undefined?!!remember:!!prev?.remember}))
+  localStorage.setItem('tech_auth',JSON.stringify({
+    id, ts:Date.now(),
+    remember:remember!==undefined?!!remember:!!prev?.remember,
+    token:token!==undefined?token:prev?.token
+  }))
 }
 function _clearAuth(){
   localStorage.removeItem('tech_auth')
@@ -3887,12 +3897,29 @@ function _updatePinDots(){
     if(el) el.classList.toggle('filled',i<_pinVal.length)
   }
 }
-function _submitPin(){
+// SÉCURITÉ : le PIN est désormais vérifié côté serveur (/api/auth/login), jamais
+// comparé en local — l'ancienne comparaison client-side retombait toujours sur
+// des codes par défaut codés en dur dans ce fichier (donc visibles par n'importe
+// qui via "voir la source"), quoi que l'admin configure dans Paramètres.
+async function _submitPin(){
   const tc=TECHS.find(t=>t.id===_loginTechId)
-  const expectedCode=tc?.code || TECHS_DEFAULT.find(t=>t.id===_loginTechId)?.code || ''
-  if(_pinVal===expectedCode){
+  if(!tc){ document.getElementById('pin-error').textContent='Technicien introuvable'; return }
+  const pinToCheck=_pinVal
+  _pinVal='' // évite un double-envoi si l'utilisateur retape pendant la vérification
+  try{
+    const r=await fetch('/api/auth/login',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({type:'tech', nom:tc.name, pin:pinToCheck})
+    })
+    const d=await r.json()
+    if(!r.ok||!d.ok){
+      document.getElementById('pin-error').textContent=d.error||'Code incorrect, réessayez'
+      setTimeout(()=>{ _updatePinDots(); document.getElementById('pin-error').textContent='' },1200)
+      return
+    }
     const remember=document.getElementById('pin-remember')?.checked!==false
-    _setAuth(_loginTechId,remember)
+    _setAuth(_loginTechId,remember,d.token)
+    localStorage.setItem('optiq_session',JSON.stringify({token:d.token,nom:d.nom,role:'tech',savedAt:Date.now(),remember}))
     curTech=_loginTechId
     localStorage.setItem('tech_id',_loginTechId)
     hideLogin()
@@ -3900,13 +3927,9 @@ function _submitPin(){
     updateTopbar();updateBadges();goTab(curTab)
     // Calcul de carte automatique après connexion
     _schedCalcMap(1800)
-  } else {
-    document.getElementById('pin-error').textContent='Code incorrect, réessayez'
-    _pinVal=''
-    setTimeout(()=>{
-      _updatePinDots()
-      document.getElementById('pin-error').textContent=''
-    },800)
+  }catch(e){
+    document.getElementById('pin-error').textContent='Erreur réseau — réessayez'
+    setTimeout(()=>{ _updatePinDots(); document.getElementById('pin-error').textContent='' },1200)
   }
 }
 function logout(){
@@ -3981,7 +4004,7 @@ try{
     if(!s.remember&&Date.now()-(s.savedAt||0)>AUTH_DURATION_MS) return
     const tc=TECHS.find(t=>t.name.toLowerCase()===s.nom.toLowerCase())
     if(!tc) return
-    _setAuth(tc.id,s.remember)
+    _setAuth(tc.id,s.remember,s.token)
     curTech=tc.id
     localStorage.setItem('tech_id',tc.id)
   }catch(e){}

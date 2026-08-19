@@ -1,13 +1,98 @@
 // netlify/functions/notion.js
 // Proxy Notion API — résout le CORS navigateur
 // DB ID Defiligne : 3ab30393-8dd2-4f10-98e4-b7f7b1c91f60
+//
+// SÉCURITÉ : toutes les actions nécessitent désormais une identité vérifiée côté
+// serveur (admin = session Supabase Auth, technicien = token HMAC signé par
+// auth.js). Matrice de permissions + liste blanche de propriétés + vérification
+// d'assignation (IDOR) définies plus bas — construites à partir de l'usage réel
+// observé dans defiligne.html et tech.html, pas d'une supposition.
+
+const crypto = require('crypto')
 
 const NOTION_VERSION = '2022-06-28'
 const NOTION_BASE    = 'https://api.notion.com/v1'
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Content-Type': 'application/json'
+}
+
+// ── Authentification admin : session Supabase Auth + rôle réel ──────────────
+// Même pattern que settings.js (isAdminRequest) — ne jamais faire confiance à
+// un rôle envoyé par le frontend, toujours revérifier via /auth/v1/user puis
+// la table profiles (protégée par RLS : chacun ne lit que sa propre ligne).
+async function verifyAdmin(authHeader) {
+  const token = (authHeader || '').startsWith('Bearer ') ? authHeader.slice(7) : null
+  const SB_URL  = process.env.SUPABASE_URL
+  const SB_ANON = process.env.SUPABASE_ANON_KEY
+  if (!token || !SB_URL || !SB_ANON) return null
+  try {
+    const userRes = await fetch(`${SB_URL}/auth/v1/user`, {
+      headers: { apikey: SB_ANON, Authorization: `Bearer ${token}` }
+    })
+    if (!userRes.ok) return null
+    const user = await userRes.json()
+    if (!user?.id) return null
+    const profRes = await fetch(`${SB_URL}/rest/v1/profiles?id=eq.${user.id}&select=role`, {
+      headers: { apikey: SB_ANON, Authorization: `Bearer ${token}` }
+    })
+    if (!profRes.ok) return null
+    const rows = await profRes.json()
+    return rows?.[0]?.role === 'admin' ? { role: 'admin' } : null
+  } catch { return null }
+}
+
+// ── Authentification technicien : token HMAC signé par auth.js ──────────────
+// Vérifie réellement la signature (temps constant) et l'expiration — ne jamais
+// se contenter de décoder le payload sans vérifier le HMAC.
+function verifyTechToken(authHeader) {
+  const token  = (authHeader || '').startsWith('Bearer ') ? authHeader.slice(7) : null
+  const secret = process.env.AUTH_SECRET
+  if (!token || !secret) return null
+  const parts = token.split('.')
+  if (parts.length !== 2) return null
+  const [dataB64, sig] = parts
+  let data
+  try { data = Buffer.from(dataB64, 'base64url').toString() } catch { return null }
+  const expected = crypto.createHmac('sha256', secret).update(data).digest('hex')
+  let sigBuf, expBuf
+  try { sigBuf = Buffer.from(sig, 'hex'); expBuf = Buffer.from(expected, 'hex') } catch { return null }
+  if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) return null
+  let payload
+  try { payload = JSON.parse(data) } catch { return null }
+  if (payload.role !== 'tech' || !payload.nom) return null
+  if (!payload.exp || Date.now() > payload.exp) return null
+  return { role: 'tech', nom: payload.nom }
+}
+
+async function authenticate(event) {
+  const authHeader = event.headers?.authorization || event.headers?.Authorization || ''
+  const admin = await verifyAdmin(authHeader)
+  if (admin) return admin
+  const tech = verifyTechToken(authHeader)
+  if (tech) return tech
+  return null
+}
+
+// ── Matrice de permissions ───────────────────────────────────────────────
+// Construite à partir de l'usage réel (grep de defiligne.html et tech.html) :
+// tech.html n'appelle jamais get_page/get_db/create_page/archive_page/
+// fetch_archive/query — seulement query_range, update_page, query_kizeo et
+// sync_kizeo_completion. L'admin a accès à toutes les actions.
+const TECH_ALLOWED_ACTIONS = new Set(['query_range', 'update_page', 'query_kizeo', 'sync_kizeo_completion'])
+
+// Liste blanche des propriétés qu'un technicien peut modifier via update_page —
+// seul le statut Terminer/Echec est réellement poussé depuis tech.html aujourd'hui.
+const TECH_ALLOWED_PROPERTIES = new Set(['Terminer', 'Echec'])
+
+function simpleProp(properties, key) {
+  const v = properties?.[key]
+  if (!v) return ''
+  if (v.type === 'select')    return v.select?.name || ''
+  if (v.type === 'rich_text') return v.rich_text?.map(t => t.plain_text).join('') || ''
+  if (v.type === 'title')     return v.title?.map(t => t.plain_text).join('') || ''
+  return ''
 }
 
 exports.handler = async (event) => {
@@ -15,6 +100,12 @@ exports.handler = async (event) => {
     statusCode: 200,
     headers: { ...CORS, 'Access-Control-Allow-Methods': 'POST,GET,OPTIONS' },
     body: ''
+  }
+
+  const actor = await authenticate(event)
+  if (!actor) return {
+    statusCode: 401, headers: CORS,
+    body: JSON.stringify({ error: 'Authentification requise' })
   }
 
   const token  = process.env.NOTION_TOKEN
@@ -35,6 +126,36 @@ exports.handler = async (event) => {
   try { if (event.body) body = JSON.parse(event.body) } catch {}
 
   const { action, pageId, filter, sorts, startCursor } = body
+
+  // Un technicien ne peut appeler que les actions dont il a réellement besoin
+  if (actor.role === 'tech' && !TECH_ALLOWED_ACTIONS.has(action)) {
+    return { statusCode: 403, headers: CORS, body: JSON.stringify({ error: `Action non autorisée pour un technicien : ${action}` }) }
+  }
+
+  // update_page technicien : liste blanche de propriétés + vérification IDOR
+  // (l'intervention doit lui être assignée — on ne fait jamais confiance au
+  // seul pageId fourni par le client).
+  if (action === 'update_page' && actor.role === 'tech') {
+    const props = body.properties || {}
+    const badKey = Object.keys(props).find(k => !TECH_ALLOWED_PROPERTIES.has(k))
+    if (badKey) {
+      return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: `Propriété non autorisée pour un technicien : ${badKey}` }) }
+    }
+    if (!pageId) {
+      return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'pageId requis' }) }
+    }
+    try {
+      const pr = await fetch(`${NOTION_BASE}/pages/${pageId}`, { headers })
+      if (!pr.ok) return { statusCode: pr.status, headers: CORS, body: JSON.stringify(await pr.json()) }
+      const page = await pr.json()
+      const assigned = (simpleProp(page.properties, 'Technicien') || simpleProp(page.properties, 'Commercial ') || '').toLowerCase()
+      if (!assigned || !assigned.includes(actor.nom.toLowerCase())) {
+        return { statusCode: 403, headers: CORS, body: JSON.stringify({ error: 'Cette intervention n\'est pas assignée à ce technicien' }) }
+      }
+    } catch (e) {
+      return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'Vérification assignation échouée : ' + e.message }) }
+    }
+  }
 
   try {
     switch (action) {
@@ -84,13 +205,13 @@ exports.handler = async (event) => {
         return { statusCode: 200, headers: CORS, body: JSON.stringify({ results: all, truncated: !!next }) }
       }
 
-      // ── GET SINGLE PAGE ─────────────────────────────────────────────────
+      // ── GET SINGLE PAGE (admin uniquement — cf. TECH_ALLOWED_ACTIONS) ───
       case 'get_page': {
         const r = await fetch(`${NOTION_BASE}/pages/${pageId}`, { headers })
         return { statusCode: r.status, headers: CORS, body: JSON.stringify(await r.json()) }
       }
 
-      // ── GET DB SCHEMA : liste les propriétés réelles de la DB ───────────
+      // ── GET DB SCHEMA (admin uniquement) ────────────────────────────────
       case 'get_db': {
         const r = await fetch(`${NOTION_BASE}/databases/${dbId}`, { headers })
         const d = await r.json()
@@ -99,6 +220,7 @@ exports.handler = async (event) => {
       }
 
       // ── UPDATE PAGE : modifier statut, technicien, etc. ─────────────────
+      // (liste blanche + IDOR déjà appliqués plus haut pour un technicien)
       case 'update_page': {
         const { properties } = body
         const r = await fetch(`${NOTION_BASE}/pages/${pageId}`, {
@@ -108,7 +230,7 @@ exports.handler = async (event) => {
         return { statusCode: r.status, headers: CORS, body: JSON.stringify(await r.json()) }
       }
 
-      // ── ARCHIVE PAGE : suppression (archivage Notion) ──────────────────
+      // ── ARCHIVE PAGE : suppression (archivage Notion) — admin uniquement ─
       case 'archive_page': {
         const r = await fetch(`${NOTION_BASE}/pages/${pageId}`, {
           method: 'PATCH', headers,
@@ -117,7 +239,7 @@ exports.handler = async (event) => {
         return { statusCode: r.status, headers: CORS, body: JSON.stringify(await r.json()) }
       }
 
-      // ── CREATE PAGE : nouvelle intervention ─────────────────────────────
+      // ── CREATE PAGE : nouvelle intervention — admin uniquement ──────────
       case 'create_page': {
         const { properties } = body
         const r = await fetch(`${NOTION_BASE}/pages`, {
@@ -251,6 +373,7 @@ exports.handler = async (event) => {
       }
 
       // ── FETCH ARCHIVE : historique interventions par plage de dates ────
+      // (admin uniquement — cf. TECH_ALLOWED_ACTIONS)
       // Retourne des objets déjà mappés (pas de pages Notion brutes)
       case 'fetch_archive': {
         const { dateFrom, dateTo } = body
