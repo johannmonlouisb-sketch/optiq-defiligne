@@ -10,7 +10,7 @@ const OSRM        = 'https://router.project-osrm.org/route/v1/driving'
 const CORS = {
   'Access-Control-Allow-Origin':  'https://optitechx.netlify.app',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Content-Type': 'application/json'
 }
 
@@ -212,12 +212,33 @@ async function callGeminiFallback(systemPrompt, messages) {
 
 // ─── Point d'entrée Netlify ───────────────────────────────────────────────────
 
+// SÉCURITÉ : réservé aux administrateurs (session Supabase Auth + profiles.role='admin').
+async function verifyAdmin(authHeader) {
+  const token = (authHeader || '').startsWith('Bearer ') ? authHeader.slice(7) : null
+  const SB_URL = process.env.SUPABASE_URL
+  const SB_ANON = process.env.SUPABASE_ANON_KEY
+  if (!token || !SB_URL || !SB_ANON) return false
+  try {
+    const userRes = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: SB_ANON, Authorization: `Bearer ${token}` } })
+    if (!userRes.ok) return false
+    const user = await userRes.json()
+    if (!user?.id) return false
+    const profRes = await fetch(`${SB_URL}/rest/v1/profiles?id=eq.${user.id}&select=role`, { headers: { apikey: SB_ANON, Authorization: `Bearer ${token}` } })
+    if (!profRes.ok) return false
+    const rows = await profRes.json()
+    return rows?.[0]?.role === 'admin'
+  } catch { return false }
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS')
     return { statusCode: 200, headers: CORS, body: '' }
 
   if (event.httpMethod !== 'POST')
     return { statusCode: 405, headers: CORS, body: JSON.stringify({ error: 'Method Not Allowed' }) }
+
+  const _authHeader = event.headers?.authorization || event.headers?.Authorization || ''
+  if (!(await verifyAdmin(_authHeader))) return { statusCode: 403, headers: CORS, body: JSON.stringify({ error: 'Réservé aux administrateurs' }) }
 
   if (!process.env.GROQ_API_KEY && !process.env.GEMINI_API_KEY)
     return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'Aucune clé IA configurée (GROQ_API_KEY ou GEMINI_API_KEY requis)' }) }

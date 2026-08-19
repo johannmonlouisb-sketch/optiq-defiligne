@@ -1103,7 +1103,7 @@ async function _calcETAsHeadless(){
     const waypoints=techRoundTrip?[dc,...ordered.map(p=>p.c),ac]:[dc,...ordered.map(p=>p.c)]
     // Appel route-traffic (même API que admin)
     const startHHMM=depStartTime()
-    const res=await fetch('/api/route-traffic',{method:'POST',headers:{'Content-Type':'application/json'},
+    const res=await fetch('/api/route-traffic',{method:'POST',headers:{'Content-Type':'application/json', ..._techAuthHeaders()},
       body:JSON.stringify({waypoints,departureHHMM:startHHMM})})
     if(!res.ok) return
     const data=await res.json()
@@ -2062,7 +2062,7 @@ async function calcMap(){
             timeWindow:(p.iv.timeStart||p.iv.timeEnd)?{start:p.iv.timeStart||"00:00",end:p.iv.timeEnd||"23:59"}:null
           }))
         }]}
-        const res=await fetch('/api/optimize-route',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+        const res=await fetch('/api/optimize-route',{method:'POST',headers:{'Content-Type':'application/json', ..._techAuthHeaders()},body:JSON.stringify(payload)})
         if(res.ok){
           const data=await res.json()
           const r=data.results?.[curTech]
@@ -2137,7 +2137,7 @@ async function calcMap(){
     const all=techRoundTrip?[dc,...orderedPts.map(p=>p.c),ac]:[dc,...orderedPts.map(p=>p.c)]
     try{
       const startHHMM=depStartTime()
-      const res=await fetch('/api/route-traffic',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({waypoints:all,departureHHMM:startHHMM})})
+      const res=await fetch('/api/route-traffic',{method:'POST',headers:{'Content-Type':'application/json', ..._techAuthHeaders()},body:JSON.stringify({waypoints:all,departureHHMM:startHHMM})})
       const data=await res.json()
       techRouteLegDurations=data.legs||[]
       _routeOrderedPts=[...orderedPts]
@@ -2332,7 +2332,7 @@ async function reoptimizeFromDepot(){
             timeWindow:(p.iv.timeStart||p.iv.timeEnd)?{start:p.iv.timeStart||"00:00",end:p.iv.timeEnd||"23:59"}:null
           }))
         }]}
-        const res=await fetch("/api/optimize-route",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)})
+        const res=await fetch("/api/optimize-route",{method:"POST",headers:{"Content-Type":"application/json", ..._techAuthHeaders()},body:JSON.stringify(payload)})
         if(res.ok){
           const data=await res.json()
           const r=data.results?.[curTech]
