@@ -232,7 +232,6 @@ async function analyzeBatch(days, useGroq = true) {
   }
 }
 
-module.exports = { analyzeDay, analyzeBatch, haversine, roadDist, DEPOT, VITESSE_MAX_KMH, KM_JOURNALIER_MAX }
 
 // ── Handler HTTP ──────────────────────────────────────────────
 
@@ -282,3 +281,6 @@ exports.handler = async (event) => {
     return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: err.message }) }
   }
 }
+
+// (exports déplacés en fin de fichier — cf. commentaire dans geocode.js)
+Object.assign(module.exports, { analyzeDay, analyzeBatch, haversine, roadDist, DEPOT, VITESSE_MAX_KMH, KM_JOURNALIER_MAX })

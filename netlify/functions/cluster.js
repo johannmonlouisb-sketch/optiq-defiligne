@@ -252,17 +252,6 @@ async function geocodeAndCluster(interventions, options = {}) {
   return { inZoneDays, outOfZone, stats }
 }
 
-// ── Exports pour les autres fonctions Netlify ─────────────────
-module.exports = {
-  haversine,
-  roadDist,
-  travelHours,
-  clusterByZone,
-  clusterIntoDays,
-  geocodeAndCluster,
-  DEPOT,
-  DEFAULT_CONSTRAINTS
-}
 
 // ── Handler HTTP ──────────────────────────────────────────────
 
@@ -308,3 +297,6 @@ exports.handler = async (event) => {
     return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: err.message }) }
   }
 }
+
+// (exports déplacés en fin de fichier — cf. commentaire dans geocode.js)
+Object.assign(module.exports, { haversine, roadDist, travelHours, clusterByZone, clusterIntoDays, geocodeAndCluster, DEPOT, DEFAULT_CONSTRAINTS })

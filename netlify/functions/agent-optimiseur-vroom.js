@@ -449,7 +449,6 @@ async function optimizeWithVroom(days) {
   }
 }
 
-module.exports = { optimizeWithVroom, callVroom, buildDayPayload, parseVroomResult }
 
 // ── Handler HTTP ──────────────────────────────────────────────
 
@@ -495,3 +494,6 @@ exports.handler = async (event) => {
     return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: err.message }) }
   }
 }
+
+// (exports déplacés en fin de fichier — cf. commentaire dans geocode.js)
+Object.assign(module.exports, { optimizeWithVroom, callVroom, buildDayPayload, parseVroomResult })

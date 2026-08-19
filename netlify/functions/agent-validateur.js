@@ -94,7 +94,6 @@ function validateBatch(interventions) {
   }
 }
 
-module.exports = { validateIntervention, validateBatch, validateEmail, validatePhone, validateCP }
 
 // ── Handler HTTP ──────────────────────────────────────────────
 
@@ -138,3 +137,6 @@ exports.handler = async (event) => {
 
   return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: '"intervention" ou "interventions" requis' }) }
 }
+
+// (exports déplacés en fin de fichier — cf. commentaire dans geocode.js)
+Object.assign(module.exports, { validateIntervention, validateBatch, validateEmail, validatePhone, validateCP })

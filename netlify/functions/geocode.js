@@ -179,9 +179,6 @@ async function geocodeInterventions(interventions) {
   return { found, notFound }
 }
 
-// ── Exports pour les autres fonctions Netlify ─────────────────
-module.exports = { geocodeAddress, batchGeocode, geocodeInterventions }
-
 // ── Handler HTTP ──────────────────────────────────────────────
 
 // SÉCURITÉ : réservé aux administrateurs (session Supabase Auth + profiles.role='admin').
@@ -234,3 +231,14 @@ exports.handler = async (event) => {
 
   return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: '"address" ou "addresses" requis' }) }
 }
+
+// BUGFIX (pré-existant, sans rapport avec le durcissement sécurité) : ces exports
+// étaient déclarés en `module.exports = {...}` AVANT `exports.handler = ...` plus
+// haut dans le fichier, ce qui réassignait module.exports et rendait le handler
+// invisible pour Netlify (erreur "geocode.handler is undefined or not exported").
+// Découvert en testant /api/geocode pendant l'audit — cluster.js dépend de
+// geocodeInterventions via require('./geocode'), donc on garde ces exports mais
+// après la définition du handler, sans réassigner module.exports.
+module.exports.geocodeAddress = geocodeAddress
+module.exports.batchGeocode = batchGeocode
+module.exports.geocodeInterventions = geocodeInterventions

@@ -190,8 +190,6 @@ function planDays(days, options = {}) {
   })
 }
 
-// ── Exports ───────────────────────────────────────────────────
-module.exports = { planDay, planDays, nearestNeighbor, buildRoute, toNotionDatetime, timeToMinutes, minutesToTime }
 
 // ── Handler HTTP ──────────────────────────────────────────────
 
@@ -242,3 +240,6 @@ exports.handler = async (event) => {
     return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: err.message }) }
   }
 }
+
+// (exports déplacés en fin de fichier — cf. commentaire dans geocode.js)
+Object.assign(module.exports, { planDay, planDays, nearestNeighbor, buildRoute, toNotionDatetime, timeToMinutes, minutesToTime })
