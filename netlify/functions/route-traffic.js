@@ -5,7 +5,7 @@
 // Source 3 : OSRM (géométrie réelle) + coefficients heure de pointe France (toujours disponible)
 
 const CORS = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': 'https://optitechx.netlify.app',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
   'Content-Type': 'application/json'

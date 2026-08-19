@@ -3,7 +3,7 @@ import crypto from 'crypto'
 import { getStore } from '@netlify/blobs'
 
 const CORS = {
-  'Access-Control-Allow-Origin':  '*',
+  'Access-Control-Allow-Origin':  'https://optitechx.netlify.app',
   'Access-Control-Allow-Headers': 'Content-Type',
   'Content-Type': 'application/json'
 }

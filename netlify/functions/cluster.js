@@ -7,7 +7,7 @@ const { geocodeInterventions } = require('./geocode')
 const DEPOT = { lat: 48.965, lng: 1.967, name: 'Vernouillet' }
 
 const CORS = {
-  'Access-Control-Allow-Origin':  '*',
+  'Access-Control-Allow-Origin':  'https://optitechx.netlify.app',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
   'Content-Type': 'application/json'

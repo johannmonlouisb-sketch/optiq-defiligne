@@ -5,7 +5,7 @@
 const { haversine, roadDist, travelHours, DEPOT, DEFAULT_CONSTRAINTS } = require('./cluster')
 
 const CORS = {
-  'Access-Control-Allow-Origin':  '*',
+  'Access-Control-Allow-Origin':  'https://optitechx.netlify.app',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
   'Content-Type': 'application/json'

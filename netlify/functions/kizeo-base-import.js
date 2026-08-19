@@ -45,7 +45,7 @@ async function verifyAdmin(authHeader) {
 exports.handler = async (event) => {
   const headers = {
     'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': 'https://optitechx.netlify.app',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   };
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };

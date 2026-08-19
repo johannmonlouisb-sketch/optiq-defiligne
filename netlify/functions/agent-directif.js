@@ -123,7 +123,7 @@ const TOOLS = [
 exports.handler = async (event) => {
   const cors = {
     'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': 'https://optitechx.netlify.app',
     'Access-Control-Allow-Headers': 'Content-Type',
   };
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: cors, body: '' };

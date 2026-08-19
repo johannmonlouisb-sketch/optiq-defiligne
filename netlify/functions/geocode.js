@@ -10,7 +10,7 @@ const FR_GEO       = 'https://api-adresse.data.gouv.fr/search'
 const NOMINATIM    = 'https://nominatim.openstreetmap.org/search'
 
 const CORS = {
-  'Access-Control-Allow-Origin':  '*',
+  'Access-Control-Allow-Origin':  'https://optitechx.netlify.app',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
   'Content-Type': 'application/json'

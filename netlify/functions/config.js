@@ -1,7 +1,7 @@
 // netlify/functions/config.js  (Netlify Functions v2 — ESM)
 import { getStore } from '@netlify/blobs'
 
-const CORS = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' }
+const CORS = { 'Access-Control-Allow-Origin': 'https://optitechx.netlify.app', 'Content-Type': 'application/json' }
 
 export default async (request) => {
   if (request.method === 'OPTIONS')
