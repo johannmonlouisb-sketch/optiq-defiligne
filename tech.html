@@ -1730,10 +1730,9 @@ async function pushToKizeo(id, statut){
   try{
     await fetch("/api/kizeo",{
       method:"POST",
-      headers:{"Content-Type":"application/json"},
+      headers:{"Content-Type":"application/json", ..._techAuthHeaders()},
       body:JSON.stringify({
         action:"push_intervention",
-        token:techCfg.token,
         formId:techCfg.formId,
         data:{
           recipientUserId:parseInt(techCfg.userId),
@@ -3283,8 +3282,8 @@ async function syncKizeo(){
       res.innerHTML=`<span style="color:var(--green)">✅ Mode démo — 3 fiches simulées récupérées</span>`
       toast("✅ Sync OK (démo)","#2E7D32")
     }else{
-      const resp=await fetch("/api/kizeo",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({action:"pull_unread",token:techCfg.token,formId:techCfg.formId})})
+      const resp=await fetch("/api/kizeo",{method:"POST",headers:{"Content-Type":"application/json", ..._techAuthHeaders()},
+        body:JSON.stringify({action:"pull_unread",formId:techCfg.formId})})
       const data=await resp.json()
       const count=data.data?.length||0
       // Traiter les fiches reçues
@@ -3559,14 +3558,19 @@ function normalizeHHMM(s){
   return ''
 }
 
+// SÉCURITÉ : /api/notion et /api/kizeo exigent une identité vérifiée côté
+// serveur — on attache le token technicien (signé par /api/auth/login).
+function _techAuthHeaders(){
+  const t=_getAuth()?.token
+  return t?{'Authorization':`Bearer ${t}`}:{}
+}
 async function notionCall(action,extra={},attempt=1){
   const MAX=3, DELAYS=[0,1500,4000]
   try{
     if(attempt>1) await new Promise(r=>setTimeout(r,DELAYS[attempt-1]))
-    const authTok=_getAuth()?.token
     const r=await fetch(NOTION_ENDPOINT,{
       method:'POST',
-      headers:{'Content-Type':'application/json', ...(authTok?{'Authorization':`Bearer ${authTok}`}:{})},
+      headers:{'Content-Type':'application/json', ..._techAuthHeaders()},
       body:JSON.stringify({action,...extra})
     })
     if(r.status===429||r.status>=500){
