@@ -10,9 +10,11 @@
 <link rel="manifest" href="/manifest.json">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/supabase-config.js"></script>
 <script src="/hybrid-sync.js"></script>
+<script src="/stock-module.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
@@ -414,12 +416,35 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
       <div style="padding:12px 14px 4px;font-size:13px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px" id="mat-title"></div>
       <div style="padding:6px 12px 2px" id="mat-prep-btn"></div>
       <div id="mat-alert" style="display:none;margin:6px 12px;padding:10px 14px;background:#FFF3E0;border-left:4px solid var(--orange);border-radius:10px;font-size:14px;color:var(--orange);font-weight:600"></div>
+
+      <!-- ═══ SORTIE DE STOCK DAE (scan série) ═══ -->
+      <div style="margin:10px 12px;padding:12px 14px;background:#fff;border:2px solid var(--blue);border-radius:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <span style="font-size:13px;font-weight:700;color:var(--blue)">📦 Matériel sorti du stock</span>
+          <button onclick="openDaeScan()" style="padding:8px 14px;background:var(--blue);color:#fff;border:none;border-radius:20px;font-size:13px;font-weight:700;cursor:pointer">📷 Scanner un DAE</button>
+        </div>
+        <div id="dae-stock-list" style="font-size:12px;color:var(--gray)">Aucun matériel scanné</div>
+      </div>
       <div style="flex:1;overflow-y:auto">
         <div id="mat-totaux"></div>
         <div style="padding:10px 14px 2px;font-size:12px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px">Détail par client — appuyer pour voir la fiche</div>
         <div id="mat-detail"></div>
         <div style="height:16px"></div>
       </div>
+    </div>
+
+    <!-- ═══ STOCK CONSOMMABLES (Pad-Pak, électrodes, batteries...) ═══ -->
+    <div id="v-stock" class="view">
+      <div style="padding:12px 14px 4px;font-size:13px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px">📦 Stock</div>
+      <div id="stk-alert-banner"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px 14px">
+        <button onclick="stkOpenScan('lookup')" style="grid-column:1/3;padding:18px;background:var(--blue);color:#fff;border:none;border-radius:14px;font-size:17px;font-weight:800;cursor:pointer;box-shadow:0 3px 10px rgba(21,101,192,.3)">📷 SCANNER</button>
+        <button onclick="stkOpenManualPicker('entree')" style="padding:16px 10px;background:#E8F5E9;color:#1B5E20;border:2px solid #1B5E20;border-radius:14px;font-size:14px;font-weight:800;cursor:pointer">📥 ENTRÉE</button>
+        <button onclick="stkOpenManualPicker('sortie')" style="padding:16px 10px;background:#FFF3E0;color:#E65100;border:2px solid #E65100;border-radius:14px;font-size:14px;font-weight:800;cursor:pointer">📤 SORTIE</button>
+        <button onclick="stkStartContinuous()" style="padding:16px 10px;background:#F3E5F5;color:#6A1B9A;border:2px solid #6A1B9A;border-radius:14px;font-size:14px;font-weight:800;cursor:pointer">🔄 SCAN CONTINU</button>
+        <button onclick="stkOpenHistorique()" style="padding:16px 10px;background:#ECEFF1;color:#37474F;border:2px solid #37474F;border-radius:14px;font-size:14px;font-weight:800;cursor:pointer">📋 HISTORIQUE</button>
+      </div>
+      <div id="stk-content" style="padding:4px 14px 20px"></div>
     </div>
 
     <!-- ═══ FICHE MATÉRIEL (overlay lecture seule) ═══ -->
@@ -431,6 +456,67 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
           <button onclick="closeMatFiche()" style="border:none;background:#EBEBEB;border-radius:50%;width:30px;height:30px;font-size:18px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center">×</button>
         </div>
         <div id="mat-fiche-content" style="padding:16px"></div>
+      </div>
+    </div>
+
+    <!-- ═══ SCAN DAE (overlay caméra) ═══ -->
+    <div id="dae-scan-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1000;flex-direction:column">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px">
+        <span style="color:#fff;font-size:14px;font-weight:700">📷 Scanner l'étiquette du DAE</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button id="dae-torch-btn" onclick="toggleDaeTorch()" style="display:none;border:none;background:rgba(255,255,255,.15);color:#fff;border-radius:50%;width:32px;height:32px;font-size:16px;cursor:pointer">🔦</button>
+          <button onclick="closeDaeScan()" style="border:none;background:rgba(255,255,255,.15);color:#fff;border-radius:50%;width:32px;height:32px;font-size:18px;cursor:pointer">×</button>
+        </div>
+      </div>
+      <div id="dae-scan-reader" style="width:100%;max-width:480px;margin:0 auto"></div>
+      <p style="color:#aaa;font-size:11px;text-align:center;margin:8px 16px 0">Recule à ~20-25 cm (distance où le téléphone arrive à faire le point), et utilise le zoom ci-dessous pour agrandir l'étiquette si besoin</p>
+      <div id="dae-zoom-wrap" style="display:none;padding:6px 24px;align-items:center;gap:8px">
+        <span style="color:#fff;font-size:14px">🔍</span>
+        <input type="range" id="dae-zoom-slider" style="flex:1" oninput="onDaeZoomChange(this.value)"/>
+      </div>
+      <p id="dae-scan-raw-hint" style="display:none;color:#FFD54F;font-size:11px;text-align:center;margin:6px 16px 0;word-break:break-all"></p>
+      <div id="dae-scan-manual" style="padding:16px;text-align:center">
+        <p style="color:#ccc;font-size:12px;margin-bottom:8px">Vérifie/corrige le numéro de série avant de valider :</p>
+        <input id="dae-scan-input" placeholder="Saisir le numéro de série" style="width:100%;max-width:320px;padding:10px 12px;border-radius:8px;border:none;font-size:14px"/>
+        <div style="margin-top:8px;display:flex;gap:8px;justify-content:center">
+          <button onclick="daeScanRescan()" style="padding:10px 16px;background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">🔄 Rescanner</button>
+          <button onclick="onDaeScanSuccess(document.getElementById('dae-scan-input').value.trim())" style="padding:10px 20px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">✅ Valider</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ SCAN STOCK (overlay caméra) — séparé du scan DAE ═══ -->
+    <div id="stk-scan-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1000;flex-direction:column">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px">
+        <span style="color:#fff;font-size:14px;font-weight:700" id="stk-scan-title">📷 Scanner un article</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button id="stk-torch-btn" onclick="stkToggleTorch()" style="display:none;border:none;background:rgba(255,255,255,.15);color:#fff;border-radius:50%;width:32px;height:32px;font-size:16px;cursor:pointer">🔦</button>
+          <button onclick="stkCloseScan()" style="border:none;background:rgba(255,255,255,.15);color:#fff;border-radius:50%;width:32px;height:32px;font-size:18px;cursor:pointer">×</button>
+        </div>
+      </div>
+      <div id="stk-scan-reader" style="width:100%;max-width:480px;margin:0 auto"></div>
+      <p style="color:#aaa;font-size:11px;text-align:center;margin:8px 16px 0">Vise le code-barres de l'article (EAN-13, EAN-8, UPC ou QR)</p>
+      <div id="stk-zoom-wrap" style="display:none;padding:6px 24px;align-items:center;gap:8px">
+        <span style="color:#fff;font-size:14px">🔍</span>
+        <input type="range" id="stk-zoom-slider" style="flex:1" oninput="stkOnZoomChange(this.value)"/>
+      </div>
+
+      <!-- Récap live du scan continu -->
+      <div id="stk-continuous-panel" style="display:none;padding:10px 16px;background:rgba(255,255,255,.06);margin:8px 16px;border-radius:10px">
+        <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:8px">
+          <span style="color:#ccc;font-size:12px">Mode :</span>
+          <button id="stk-cont-type-sortie" onclick="stkSetContinuousType('sortie')" style="padding:6px 14px;border-radius:20px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:#E65100;color:#fff">📤 Sortie</button>
+          <button id="stk-cont-type-entree" onclick="stkSetContinuousType('entree')" style="padding:6px 14px;border-radius:20px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:rgba(255,255,255,.15);color:#fff">📥 Entrée</button>
+        </div>
+        <div id="stk-continuous-list" style="max-height:140px;overflow-y:auto;font-size:13px;color:#fff"></div>
+      </div>
+      <div id="stk-continuous-actions" style="display:none;padding:0 16px 12px;text-align:center">
+        <button onclick="stkValidateContinuous()" style="width:100%;padding:14px;background:#1B5E20;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer">✅ VALIDER LES MOUVEMENTS</button>
+      </div>
+
+      <div id="stk-scan-manual-wrap" style="padding:16px;text-align:center">
+        <input id="stk-scan-manual-input" placeholder="Ou saisir le code-barres manuellement" style="width:100%;max-width:320px;padding:10px 12px;border-radius:8px;border:none;font-size:14px"/>
+        <button onclick="stkHandleScannedCode(document.getElementById('stk-scan-manual-input').value.trim())" style="margin-top:8px;padding:10px 20px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">Valider</button>
       </div>
     </div>
 
@@ -531,6 +617,10 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
     <button class="tab" onclick="goTab('materiel')" id="tab-materiel">
       <span class="ti">📦</span><span class="tl">Matériel</span>
       <span class="tbadge" id="badge-mat"></span>
+    </button>
+    <button class="tab" onclick="goTab('stock')" id="tab-stock">
+      <span class="ti">🏷️</span><span class="tl">Stock</span>
+      <span class="tbadge" id="badge-stock"></span>
     </button>
     <button class="tab" onclick="goTab('profil')" id="tab-profil">
       <span class="ti">👤</span><span class="tl">Profil</span>
@@ -1159,6 +1249,7 @@ function goTab(tab){
   }
   else if(tab==="planning")renderPlanning()
   else if(tab==="materiel")renderMateriel()
+  else if(tab==="stock")renderStock()
   else if(tab==="profil")renderProfil()
 }
 
@@ -1182,17 +1273,44 @@ function openTechSelect(){
   document.getElementById("tech-overlay").classList.add("open")
 }
 function closeTechSelect(){document.getElementById("tech-overlay").classList.remove("open")}
+// Une tournée démarrée un jour précédent et jamais clôturée (app fermée sans taper
+// "Terminer la tournée") ne doit pas ressurgir des jours plus tard avec un chrono absurde —
+// on ne restaure "en cours" que si le départ date d'aujourd'hui.
+function _isSameDayStart(iso){
+  const d=new Date(iso)
+  return !isNaN(d)&&d.toLocaleDateString('fr-CA',{timeZone:TZ})===TODAY()
+}
 function _restoreTourState(){
   clearInterval(tourTimer); tourTimer=null
   const saved=localStorage.getItem('optiq_tour_start_'+curTech)
-  if(saved){
+  if(saved&&_isSameDayStart(saved)){
     tourStartTime=new Date(saved)
     tourRunning=true
     _startTourInterval()
   } else {
+    if(saved){
+      try{localStorage.removeItem('optiq_tour_start_'+curTech)}catch(e){}
+      _closeAbandonedTour(curTech)
+    }
     tourStartTime=null
     tourRunning=false
   }
+}
+// Clôture côté Supabase une tournée abandonnée (jamais terminée explicitement, retrouvée
+// un autre jour) — évite qu'elle reste "en cours" indéfiniment dans le suivi admin.
+async function _closeAbandonedTour(techId){
+  if(!_sbClient) return
+  try{
+    const {data}=await _sbClient.from('app_state').select('value').eq('key','optiq_tour_progress').maybeSingle()
+    const val=(data?.value&&typeof data.value==='object')?data.value:{}
+    const today=TODAY()
+    let changed=false
+    Object.keys(val).forEach(k=>{
+      const v=val[k]
+      if(v?.techId===techId&&v.status==='running'&&v.date<today){ v.status='done'; v.updatedAt=Date.now(); changed=true }
+    })
+    if(changed) await _sbClient.from('app_state').upsert({key:'optiq_tour_progress',value:val},{onConflict:'key'})
+  }catch(e){}
 }
 function selectTech(id){
   curTech=id;closeTechSelect()
@@ -2399,6 +2517,655 @@ function renderMateriel(){
         ${eq.map(e=>`<span style="background:${e.bg};color:${e.col};padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600">${e.icon} ${e.text}</span>`).join("")}
       </div>`:`<div style="padding:2px 10px 8px;font-size:12px;color:var(--gray)">Maintenance standard · appuyer pour la fiche</div>`}
     </div>`}).join("")
+  renderDaeStockList()
+}
+
+// ════════════════════════════════════════════
+// STOCK DAE — scan série au moment de la préparation matériel
+// Registre simple sorti/stock (pas lié à une intervention précise), synchronisé
+// via Supabase (clé optiq_dae_stock, même format {clé:valeur} que les autres).
+// ════════════════════════════════════════════
+let daeStock={}
+let _daeScanner=null
+const DAE_MODELS=['HS500P','HS360P','HS350P','HS300P','CR2','Rotaid','Autre']
+
+async function loadDaeStock(){
+  try{
+    const s=localStorage.getItem('optiq_dae_stock');if(s)daeStock=JSON.parse(s)
+  }catch(e){}
+  if(_sbClient){
+    try{
+      const {data}=await _sbClient.from('app_state').select('value').eq('key','optiq_dae_stock').maybeSingle()
+      if(data?.value&&typeof data.value==='object'){
+        daeStock=data.value
+        try{localStorage.setItem('optiq_dae_stock',JSON.stringify(daeStock))}catch(e){}
+      }
+    }catch(e){}
+  }
+  renderDaeStockList()
+}
+
+async function saveDaeStock(){
+  try{localStorage.setItem('optiq_dae_stock',JSON.stringify(daeStock))}catch(e){}
+  if(_sbClient){
+    try{ await _sbClient.from('app_state').upsert({key:'optiq_dae_stock',value:daeStock},{onConflict:'key'}) }
+    catch(e){}
+  }
+}
+
+function renderDaeStockList(){
+  const el=document.getElementById('dae-stock-list')
+  if(!el) return
+  const mine=Object.values(daeStock).filter(u=>u.techId===curTech&&u.status==='sorti')
+    .sort((a,b)=>(b.outTs||0)-(a.outTs||0))
+  if(!mine.length){ el.innerHTML='Aucun matériel scanné' ; return }
+  el.innerHTML=mine.map(u=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-top:1px solid #F0F0F0">
+    <div><strong style="color:var(--dark)">${u.model||'?'}</strong> <span style="color:var(--gray)">· ${u.serial}</span></div>
+    <button onclick="returnDaeToStock('${u.serial.replace(/'/g,"\\'")}')" style="padding:5px 10px;background:#F5F5F5;color:var(--dark);border:none;border-radius:14px;font-size:11px;font-weight:600;cursor:pointer">↩ Retour stock</button>
+  </div>`).join('')
+}
+
+let _daeTorchOn=false
+function openDaeScan(){
+  const ov=document.getElementById('dae-scan-overlay')
+  ov.style.display='flex'
+  _daeTorchOn=false
+  const torchBtn=document.getElementById('dae-torch-btn')
+  if(torchBtn) torchBtn.style.display='none'
+  const zoomWrap=document.getElementById('dae-zoom-wrap')
+  if(zoomWrap) zoomWrap.style.display='none'
+  if(typeof Html5Qrcode==='undefined'){
+    document.getElementById('dae-scan-reader').innerHTML='<p style="color:#fff;text-align:center;padding:20px">Scanner indisponible — utilise la saisie manuelle ci-dessous.</p>'
+    return
+  }
+  _daeScanner=new Html5Qrcode('dae-scan-reader')
+  _daeScanner.start(
+    { facingMode:{ideal:'environment'} },
+    {
+      fps:10, qrbox:{width:280,height:200}, aspectRatio:1.5,
+      // Mise au point continue + résolution plus élevée : par défaut la caméra choisit
+      // souvent une résolution basse et un focus fixe, ce qui rend le texte flou de près.
+      // Note : beaucoup de téléphones ont une distance minimale de mise au point d'environ
+      // 10-15cm — en dessous, AUCUN réglage logiciel ne peut compenser un flou purement
+      // optique. D'où le curseur de zoom ci-dessous : reculer à une distance où l'appareil
+      // arrive à faire le point, puis zoomer numériquement sur l'étiquette.
+      videoConstraints:{
+        facingMode:{ideal:'environment'},
+        width:{ideal:1920}, height:{ideal:1080},
+        advanced:[{focusMode:'continuous'}]
+      }
+    },
+    decodedText=>{ onDaeCodeDetected(decodedText) },
+    ()=>{} // ignorer les échecs de décodage image-par-image (normal en continu)
+  ).then(()=>{
+    document.getElementById('dae-scan-input').value=''
+    document.getElementById('dae-scan-raw-hint').style.display='none'
+    try{
+      const caps=_daeScanner.getRunningTrackCapabilities?.()
+      // Bouton lampe torche si le téléphone le supporte (aide la mise au point en lumière faible)
+      if(caps && 'torch' in caps && torchBtn) torchBtn.style.display='inline-block'
+      // Curseur de zoom si le téléphone le supporte
+      if(caps && caps.zoom && zoomWrap){
+        const sl=document.getElementById('dae-zoom-slider')
+        sl.min=caps.zoom.min; sl.max=caps.zoom.max; sl.step=caps.zoom.step||0.1
+        sl.value=caps.zoom.min
+        zoomWrap.style.display='flex'
+      }
+    }catch(e){}
+  }).catch(()=>{
+    document.getElementById('dae-scan-reader').innerHTML='<p style="color:#fff;text-align:center;padding:20px">Impossible d\'accéder à la caméra — utilise la saisie manuelle ci-dessous.</p>'
+  })
+}
+async function toggleDaeTorch(){
+  if(!_daeScanner) return
+  try{
+    _daeTorchOn=!_daeTorchOn
+    await _daeScanner.applyVideoConstraints({advanced:[{torch:_daeTorchOn}]})
+  }catch(e){ _daeTorchOn=!_daeTorchOn }
+}
+async function onDaeZoomChange(val){
+  if(!_daeScanner) return
+  try{ await _daeScanner.applyVideoConstraints({advanced:[{zoom:parseFloat(val)}]}) }catch(e){}
+}
+
+function closeDaeScan(){
+  const ov=document.getElementById('dae-scan-overlay')
+  ov.style.display='none'
+  document.getElementById('dae-scan-input').value=''
+  if(_daeScanner){
+    _daeScanner.stop().then(()=>_daeScanner.clear()).catch(()=>{})
+    _daeScanner=null
+  }
+}
+
+// Beaucoup d'étiquettes DAE (dispositifs médicaux) utilisent un code GS1 DataMatrix qui
+// encode plusieurs infos (GTIN, lot, péremption, série) dans une seule chaîne — sans
+// extraction, le numéro "scanné" est un texte illisible/faux. On tente d'en extraire le
+// numéro de série (AI 21) ; sinon on retombe sur le texte brut.
+function parseGS1(raw){
+  const FNC1='\x1D'
+  const s=String(raw||'')
+  const out={}
+  let i=0
+  while(i<s.length-1){
+    const ai=s.substr(i,2)
+    if(ai==='01'&&/^\d{14}/.test(s.substr(i+2))){ out.gtin=s.substr(i+2,14); i+=16; continue }
+    if((ai==='17'||ai==='11')&&/^\d{6}/.test(s.substr(i+2))){ i+=8; continue }
+    if(ai==='10'||ai==='21'){
+      const rest=s.slice(i+2)
+      const end=rest.indexOf(FNC1)
+      const val=end>=0?rest.slice(0,end):rest
+      if(ai==='21') out.serial=val
+      i+=2+val.length+(end>=0?1:0)
+      continue
+    }
+    i++
+  }
+  return out
+}
+
+// Callback caméra : NE sauvegarde PAS directement — affiche le code détecté (avec extraction
+// GS1 si applicable) pour vérification/correction avant validation manuelle. Un scan qui
+// enregistrait le mauvais numéro le faisait car le texte brut du code-barres (parfois un
+// identifiant GS1 composite) était utilisé tel quel sans relecture possible.
+function onDaeCodeDetected(decodedText){
+  if(_daeScanner){ try{ _daeScanner.pause(true) }catch(e){} }
+  const parsed=parseGS1(decodedText)
+  const guess=parsed.serial||decodedText
+  const input=document.getElementById('dae-scan-input')
+  if(input){ input.value=guess; input.focus() }
+  const hint=document.getElementById('dae-scan-raw-hint')
+  if(hint){
+    hint.style.display='block'
+    hint.textContent=parsed.serial
+      ? `Numéro de série extrait automatiquement (code GS1). Texte brut : ${decodedText}`
+      : `Code détecté — vérifie que c'est bien le numéro de série avant de valider.`
+  }
+}
+
+function daeScanRescan(){
+  document.getElementById('dae-scan-input').value=''
+  document.getElementById('dae-scan-raw-hint').style.display='none'
+  if(_daeScanner){ try{ _daeScanner.resume() }catch(e){} }
+}
+
+async function onDaeScanSuccess(serial){
+  serial=(serial||'').trim()
+  if(!serial) return
+  // Éviter les doubles déclenchements pendant qu'un scan continu tourne
+  if(_daeScanner){ try{ await _daeScanner.pause(true) }catch(e){} }
+
+  const existing=daeStock[serial]
+  if(existing&&existing.status==='sorti'&&existing.techId&&existing.techId!==curTech){
+    const otherName=TB(existing.techId)?.name||'un autre technicien'
+    if(!confirm(`Ce DAE (${existing.model||serial}) est déjà sorti par ${otherName}. Le réattribuer à toi ?`)){
+      if(_daeScanner){ try{ await _daeScanner.resume() }catch(e){} }
+      return
+    }
+  }
+
+  let model=existing?.model
+  if(!model){
+    model=prompt('Modèle du DAE (ex: HS500P) :', DAE_MODELS[0]) || 'Inconnu'
+  }
+
+  const now=Date.now()
+  const hist=existing?.history||[]
+  hist.push({ts:now,action:'sortie',techId:curTech})
+  daeStock[serial]={
+    serial, model,
+    status:'sorti', techId:curTech,
+    inDate:existing?.inDate||depDate(), outDate:depDate(), outTs:now,
+    history:hist
+  }
+  await saveDaeStock()
+  renderDaeStockList()
+  toast(`✅ ${model} (${serial}) sorti du stock`,'#1B5E20')
+  closeDaeScan()
+}
+
+async function returnDaeToStock(serial){
+  const u=daeStock[serial]
+  if(!u) return
+  if(!confirm(`Remettre ${u.model} (${serial}) en stock ?`)) return
+  u.history=u.history||[]
+  u.history.push({ts:Date.now(),action:'retour',techId:curTech})
+  u.status='stock'
+  u.techId=null
+  await saveDaeStock()
+  renderDaeStockList()
+  toast('↩ Remis en stock','#1565C0')
+}
+
+// ════════════════════════════════════════════════════════════════
+// STOCK CONSOMMABLES (Pad-Pak, électrodes, batteries...) — module séparé
+// du stock DAE (numéros de série) ci-dessus. Utilise de vraies tables
+// Supabase (articles_stock, mouvements_stock) via stock-module.js, pas le
+// pattern app_state en JSON utilisé pour le reste de l'appli : les quantités
+// et l'historique s'y prêtent mal (concurrence, filtres, agrégats).
+// ════════════════════════════════════════════════════════════════
+function stkInitModule(){
+  if(!_sbClient||typeof StockModule==='undefined') return
+  StockModule.init({
+    baseUrl: _SB_URL+'/rest/v1',
+    getHeaders: async()=>({apikey:_SB_KEY, Authorization:'Bearer '+_SB_KEY}),
+    getActor: ()=>({techId:curTech, label:TB(curTech)?.name||'Technicien'})
+  })
+}
+
+let stkScanner=null, stkTorchOn=false
+let stkContinuousActive=false, stkContinuousType='sortie', stkContinuousTally={}
+let stkLastScanCode=null, stkLastScanTs=0
+let stkCurrentArticle=null
+
+async function renderStock(){
+  stkRenderAlertBanner()
+  const el=document.getElementById('stk-content')
+  if(el && !el.dataset.filled){
+    el.innerHTML='<div style="text-align:center;color:var(--gray);padding:30px;font-size:13px">Utilise les boutons ci-dessus pour scanner, faire une entrée/sortie, ou consulter l\'historique.</div>'
+  }
+}
+
+async function stkRenderAlertBanner(){
+  const banner=document.getElementById('stk-alert-banner')
+  if(!banner||typeof StockModule==='undefined') return
+  try{
+    const low=await StockModule.lowStockArticles()
+    if(!low.length){ banner.innerHTML=''; return }
+    const rupture=low.filter(a=>a.quantite_stock<=0).length
+    banner.innerHTML=`<div style="margin:8px 14px 0;padding:10px 14px;background:#FFF3E0;border-left:4px solid #E65100;border-radius:10px;font-size:12px;color:#E65100;font-weight:600;cursor:pointer" onclick="stkOpenAlerts()">
+      ${rupture?`🔴 ${rupture} en rupture · `:''}🟠 ${low.length} article${low.length>1?'s':''} sous le seuil mini — voir
+    </div>`
+  }catch(e){}
+}
+
+// ── Scanner caméra ──────────────────────────────────────────────
+function stkOpenScan(){
+  stkLastScanCode=null; stkLastScanTs=0
+  document.getElementById('stk-scan-title').textContent = stkContinuousActive ? '🔄 Scan continu' : '📷 Scanner un article'
+  document.getElementById('stk-continuous-panel').style.display = stkContinuousActive ? 'block' : 'none'
+  document.getElementById('stk-continuous-actions').style.display = stkContinuousActive ? 'block' : 'none'
+  if(stkContinuousActive) stkRenderContinuousList()
+  const ov=document.getElementById('stk-scan-overlay')
+  ov.style.display='flex'
+  stkTorchOn=false
+  const torchBtn=document.getElementById('stk-torch-btn'); if(torchBtn) torchBtn.style.display='none'
+  const zoomWrap=document.getElementById('stk-zoom-wrap'); if(zoomWrap) zoomWrap.style.display='none'
+  if(typeof Html5Qrcode==='undefined'){
+    document.getElementById('stk-scan-reader').innerHTML='<p style="color:#fff;text-align:center;padding:20px">Scanner indisponible — utilise la saisie manuelle ci-dessous.</p>'
+    return
+  }
+  const formats=(typeof Html5QrcodeSupportedFormats!=='undefined')?[
+    Html5QrcodeSupportedFormats.EAN_13,Html5QrcodeSupportedFormats.EAN_8,
+    Html5QrcodeSupportedFormats.UPC_A,Html5QrcodeSupportedFormats.UPC_E,
+    Html5QrcodeSupportedFormats.CODE_128,Html5QrcodeSupportedFormats.QR_CODE
+  ]:undefined
+  stkScanner=new Html5Qrcode('stk-scan-reader',formats?{formatsToSupport:formats,verbose:false}:undefined)
+  stkScanner.start(
+    { facingMode:{ideal:'environment'} },
+    {
+      fps:10, qrbox:{width:280,height:180}, aspectRatio:1.5,
+      videoConstraints:{
+        facingMode:{ideal:'environment'},
+        width:{ideal:1920}, height:{ideal:1080},
+        advanced:[{focusMode:'continuous'}]
+      }
+    },
+    decodedText=>{ stkOnDetect(decodedText) },
+    ()=>{}
+  ).then(()=>{
+    try{
+      const caps=stkScanner.getRunningTrackCapabilities?.()
+      if(caps && 'torch' in caps && torchBtn) torchBtn.style.display='inline-block'
+      if(caps && caps.zoom && zoomWrap){
+        const sl=document.getElementById('stk-zoom-slider')
+        sl.min=caps.zoom.min; sl.max=caps.zoom.max; sl.step=caps.zoom.step||0.1; sl.value=caps.zoom.min
+        zoomWrap.style.display='flex'
+      }
+    }catch(e){}
+  }).catch(()=>{
+    document.getElementById('stk-scan-reader').innerHTML='<p style="color:#fff;text-align:center;padding:20px">Impossible d\'accéder à la caméra — utilise la saisie manuelle ci-dessous.</p>'
+  })
+}
+async function stkToggleTorch(){
+  if(!stkScanner) return
+  try{ stkTorchOn=!stkTorchOn; await stkScanner.applyVideoConstraints({advanced:[{torch:stkTorchOn}]}) }catch(e){ stkTorchOn=!stkTorchOn }
+}
+async function stkOnZoomChange(val){
+  if(!stkScanner) return
+  try{ await stkScanner.applyVideoConstraints({advanced:[{zoom:parseFloat(val)}]}) }catch(e){}
+}
+function stkCloseScan(){
+  document.getElementById('stk-scan-overlay').style.display='none'
+  document.getElementById('stk-scan-manual-input').value=''
+  if(stkScanner){ const s=stkScanner; stkScanner=null; s.stop().then(()=>s.clear()).catch(()=>{}) }
+  stkContinuousActive=false
+}
+// Anti-double-scan : ignore une nouvelle détection du même code dans les 2s (évite qu'un
+// seul passage devant la caméra ne compte plusieurs fois le même article).
+function stkOnDetect(code){
+  const now=Date.now()
+  if(code===stkLastScanCode && now-stkLastScanTs<2000) return
+  stkLastScanCode=code; stkLastScanTs=now
+  if(navigator.vibrate) navigator.vibrate(80)
+  stkHandleScannedCode(code)
+}
+
+async function stkHandleScannedCode(code){
+  code=(code||'').trim()
+  if(!code) return
+  if(stkContinuousActive){ await stkContinuousAdd(code); return }
+  stkCloseScan()
+  const el=document.getElementById('stk-content')
+  el.dataset.filled='1'
+  el.innerHTML='<div style="text-align:center;color:var(--gray);padding:20px">🔍 Recherche de l\'article...</div>'
+  goTab('stock')
+  try{
+    const art=await StockModule.findByBarcode(code)
+    if(art) stkRenderFiche(art)
+    else stkRenderUnknown(code)
+  }catch(e){
+    el.innerHTML=`<div style="text-align:center;color:#C62828;padding:20px">❌ Erreur : ${e.message}</div>`
+  }
+}
+
+// ── Fiche article connu ─────────────────────────────────────────
+function stkRenderFiche(art){
+  stkCurrentArticle=art
+  const low=art.quantite_stock<=art.stock_minimum
+  const rupture=art.quantite_stock<=0
+  const el=document.getElementById('stk-content')
+  el.dataset.filled='1'
+  el.innerHTML=`
+    <div class="card" style="padding:16px">
+      <div style="font-size:16px;font-weight:800;margin-bottom:2px">${art.nom}</div>
+      <div style="font-size:12px;color:var(--gray);margin-bottom:8px">${art.reference?'Réf. '+art.reference+' · ':''}Code : ${art.code_barres||'—'}</div>
+      <div style="font-size:28px;font-weight:800;color:${rupture?'#C62828':low?'#E65100':'#1B5E20'}">${art.quantite_stock}</div>
+      <div style="font-size:11px;color:var(--gray);margin-bottom:12px">en stock${rupture?' · 🔴 rupture':low?' · 🟠 stock faible':''}</div>
+      <label style="font-size:12px;color:var(--gray);display:block;margin-bottom:4px">Quantité</label>
+      <input type="number" id="stk-qty-input" value="1" min="1" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:16px;margin-bottom:10px"/>
+      <div id="stk-interv-picker"></div>
+      <div style="display:flex;gap:10px;margin-top:10px">
+        <button onclick="stkSubmit('entree')" style="flex:1;padding:14px;background:#1B5E20;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer">📥 Ajouter au stock</button>
+        <button onclick="stkSubmit('sortie')" style="flex:1;padding:14px;background:#E65100;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer">📤 Retirer du stock</button>
+      </div>
+      <div id="stk-submit-result" style="margin-top:10px"></div>
+      <button onclick="renderStockHome()" style="width:100%;margin-top:10px;padding:8px;background:none;border:none;color:var(--gray);font-size:12px;cursor:pointer">← Retour</button>
+    </div>`
+  stkRenderInterventionPicker()
+}
+function renderStockHome(){
+  const el=document.getElementById('stk-content')
+  el.dataset.filled=''
+  renderStock()
+}
+
+function stkRenderInterventionPicker(){
+  const wrap=document.getElementById('stk-interv-picker')
+  if(!wrap) return
+  const d=new Date(); d.setDate(d.getDate()-7)
+  const from=d.toLocaleDateString('fr-CA',{timeZone:TZ})
+  const candidates=ivs.filter(i=>i.techId===curTech && i.date>=from).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,40)
+  wrap.innerHTML=`<label style="font-size:12px;color:var(--gray);display:block;margin-bottom:4px">Intervention liée (optionnel)</label>
+    <select id="stk-interv-select" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;margin-bottom:10px">
+      <option value="">— Sortie générale (aucune) —</option>
+      ${candidates.map(i=>`<option value="${i.id}">${fd(i.date)} · ${i.client}</option>`).join('')}
+    </select>`
+}
+
+async function stkSubmit(type){
+  if(!stkCurrentArticle) return
+  const qty=parseInt(document.getElementById('stk-qty-input').value)||0
+  if(qty<=0){ alert('Quantité invalide'); return }
+  if(type==='sortie' && qty>=10){
+    if(!confirm(`Confirmer la sortie de ${qty} × ${stkCurrentArticle.nom} ?`)) return
+  }
+  const selInterv=document.getElementById('stk-interv-select')?.value
+  const ivObj=selInterv?ivs.find(i=>i.id===parseInt(selInterv)):null
+  const resEl=document.getElementById('stk-submit-result')
+  resEl.innerHTML='<div style="text-align:center;color:var(--gray);padding:10px">⏳ Enregistrement...</div>'
+  try{
+    const mv=await StockModule.recordMovement({
+      articleId: stkCurrentArticle.id, type, quantite: qty,
+      interventionId: ivObj?String(ivObj.id):null,
+      interventionLabel: ivObj?(ivObj.client+' · '+fd(ivObj.date)):null
+    })
+    if(navigator.vibrate) navigator.vibrate([50,50,50])
+    resEl.innerHTML=`<div style="text-align:center;padding:14px;background:#E8F5E9;border-radius:10px">
+      <div style="font-size:20px">✅</div>
+      <div style="font-size:13px;font-weight:700;margin-top:4px">Stock mis à jour</div>
+      <div style="font-size:12px;color:var(--gray)">${stkCurrentArticle.nom} · ${type==='entree'?'+':'-'}${qty}</div>
+      <div style="font-size:16px;font-weight:800;margin-top:4px">Nouveau stock : ${mv.stock_apres}</div>
+    </div>`
+    stkCurrentArticle.quantite_stock=mv.stock_apres
+    stkRenderAlertBanner()
+    setTimeout(()=>renderStockHome(),1800)
+  }catch(e){
+    resEl.innerHTML=`<div style="text-align:center;padding:14px;background:#FFEBEE;border-radius:10px;color:#C62828">
+      <div style="font-size:20px">❌</div>
+      <div style="font-size:13px;font-weight:700;margin-top:4px">Impossible de mettre à jour le stock</div>
+      <div style="font-size:12px;margin-top:2px">${e.message}</div>
+    </div>`
+  }
+}
+
+// ── Article inconnu → création ──────────────────────────────────
+function stkRenderUnknown(code){
+  const el=document.getElementById('stk-content')
+  el.dataset.filled='1'
+  el.innerHTML=`
+    <div class="card" style="padding:16px;text-align:center">
+      <div style="font-size:30px;margin-bottom:6px">⚠️</div>
+      <div style="font-size:15px;font-weight:800;color:#E65100;margin-bottom:4px">ARTICLE INCONNU</div>
+      <div style="font-size:12px;color:var(--gray);margin-bottom:14px">Code détecté : <strong>${code}</strong></div>
+      <div style="display:flex;gap:10px">
+        <button onclick="stkOpenCreateArticle('${code.replace(/'/g,"\\'")}')" style="flex:1;padding:12px;background:var(--blue);color:#fff;border:none;border-radius:10px;font-weight:700;cursor:pointer">Créer l'article</button>
+        <button onclick="renderStockHome()" style="flex:1;padding:12px;background:#F5F5F5;color:var(--dark);border:none;border-radius:10px;font-weight:700;cursor:pointer">Annuler</button>
+      </div>
+    </div>`
+}
+function stkOpenCreateArticle(prefilledCode){
+  const el=document.getElementById('stk-content')
+  el.dataset.filled='1'
+  el.innerHTML=`
+    <div class="card" style="padding:16px">
+      <div style="font-size:15px;font-weight:800;margin-bottom:10px">➕ Nouvel article</div>
+      <label class="lbl">Nom *</label>
+      <input id="stk-new-nom" placeholder="Ex: Pad-Pak adulte" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;margin-bottom:8px"/>
+      <label class="lbl">Code-barres</label>
+      <input id="stk-new-code" value="${(prefilledCode||'').replace(/"/g,'&quot;')}" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;margin-bottom:8px"/>
+      <label class="lbl">Référence</label>
+      <input id="stk-new-ref" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;margin-bottom:8px"/>
+      <label class="lbl">Catégorie</label>
+      <select id="stk-new-cat" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;margin-bottom:8px">
+        <option value="Pad-Pak">Pad-Pak</option><option value="Électrodes">Électrodes</option>
+        <option value="Batterie">Batterie</option><option value="Accessoires DAE">Accessoires DAE</option>
+        <option value="Autre">Autre consommable</option>
+      </select>
+      <label class="lbl">Stock minimum (alerte)</label>
+      <input id="stk-new-min" type="number" value="0" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;margin-bottom:8px"/>
+      <label class="lbl">Emplacement</label>
+      <input id="stk-new-emp" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;margin-bottom:12px"/>
+      <button onclick="stkSubmitCreateArticle()" style="width:100%;padding:14px;background:var(--blue);color:#fff;border:none;border-radius:10px;font-weight:800;cursor:pointer">Créer l'article</button>
+      <button onclick="renderStockHome()" style="width:100%;margin-top:8px;padding:8px;background:none;border:none;color:var(--gray);font-size:12px;cursor:pointer">Annuler</button>
+    </div>`
+}
+async function stkSubmitCreateArticle(){
+  const nom=document.getElementById('stk-new-nom').value.trim()
+  if(!nom){ alert('Le nom est obligatoire'); return }
+  try{
+    const art=await StockModule.createArticle({
+      nom, code_barres:document.getElementById('stk-new-code').value.trim()||null,
+      reference:document.getElementById('stk-new-ref').value.trim()||null,
+      categorie:document.getElementById('stk-new-cat').value,
+      stock_minimum:parseInt(document.getElementById('stk-new-min').value)||0,
+      emplacement:document.getElementById('stk-new-emp').value.trim()||null
+    })
+    toast('✅ Article créé','#1B5E20')
+    stkRenderFiche(art)
+  }catch(e){
+    alert("❌ Impossible de créer l'article : "+e.message)
+  }
+}
+
+// ── Entrée / Sortie sans scan (choix dans une liste) ────────────
+async function stkOpenManualPicker(type){
+  const el=document.getElementById('stk-content')
+  el.dataset.filled='1'
+  el.innerHTML='<div style="text-align:center;color:var(--gray);padding:20px">Chargement des articles...</div>'
+  try{
+    const list=await StockModule.listArticles()
+    window._stkPickerArticles=list
+    el.innerHTML=`
+      <div class="card" style="padding:14px">
+        <div style="font-size:14px;font-weight:800;margin-bottom:8px">${type==='entree'?'📥 Entrée':'📤 Sortie'} — choisir un article</div>
+        <input id="stk-picker-search" placeholder="Rechercher..." oninput="stkFilterPicker()" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;margin-bottom:10px"/>
+        <div id="stk-picker-list"></div>
+        <button onclick="renderStockHome()" style="width:100%;margin-top:10px;padding:8px;background:none;border:none;color:var(--gray);font-size:12px;cursor:pointer">← Retour</button>
+      </div>`
+    stkFilterPicker()
+  }catch(e){
+    el.innerHTML=`<div style="text-align:center;color:#C62828;padding:20px">❌ ${e.message}</div>`
+  }
+}
+function stkFilterPicker(){
+  const q=(document.getElementById('stk-picker-search')?.value||'').toLowerCase()
+  const list=(window._stkPickerArticles||[]).filter(a=>!q||a.nom.toLowerCase().includes(q)||(a.reference||'').toLowerCase().includes(q))
+  document.getElementById('stk-picker-list').innerHTML=list.slice(0,50).map(a=>`
+    <div onclick="stkPickArticle('${a.id}')" style="padding:10px;border-bottom:1px solid #F0F0F0;cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+      <div><div style="font-weight:600;font-size:13px">${a.nom}</div><div style="font-size:11px;color:var(--gray)">${a.reference||''}</div></div>
+      <div style="font-weight:800;color:${a.quantite_stock<=a.stock_minimum?'#E65100':'#1B5E20'}">${a.quantite_stock}</div>
+    </div>`).join('') || '<div style="text-align:center;color:var(--gray);padding:16px;font-size:12px">Aucun article</div>'
+}
+function stkPickArticle(id){
+  const art=(window._stkPickerArticles||[]).find(a=>a.id===id)
+  if(art) stkRenderFiche(art)
+}
+
+// ── Scan continu ─────────────────────────────────────────────────
+function stkStartContinuous(){
+  stkContinuousActive=true
+  stkContinuousType='sortie'
+  stkContinuousTally={}
+  stkOpenScan()
+}
+function stkSetContinuousType(t){
+  stkContinuousType=t
+  document.getElementById('stk-cont-type-sortie').style.background = t==='sortie'?'#E65100':'rgba(255,255,255,.15)'
+  document.getElementById('stk-cont-type-entree').style.background = t==='entree'?'#1B5E20':'rgba(255,255,255,.15)'
+}
+async function stkContinuousAdd(code){
+  try{
+    const art=await StockModule.findByBarcode(code)
+    if(!art){
+      if(navigator.vibrate) navigator.vibrate([30,60,30])
+      const hint=document.getElementById('stk-scan-title')
+      if(hint) hint.textContent='⚠️ Article inconnu : '+code
+      return
+    }
+    if(navigator.vibrate) navigator.vibrate(80)
+    if(!stkContinuousTally[art.id]) stkContinuousTally[art.id]={article:art,count:0}
+    stkContinuousTally[art.id].count++
+    stkRenderContinuousList()
+  }catch(e){}
+}
+function stkRenderContinuousList(){
+  const el=document.getElementById('stk-continuous-list')
+  if(!el) return
+  const items=Object.values(stkContinuousTally)
+  el.innerHTML=items.length?items.map(it=>`<div style="display:flex;justify-content:space-between;padding:4px 0">
+      <span>${it.article.nom.toUpperCase()}</span><strong>${it.count}</strong>
+    </div>`).join(''):'<div style="color:#888;text-align:center;padding:6px">Scanne un premier article…</div>'
+}
+async function stkValidateContinuous(){
+  const items=Object.values(stkContinuousTally)
+  if(!items.length){ stkCloseScan(); return }
+  if(!confirm(`Valider ${items.length} article(s) en ${stkContinuousType==='sortie'?'sortie':'entrée'} ?`)) return
+  const type=stkContinuousType
+  stkCloseScan()
+  const el=document.getElementById('stk-content')
+  el.dataset.filled='1'
+  el.innerHTML='<div style="text-align:center;color:var(--gray);padding:20px">⏳ Enregistrement des mouvements...</div>'
+  try{
+    await StockModule.recordMovements(items.map(it=>({articleId:it.article.id,type,quantite:it.count})))
+    toast(`✅ ${items.length} mouvement(s) enregistré(s)`,'#1B5E20')
+    stkContinuousTally={}
+    stkRenderAlertBanner()
+    renderStockHome()
+  }catch(e){
+    el.innerHTML=`<div style="text-align:center;padding:16px;background:#FFEBEE;border-radius:10px;color:#C62828">❌ ${e.message}<br><button onclick="renderStockHome()" style="margin-top:10px;padding:8px 16px;background:#fff;border:1px solid #C62828;border-radius:8px;cursor:pointer">Fermer</button></div>`
+  }
+}
+
+// ── Alertes stock faible ─────────────────────────────────────────
+async function stkOpenAlerts(){
+  const el=document.getElementById('stk-content')
+  el.dataset.filled='1'
+  el.innerHTML='<div style="text-align:center;color:var(--gray);padding:20px">Chargement...</div>'
+  try{
+    const low=await StockModule.lowStockArticles()
+    el.innerHTML=`
+      <div class="card" style="padding:14px">
+        <div style="font-size:14px;font-weight:800;margin-bottom:10px">⚠️ Articles à réapprovisionner</div>
+        ${!low.length?'<div style="text-align:center;color:var(--gray);padding:16px">Aucune alerte 🎉</div>':low.map(a=>{
+          const rupture=a.quantite_stock<=0
+          return `<div onclick="stkPickArticleAlert('${a.id}')" style="padding:10px;border-bottom:1px solid #F0F0F0;cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+            <div><div style="font-weight:600;font-size:13px">${rupture?'🔴':'🟠'} ${a.nom}</div><div style="font-size:11px;color:var(--gray)">Seuil mini : ${a.stock_minimum}</div></div>
+            <div style="font-weight:800;color:${rupture?'#C62828':'#E65100'}">${a.quantite_stock}</div>
+          </div>`
+        }).join('')}
+        <button onclick="renderStockHome()" style="width:100%;margin-top:10px;padding:8px;background:none;border:none;color:var(--gray);font-size:12px;cursor:pointer">← Retour</button>
+      </div>`
+    window._stkAlertArticles=low
+  }catch(e){
+    el.innerHTML=`<div style="text-align:center;color:#C62828;padding:20px">❌ ${e.message}</div>`
+  }
+}
+function stkPickArticleAlert(id){
+  const art=(window._stkAlertArticles||[]).find(a=>a.id===id)
+  if(art) stkRenderFiche(art)
+}
+
+// ── Historique ─────────────────────────────────────────────────
+async function stkOpenHistorique(){
+  const el=document.getElementById('stk-content')
+  el.dataset.filled='1'
+  el.innerHTML=`
+    <div class="card" style="padding:14px">
+      <div style="font-size:14px;font-weight:800;margin-bottom:10px">📋 Historique</div>
+      <select id="stk-hist-type" onchange="stkRenderHistorique()" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;margin-bottom:8px">
+        <option value="">Tous les mouvements</option>
+        <option value="entree">Entrées seulement</option>
+        <option value="sortie">Sorties seulement</option>
+      </select>
+      <input id="stk-hist-search" placeholder="Rechercher (article, intervention...)" oninput="stkRenderHistorique()" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;margin-bottom:10px"/>
+      <div id="stk-hist-list"></div>
+      <button onclick="renderStockHome()" style="width:100%;margin-top:10px;padding:8px;background:none;border:none;color:var(--gray);font-size:12px;cursor:pointer">← Retour</button>
+    </div>`
+  stkRenderHistorique()
+}
+async function stkRenderHistorique(){
+  const list=document.getElementById('stk-hist-list')
+  if(!list) return
+  list.innerHTML='<div style="text-align:center;color:var(--gray);padding:16px">Chargement...</div>'
+  try{
+    const type=document.getElementById('stk-hist-type')?.value||undefined
+    const search=document.getElementById('stk-hist-search')?.value||undefined
+    const rows=await StockModule.listMovements({type, search, techId:curTech, limit:100})
+    list.innerHTML=rows.length?rows.map(m=>{
+      const dt=new Date(m.date)
+      const isEntree=m.type==='entree'
+      return `<div style="padding:8px 0;border-top:1px solid #F0F0F0">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <strong style="font-size:13px">${m.articles_stock?.nom||'?'}</strong>
+          <span style="font-weight:800;color:${isEntree?'#1B5E20':'#E65100'}">${isEntree?'+':'-'}${m.quantite}</span>
+        </div>
+        <div style="font-size:11px;color:var(--gray)">${dt.toLocaleDateString('fr-FR')} ${dt.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})} · ${m.utilisateur||'?'} · ${m.stock_avant}→${m.stock_apres}${m.intervention_label?' · '+m.intervention_label:''}</div>
+      </div>`
+    }).join(''):'<div style="text-align:center;color:var(--gray);padding:16px">Aucun mouvement</div>'
+  }catch(e){
+    list.innerHTML=`<div style="text-align:center;color:#C62828;padding:16px">❌ ${e.message}</div>`
+  }
 }
 
 // ════════════════════════════════════════════
@@ -3154,9 +3921,11 @@ function logout(){
 // ════════════════════════════════════════════
 try{const s=localStorage.getItem("tech_id");if(s)curTech=parseInt(s)}catch(e){}
 // Restaurer le timer de tournée si la page a été rechargée pendant une tournée en cours
+// (uniquement si le départ date d'aujourd'hui — sinon c'est une tournée abandonnée, cf.
+// _restoreTourState/_closeAbandonedTour qui la nettoieront)
 ;(()=>{
   const saved=localStorage.getItem('optiq_tour_start_'+curTech)
-  if(!saved) return
+  if(!saved||!_isSameDayStart(saved)) return
   tourStartTime=new Date(saved)
   tourRunning=true
   _startTourInterval() // DOM déjà prêt (scripts en bas de body)
@@ -3412,6 +4181,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     return
   }
   _sbClient = window.supabase.createClient(_SB_URL, _SB_KEY)
+  // Nettoyage best-effort d'une éventuelle tournée abandonnée un jour précédent (fermée sans
+  // taper "Terminer" — possible même si _sbClient n'existait pas encore au moment du boot)
+  _closeAbandonedTour(curTech)
+  loadDaeStock()
+  stkInitModule()
 
   // Restaurer le timer depuis Supabase si localStorage manque (autre appareil / cache vidé)
   if(!localStorage.getItem('optiq_tour_start_'+curTech)){

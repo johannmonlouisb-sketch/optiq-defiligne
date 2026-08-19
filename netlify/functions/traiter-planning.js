@@ -37,12 +37,15 @@ exports.handler = async (event) => {
       body: JSON.stringify({ error: 'Dates invalides ou dateFrom > dateTo' })
     }
 
-  // Limite 90 jours pour éviter les timeouts Netlify
+  // Limite 21 jours — le pipeline fait un appel Vroom externe par jour (+ Groq pour les
+  // découchers) de façon séquentielle ; au-delà, le traitement dépasse le délai d'exécution
+  // de la fonction Netlify et celle-ci renvoie une page d'erreur HTML (pas du JSON), ce qui
+  // provoquait un message cryptique côté interface.
   const diffDays = (dTo - dFrom) / (1000 * 60 * 60 * 24)
-  if (diffDays > 90)
+  if (diffDays > 21)
     return {
       statusCode: 400, headers: CORS,
-      body: JSON.stringify({ error: 'Plage maximale : 90 jours' })
+      body: JSON.stringify({ error: `Plage maximale : 21 jours (demandé : ${Math.round(diffDays)} jours) — le traitement est trop long au-delà pour tenir dans le délai serveur` })
     }
 
   try {

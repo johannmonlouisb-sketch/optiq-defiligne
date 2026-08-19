@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>OptiQ — Rapport Planning</title>
+<title>OptiTechX — Rapport Planning</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -155,7 +155,7 @@ input:focus,select:focus{outline:2px solid var(--blue);border-color:var(--blue);
       <line x1="20" y1="15.5" x2="22" y2="15.5" stroke="rgba(255,255,255,.9)" stroke-width="2" stroke-linecap="round"/>
     </svg>
     <div>
-      <h1>OptiQ — Rapport Planning</h1>
+      <h1>OptiTechX — Rapport Planning</h1>
       <p>Vroom VRP · Multi-agents · PlanningOS v3</p>
     </div>
   </div>
@@ -164,7 +164,7 @@ input:focus,select:focus{outline:2px solid var(--blue);border-color:var(--blue);
     <span id="solver-pill">VROOM</span>
     <span id="last-update">—</span>
     <button id="btn-run" onclick="openRunModal()">▶ Lancer analyse</button>
-    <button id="btn-back" onclick="history.back()">← OptiQ</button>
+    <button id="btn-back" onclick="history.back()">← OptiTechX</button>
   </div>
 </div>
 
@@ -614,6 +614,16 @@ async function runAnalysis() {
 
   if (!from || !to) { showErr('Veuillez sélectionner les deux dates.'); return }
 
+  // Le pipeline (Notion + géocodage + Vroom + Groq, un appel externe par jour) dépasse le
+  // délai d'exécution du serveur au-delà d'une plage courte — mieux vaut prévenir avant
+  // l'appel plutôt que renvoyer une erreur réseau cryptique après une longue attente.
+  const MAX_DAYS = 21
+  const spanDays = Math.round((new Date(to) - new Date(from)) / 86400000)
+  if (spanDays > MAX_DAYS) {
+    showErr(`Période trop large (${spanDays} jours, max ${MAX_DAYS}) — le traitement (Notion + Vroom + Groq, un appel par jour) dépasserait le délai du serveur. Réduis la plage ou lance plusieurs analyses successives.`)
+    return
+  }
+
   btn.textContent = '⏳ Vroom en cours...'
   btn.disabled    = true
   errEl.style.display = 'none'
@@ -623,7 +633,12 @@ async function runAnalysis() {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ dateFrom: from, dateTo: to, tech: tech || undefined, updateNotion: upd })
     })
-    const d = await r.json()
+    let d
+    try { d = await r.json() }
+    catch {
+      showErr('Le traitement a pris trop de temps et le serveur a coupé la requête (délai dépassé). Réduis la période ou décoche "Mettre à jour les statuts Notion".')
+      return
+    }
     if (!r.ok) { showErr(d.error || `Erreur ${r.status}`); return }
     closeRunModal()
     await fetchReport()

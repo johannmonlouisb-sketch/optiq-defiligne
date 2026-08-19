@@ -72,6 +72,8 @@ function makeCostFns(depot, stops, matrix) {
 }
 
 // ─── Coût d'une route (indices 1..n, dépôt implicite aux extrémités) ──────────
+// Coût "brut" : somme des temps/distances de trajet uniquement — sert à l'affichage
+// (totalDurationMin, totalDistanceKm), pas à la recherche d'ordre.
 
 function routeCost(cost, route) {
   if (!route.length) return 0
@@ -86,6 +88,30 @@ function routeCostKm(cost, route) {
   for (let i = 1; i < route.length; i++) d += cost.distKm(route[i - 1], route[i])
   d += cost.distKm(route[route.length - 1], 0)
   return d
+}
+
+// Coût "pénalisé" : simule les heures d'arrivée réelles (attente si en avance sur un
+// créneau) et ajoute une forte pénalité par minute de dépassement d'heure limite
+// (timeWindow.end). C'est CE coût que 2-opt/or-opt cherchent à minimiser, pas le coût
+// brut ci-dessus — ainsi l'algorithme réorganise activement la tournée pour respecter
+// une heure limite imposée, plutôt que de se contenter de signaler le dépassement après coup.
+const LATE_PENALTY_PER_MIN = 60
+function routeCostPenalized(cost, route, stops, startMin) {
+  let curMin = startMin, prev = 0, penalty = 0
+  for (const idx of route) {
+    curMin += cost.dist(prev, idx)
+    const s = stops[idx - 1]
+    if (s.timeWindow) {
+      const fromMin = hhmm(s.timeWindow.start)
+      const toMin   = hhmm(s.timeWindow.end)
+      if (curMin < fromMin) curMin = fromMin
+      if (curMin > toMin) penalty += (curMin - toMin) * LATE_PENALTY_PER_MIN
+    }
+    curMin += (s.duration || 0)
+    prev = idx
+  }
+  curMin += cost.dist(prev, 0)
+  return (curMin - startMin) + penalty
 }
 
 // ─── Nearest Neighbor (indexé) ─────────────────────────────────────────────────
@@ -111,15 +137,15 @@ function buildNN(cost, n, seedIdx) {
 // ─── 2-opt contraint (indexé) ───────────────────────────────────────────────────
 // Ne déplace jamais les stops ancrés (RDV avec créneau horaire)
 
-function twoOptConstrained(cost, route, anchorIdx) {
-  let best = [...route], bestD = routeCost(cost, best), improved = true, iter = 0
+function twoOptConstrained(cost, route, anchorIdx, stops, startMin) {
+  let best = [...route], bestD = routeCostPenalized(cost, best, stops, startMin), improved = true, iter = 0
   while (improved && iter++ < 100) {
     improved = false
     for (let i = 0; i < best.length - 1; i++) {
       for (let j = i + 2; j < best.length; j++) {
         if (best.slice(i + 1, j + 1).some(idx => anchorIdx.has(idx))) continue
         const cand = [...best.slice(0, i + 1), ...best.slice(i + 1, j + 1).reverse(), ...best.slice(j + 1)]
-        const d = routeCost(cost, cand)
+        const d = routeCostPenalized(cost, cand, stops, startMin)
         if (d < bestD - 0.001) { best = cand; bestD = d; improved = true }
       }
     }
@@ -130,8 +156,8 @@ function twoOptConstrained(cost, route, anchorIdx) {
 // ─── Or-opt contraint (indexé) ──────────────────────────────────────────────────
 // Déplace un stop vers sa meilleure position, sans toucher aux ancrés
 
-function orOptConstrained(cost, route, anchorIdx) {
-  let best = [...route], bestD = routeCost(cost, best), improved = true
+function orOptConstrained(cost, route, anchorIdx, stops, startMin) {
+  let best = [...route], bestD = routeCostPenalized(cost, best, stops, startMin), improved = true
   while (improved) {
     improved = false
     for (let i = 0; i < best.length; i++) {
@@ -140,7 +166,7 @@ function orOptConstrained(cost, route, anchorIdx) {
       const without = best.filter((_, k) => k !== i)
       for (let j = 0; j <= without.length; j++) {
         const cand = [...without.slice(0, j), pt, ...without.slice(j)]
-        const d = routeCost(cost, cand)
+        const d = routeCostPenalized(cost, cand, stops, startMin)
         if (d < bestD - 0.001) { best = cand; bestD = d; improved = true; break }
       }
       if (improved) break
@@ -176,15 +202,18 @@ async function optimizeTech(depot, stops, startH, startMin) {
   }
 
   const anchorIdx = new Set(stops.map((s, i) => s.timeWindow ? i + 1 : null).filter(x => x !== null))
+  const startMinTotal = startH * 60 + startMin
 
   // Multi-start : essayer depuis le dépôt + depuis chaque stop
+  // Sélection sur le coût PÉNALISÉ (respect des heures limites) — pas le coût brut,
+  // sinon on choisirait le candidat le plus court en distance même s'il rate un rendez-vous.
   let best = null, bestCost = Infinity
   const starts = [0, ...Array.from({ length: n }, (_, i) => i + 1)]
   for (const seed of starts) {
     let cand = buildNN(cost, n, seed)
-    cand = twoOptConstrained(cost, cand, anchorIdx)
-    cand = orOptConstrained(cost, cand, anchorIdx)
-    const d = routeCost(cost, cand)
+    cand = twoOptConstrained(cost, cand, anchorIdx, stops, startMinTotal)
+    cand = orOptConstrained(cost, cand, anchorIdx, stops, startMinTotal)
+    const d = routeCostPenalized(cost, cand, stops, startMinTotal)
     if (d < bestCost) { bestCost = d; best = cand }
   }
 

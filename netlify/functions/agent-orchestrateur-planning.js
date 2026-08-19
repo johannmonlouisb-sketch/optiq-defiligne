@@ -316,16 +316,22 @@ async function runPipeline({ dateFrom, dateTo, tech, updateNotion = false }) {
     log.add('info', `Groq : ${groqDecision.decisions.length} décision(s) de découcher générée(s)`)
 
   // ── 8. Mise à jour Notion (optionnel) ─────────────────────
+  // Par lots de 8 en parallèle plutôt qu'une requête à la fois : un update séquentiel sur
+  // une plage de plusieurs semaines dépassait facilement le délai d'exécution de la fonction.
   if (updateNotion) {
     log.add('info', 'Mise à jour des statuts Notion...')
+    const toUpdate = interventions.filter(iv => iv.notionId)
+    const CONCURRENCY = 8
     let updated = 0
-    for (const iv of interventions) {
-      if (!iv.notionId) continue
-      const isUnassigned = vroomUnassigned.some(u => (u.notionId || u.id) === iv.notionId)
-      await updateNotionIntervention(iv.notionId, {
-        'Statut planning': { select: { name: isUnassigned ? 'Non assignable' : 'Planifié' } }
-      })
-      updated++
+    for (let i = 0; i < toUpdate.length; i += CONCURRENCY) {
+      const batch = toUpdate.slice(i, i + CONCURRENCY)
+      await Promise.all(batch.map(iv => {
+        const isUnassigned = vroomUnassigned.some(u => (u.notionId || u.id) === iv.notionId)
+        return updateNotionIntervention(iv.notionId, {
+          'Statut planning': { select: { name: isUnassigned ? 'Non assignable' : 'Planifié' } }
+        })
+      }))
+      updated += batch.length
     }
     log.add('info', `${updated} intervention(s) mises à jour dans Notion`)
   }
