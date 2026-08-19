@@ -2839,7 +2839,13 @@ function rDepart(){
     const seenIds=new Set()
     techOrder.forEach(tid=>{
       const ord=depRouteOrder[tid]
-      if(ord) ord.filter(iv=>iv.date===date&&!seenIds.has(iv.id)).forEach(iv=>{seenIds.add(iv.id);displayIvs.push(iv)})
+      // depRouteOrder ne garde que l'ORDRE : on relit toujours l'intervention fraîche
+      // depuis ivs par id (une synchro Notion peut avoir changé le nom/l'adresse
+      // depuis que cet ordre a été sauvegardé — sinon carte et panneau divergent).
+      if(ord) ord.filter(iv=>iv.date===date&&!seenIds.has(iv.id)).forEach(iv=>{
+        const fresh=ivs.find(x=>x.id===iv.id)||iv
+        seenIds.add(iv.id);displayIvs.push(fresh)
+      })
     })
     dayIvs.filter(iv=>!seenIds.has(iv.id)).forEach(iv=>{seenIds.add(iv.id);displayIvs.push(iv)})
   } else {
