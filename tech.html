@@ -3913,7 +3913,7 @@ async function _submitPin(){
   try{
     const r=await fetch('/api/auth/login',{
       method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({type:'tech', nom:tc.name, pin:pinToCheck})
+      body:JSON.stringify({type:'tech', nom:tc.name, pin:pinToCheck, techId:tc.id})
     })
     const d=await r.json()
     if(!r.ok||!d.ok){

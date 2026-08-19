@@ -436,7 +436,7 @@ const sb = window.supabase.createClient(SB_URL, SB_KEY)
 // ── Config ────────────────────────────────────────────────────────────────
 const KEY_SUB = {'2':'ABC','3':'DEF','4':'GHI','5':'JKL','6':'MNO','7':'PQRS','8':'TUV','9':'WXYZ','0':'+'}
 const PIN_LEN = 4
-let currentPin = '', selectedTech = '', selectedColor = '#2563EB', isLoading = false, ddOpen = false
+let currentPin = '', selectedTech = '', selectedTechId = null, selectedColor = '#2563EB', isLoading = false, ddOpen = false
 let techData = [] // [{nom, color}]
 
 // ── Couleur → rgba ────────────────────────────────────────────────────────
@@ -526,7 +526,7 @@ function buildDropdown(techs) {
     const color = t.color || '#1565C0'
     const initials = nom.slice(0,2).toUpperCase()
     const {r,g,b} = hexToRgb(color)
-    return `<button class="dd-item" onclick="selectTech('${nom}')">
+    return `<button class="dd-item" onclick="selectTech('${nom}', ${t.id != null ? t.id : 'null'})">
       <div class="dd-avatar" style="background:rgba(${r},${g},${b},.18);border-color:rgba(${r},${g},${b},.3);color:${color}">${initials}</div>
       ${nom}
       <svg class="dd-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
@@ -536,8 +536,9 @@ function buildDropdown(techs) {
   }).join('')
 }
 
-function selectTech(nom) {
+function selectTech(nom, id) {
   selectedTech = nom
+  selectedTechId = id != null ? id : null
   const tech = techData.find(t => (t.nom || t) === nom)
   const color = tech?.color || '#2563EB'
 
@@ -596,7 +597,7 @@ async function loginTech() {
   try {
     const r = await fetch('/api/auth/login', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ type:'tech', nom:selectedTech, pin:currentPin })
+      body: JSON.stringify({ type:'tech', nom:selectedTech, pin:currentPin, techId:selectedTechId })
     })
     const d = await r.json()
     if (!r.ok || !d.ok) { pinError(); showMsg(d.error || 'Code PIN incorrect') }

@@ -15,7 +15,7 @@ export default async (request) => {
     if (settings?.techs?.length) {
       techniciens = settings.techs
         .filter(t => t.avail !== false)
-        .map(t => ({ nom: t.name, color: t.color || '#1565C0' }))
+        .map(t => ({ id: t.id, nom: t.name, color: t.color || '#1565C0' }))
     }
   } catch {}
 
