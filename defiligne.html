@@ -2320,7 +2320,7 @@ async function _fetchNotionMonth(ym){
     const dateTo=ym+'-'+String(lastDay).padStart(2,'0')
     const res=await fetch('/api/notion',{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{'Content-Type':'application/json', ...(await _notionAuthHeaders())},
       body:JSON.stringify({action:'fetch_archive',dateFrom,dateTo})
     })
     if(!res.ok) throw new Error('HTTP '+res.status)
@@ -10123,10 +10123,17 @@ function getDaeFromStr(s){
 }
 
 // ── Appel proxy Notion ─────────────────────────────────────────
+// SÉCURITÉ : /api/notion exige désormais une identité vérifiée côté serveur —
+// on attache le token de session Supabase Auth de l'admin connecté.
+async function _notionAuthHeaders(){
+  let token=''
+  try{ const {data:{session}}=await sb.auth.getSession(); token=session?.access_token||'' }catch(e){}
+  return token?{'Authorization':`Bearer ${token}`}:{}
+}
 async function notionCall(action, extra={}){
   const r = await fetch(NOTION_ENDPOINT, {
     method:'POST',
-    headers:{'Content-Type':'application/json'},
+    headers:{'Content-Type':'application/json', ...(await _notionAuthHeaders())},
     body: JSON.stringify({action, ...extra})
   })
   if(!r.ok) throw new Error(`Notion ${r.status}: ${await r.text()}`)
