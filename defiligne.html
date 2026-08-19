@@ -3141,10 +3141,10 @@ async function initDepMap(){
       if(c){ivcRaw.push({iv:techIvs[i],coords:c});allBounds.push([c.lat,c.lng])}
       stepsDone++
     }
-    // ── Faisabilité ──
-    const {feasible:feasibleIvs,skipped:skippedIvs,reason:feasReason}=filterFeasibleIvs(tech.id,date,techIvs)
-    const feasibleIds=new Set(feasibleIvs.map(i=>i.id))
-    const ivcFiltered=ivcRaw.filter(x=>feasibleIds.has(x.iv.id))
+    // Toutes les interventions sont gardées sur la carte (pas de filtrage silencieux
+    // par faisabilité légale — ça désynchronisait la numérotation entre la carte et
+    // le panneau latéral, qui lui n'a jamais appliqué ce filtre).
+    const ivcFiltered=ivcRaw
 
     // ── Séparer stops terminés (dans leur ordre actuel) vs restants ──────────
     const savedOrd=(depRouteOrder[tech.id]||[]).filter(iv=>iv.date===date)
