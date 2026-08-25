@@ -1999,7 +1999,10 @@ let _depExpanded=new Set()
 let depMapObj=null,depRGroup=null,depMarkers={}
 let depSelectedTechs=[]
 let depTechDropdownOpen=false
-let depRouteOrder={}  // {techId:[iv,...]} ordre optimisé de la dernière carte calculée
+let depRouteOrder={}  // {techId:{date:[id,...]}} — ORDRE seulement (ids). Même pattern que
+                       // techRouteOrder côté tech.html : l'intervention est toujours relue
+                       // fraîche depuis `ivs` par id, jamais un objet mis en cache ici (sinon
+                       // carte et panneau peuvent afficher des noms différents pour "1").
 let depETAs={}        // {ivId:{eta:"08:32",leave:"08:47"}} calculé lors du dernier initDepMap
 let depTourEnd={}      // {techId:"18:24"} heure de retour au dépôt estimée (trajet retour inclus)
 let depRouteLines={}  // {techId: L.GeoJSON layer} pour mise à jour sans recalcul complet
@@ -2512,8 +2515,8 @@ function saveRouteOrder(date){
   try{
     const stored=JSON.parse(localStorage.getItem("optiq_route_order")||"{}")
     TECHS.forEach(t=>{
-      const ord=(depRouteOrder[t.id]||[]).filter(iv=>iv.date===date)
-      if(ord.length) stored[`${t.id}_${date}`]=ord.map(iv=>iv.id)
+      const ord=depRouteOrder[t.id]?.[date]
+      if(ord?.length) stored[`${t.id}_${date}`]=ord
       else delete stored[`${t.id}_${date}`] // ordre vidé (reset/déverrouillage) → ne pas laisser une valeur périmée
     })
     localStorage.setItem("optiq_route_order",JSON.stringify(stored))
@@ -2529,12 +2532,8 @@ function loadRouteOrder(date){
     TECHS.forEach(t=>{
       const ids=stored[`${t.id}_${date}`]
       if(ids?.length){
-        const byId=Object.fromEntries(ivs.map(iv=>[iv.id,iv]))
-        const ordered=ids.map(id=>byId[id]).filter(Boolean)
-        if(ordered.length){
-          const other=(depRouteOrder[t.id]||[]).filter(iv=>iv.date!==date)
-          depRouteOrder[t.id]=[...ordered,...other]
-        }
+        if(!depRouteOrder[t.id]) depRouteOrder[t.id]={}
+        depRouteOrder[t.id][date]=ids
       }
     })
   }catch(e){}
@@ -2572,7 +2571,7 @@ function setRouteLock(techId,date,val){
 function resetRouteOrder(techId,date){
   if(!confirm("Effacer l'ordre sauvegardé et relancer une optimisation complète pour ce technicien ?")) return
   setRouteLock(techId,date,false)
-  depRouteOrder[techId]=(depRouteOrder[techId]||[]).filter(iv=>iv.date!==date)
+  if(depRouteOrder[techId]) delete depRouteOrder[techId][date]
   saveRouteOrder(date)
   ivs.filter(i=>i.date===date&&i.techId===techId).forEach(i=>delete depETAs[i.id])
   _schedDepMap()
@@ -2586,7 +2585,7 @@ function toggleRouteLock(techId){
     saveRouteOrder(date)
   } else {
     // Déverrouillage : on efface l'ordre sauvegardé pour permettre une ré-optimisation
-    depRouteOrder[techId]=(depRouteOrder[techId]||[]).filter(iv=>iv.date!==date)
+    if(depRouteOrder[techId]) delete depRouteOrder[techId][date]
     saveRouteOrder(date)
     ivs.filter(i=>i.date===date&&i.techId===techId).forEach(i=>delete depETAs[i.id])
     _schedDepMap()
@@ -2598,7 +2597,10 @@ function toggleRouteLock(techId){
 async function redrawDepRoute(techId){
   if(!depMapObj||!depRGroup) return
   const date=selDate
-  const ord=(depRouteOrder[techId]||[]).filter(iv=>iv.date===date)
+  const ids=depRouteOrder[techId]?.[date]
+  if(!ids?.length) return
+  const byId=Object.fromEntries(ivs.map(iv=>[iv.id,iv]))
+  const ord=ids.map(id=>byId[id]).filter(Boolean)
   if(!ord.length) return
   const tc=TB(techId)
   const techCol=tc.color||'#1565C0'
@@ -2621,17 +2623,18 @@ async function redrawDepRoute(techId){
 // ── Inverser l'ordre d'une tournée technicien ─────────────────────
 function reverseDepRoute(techId){
   const date=selDate
-  let ord=(depRouteOrder[techId]||[]).filter(iv=>iv.date===date)
-  if(!ord.length) ord=ivs.filter(i=>i.date===date&&i.techId===techId)
-  depRouteOrder[techId]=[...ord.reverse(),...(depRouteOrder[techId]||[]).filter(iv=>iv.date!==date)]
+  let ids=depRouteOrder[techId]?.[date]
+  ids=(ids?.length?[...ids]:ivs.filter(i=>i.date===date&&i.techId===techId).map(i=>i.id)).reverse()
+  if(!depRouteOrder[techId]) depRouteOrder[techId]={}
+  depRouteOrder[techId][date]=ids
   setRouteLock(techId,date,true)
   saveRouteOrder(date)
   ivs.filter(i=>i.date===date&&i.techId===techId).forEach(i=>delete depETAs[i.id])
   rDepart()
   _schedDepMap()
   if(depMapObj){
-    ;(depRouteOrder[techId]||[]).filter(iv=>iv.date===date).forEach((iv,idx)=>{
-      if(depMarkers[iv.id]){depMarkers[iv.id]._num=idx+1;updateDepMarker(iv.id)}
+    ids.forEach((id,idx)=>{
+      if(depMarkers[id]){depMarkers[id]._num=idx+1;updateDepMarker(id)}
     })
     redrawDepRoute(techId)
   }
@@ -2640,21 +2643,22 @@ function reverseDepRoute(techId){
 // ── Déplacer une intervention en première position ────────────────
 function setFirstDepIv(ivId,techId){
   const date=selDate
-  let ord=(depRouteOrder[techId]||[]).filter(iv=>iv.date===date)
-  if(!ord.length) ord=ivs.filter(i=>i.date===date&&i.techId===techId)
-  const idx=ord.findIndex(iv=>iv.id===ivId)
+  let ids=depRouteOrder[techId]?.[date]
+  ids=ids?.length?[...ids]:ivs.filter(i=>i.date===date&&i.techId===techId).map(i=>i.id)
+  const idx=ids.indexOf(ivId)
   if(idx<=0) return  // déjà premier ou introuvable
-  const [item]=ord.splice(idx,1)
-  ord.unshift(item)
-  depRouteOrder[techId]=[...ord,...(depRouteOrder[techId]||[]).filter(iv=>iv.date!==date)]
+  ids.splice(idx,1)
+  ids.unshift(ivId)
+  if(!depRouteOrder[techId]) depRouteOrder[techId]={}
+  depRouteOrder[techId][date]=ids
   setRouteLock(techId,date,true)
   saveRouteOrder(date)
   ivs.filter(i=>i.date===date&&i.techId===techId).forEach(i=>delete depETAs[i.id])
   rDepart()
   _schedDepMap()
   if(depMapObj){
-    ord.forEach((iv,i)=>{
-      if(depMarkers[iv.id]){depMarkers[iv.id]._num=i+1;updateDepMarker(iv.id)}
+    ids.forEach((id,i)=>{
+      if(depMarkers[id]){depMarkers[id]._num=i+1;updateDepMarker(id)}
     })
     redrawDepRoute(techId)
   }
@@ -2665,15 +2669,13 @@ function dropDepCard(targetId){
   const targetIv=ivs.find(i=>i.id===targetId)
   if(!targetIv||targetIv.techId!==_dragTechId){_dragId=null;return}
   const techId=_dragTechId
-  let order=(depRouteOrder[techId]||[]).filter(iv=>iv.date===date).map(iv=>iv.id)
-  if(!order.length) order=ivs.filter(i=>i.date===date&&i.techId===techId).map(i=>i.id)
+  let order=depRouteOrder[techId]?.[date]
+  order=order?.length?[...order]:ivs.filter(i=>i.date===date&&i.techId===techId).map(i=>i.id)
   const fi=order.indexOf(_dragId),ti=order.indexOf(targetId)
   if(fi===-1||ti===-1){_dragId=null;return}
   order.splice(fi,1);order.splice(ti,0,_dragId)
-  const byId=Object.fromEntries(ivs.map(iv=>[iv.id,iv]))
-  const orderedIvs=order.map(id=>byId[id]).filter(Boolean)
-  const other=(depRouteOrder[techId]||[]).filter(iv=>iv.date!==date)
-  depRouteOrder[techId]=[...orderedIvs,...other]
+  if(!depRouteOrder[techId]) depRouteOrder[techId]={}
+  depRouteOrder[techId][date]=order
   saveRouteOrder(date)
   _dragId=null
   // Vider les ETAs obsolètes du tech reordonné pour éviter d'afficher de mauvaises heures
@@ -2681,8 +2683,8 @@ function dropDepCard(targetId){
   rDepart()
   _schedDepMap()
   if(depMapObj){
-    orderedIvs.forEach((iv,idx)=>{
-      if(depMarkers[iv.id]){depMarkers[iv.id]._num=idx+1;updateDepMarker(iv.id)}
+    order.forEach((id,idx)=>{
+      if(depMarkers[id]){depMarkers[id]._num=idx+1;updateDepMarker(id)}
     })
     redrawDepRoute(techId)
   }
@@ -2838,14 +2840,16 @@ function rDepart(){
     displayIvs=[]
     const techOrder=depSelectedTechs.length?depSelectedTechs:TECHS.map(t=>t.id)
     const seenIds=new Set()
+    const byId=Object.fromEntries(ivs.map(iv=>[iv.id,iv]))
     techOrder.forEach(tid=>{
-      const ord=depRouteOrder[tid]
-      // depRouteOrder ne garde que l'ORDRE : on relit toujours l'intervention fraîche
-      // depuis ivs par id (une synchro Notion peut avoir changé le nom/l'adresse
-      // depuis que cet ordre a été sauvegardé — sinon carte et panneau divergent).
-      if(ord) ord.filter(iv=>iv.date===date&&!seenIds.has(iv.id)).forEach(iv=>{
-        const fresh=ivs.find(x=>x.id===iv.id)||iv
-        seenIds.add(iv.id);displayIvs.push(fresh)
+      const ids=depRouteOrder[tid]?.[date]
+      // depRouteOrder ne garde que l'ORDRE (ids) : on relit toujours l'intervention
+      // fraîche depuis ivs par id (une synchro Notion peut avoir changé le nom/
+      // l'adresse depuis que cet ordre a été sauvegardé — sinon carte et panneau divergent).
+      if(ids) ids.forEach(id=>{
+        if(seenIds.has(id)) return
+        const fresh=byId[id]
+        if(fresh){seenIds.add(id);displayIvs.push(fresh)}
       })
     })
     dayIvs.filter(iv=>!seenIds.has(iv.id)).forEach(iv=>{seenIds.add(iv.id);displayIvs.push(iv)})
@@ -3044,7 +3048,10 @@ let depBuilding=false
 // Recalcule les horaires depuis une nouvelle heure de départ sans refaire la carte
 async function refreshDepETAs(techId, startHHMM){
   const date=selDate
-  const savedOrd=(depRouteOrder[techId]||[]).filter(iv=>iv.date===date)
+  const savedIds=depRouteOrder[techId]?.[date]
+  if(!savedIds?.length) return
+  const byId=Object.fromEntries(ivs.map(iv=>[iv.id,iv]))
+  const savedOrd=savedIds.map(id=>byId[id]).filter(Boolean)
   if(!savedOrd.length) return
   const[sh,sm]=startHHMM.split(':').map(Number)
   if(isNaN(sh)||isNaN(sm)) return
@@ -3165,11 +3172,11 @@ async function initDepMap(){
     const ivcFiltered=ivcRaw
 
     // ── Séparer stops terminés (dans leur ordre actuel) vs restants ──────────
-    const savedOrd=(depRouteOrder[tech.id]||[]).filter(iv=>iv.date===date)
+    const savedIds=depRouteOrder[tech.id]?.[date]||[]
     const byIdAll=Object.fromEntries(ivcFiltered.map(x=>[x.iv.id,x]))
     // Stops terminés/échoués : garder l'ordre sauvegardé, sinon ordre DB
-    const ivcDone = (savedOrd.length
-      ? savedOrd.map(iv=>byIdAll[iv.id]).filter(Boolean)
+    const ivcDone = (savedIds.length
+      ? savedIds.map(id=>byIdAll[id]).filter(Boolean)
       : ivcFiltered
     ).filter(x=>depValidated[x.iv.id]||depFailed[x.iv.id])
     const doneIds=new Set(ivcDone.map(x=>x.iv.id))
@@ -3181,9 +3188,9 @@ async function initDepMap(){
 
     let ivcOptimized
     // ── Si ordre sauvegardé (glisser-déposer) ou verrouillé : respecter cet ordre ──
-    if(isRouteLocked(tech.id,date)||savedOrd.length){
-      const lockedPending=savedOrd.length
-        ? savedOrd.map(iv=>byIdAll[iv.id]).filter(Boolean).filter(x=>!doneIds.has(x.iv.id))
+    if(isRouteLocked(tech.id,date)||savedIds.length){
+      const lockedPending=savedIds.length
+        ? savedIds.map(id=>byIdAll[id]).filter(Boolean).filter(x=>!doneIds.has(x.iv.id))
         : ivcPending
       const lockedIds=new Set(lockedPending.map(x=>x.iv.id))
       const newOnes=ivcPending.filter(x=>!lockedIds.has(x.iv.id))
@@ -3254,15 +3261,15 @@ async function initDepMap(){
 
     // Quand verrouillé : respecter l'ordre original (les terminés ne remontent pas en tête)
     // sinon le cadenas changerait l'ordre à chaque validation
-    const _locked=isRouteLocked(tech.id,date)&&savedOrd.length
+    const _locked=isRouteLocked(tech.id,date)&&savedIds.length
     const _freshById=Object.fromEntries(ivc.map(x=>[x.iv.id,x]))
     const routeOrd=_locked
-      ? savedOrd.map(sv=>_freshById[sv.id]).filter(Boolean)
+      ? savedIds.map(id=>_freshById[id]).filter(Boolean)
       : ivc
 
     // Persister l'ordre (sans réintroduire le done-first sur un ordre verrouillé)
-    const _otherDates=(depRouteOrder[tech.id]||[]).filter(iv=>iv.date!==date)
-    depRouteOrder[tech.id]=[...routeOrd.map(x=>x.iv),..._otherDates]
+    if(!depRouteOrder[tech.id]) depRouteOrder[tech.id]={}
+    depRouteOrder[tech.id][date]=routeOrd.map(x=>x.iv.id)
     saveRouteOrder(selDate)
     totalWorkMin+=routeOrd.reduce((a,{iv})=>a+dur(iv.type,iv.form),0)
     // ── Marqueurs ──
@@ -3359,12 +3366,14 @@ function openGoogleMaps(){
 
   // Pour chaque technicien, ouvrir un onglet Google Maps dans l'ordre optimisé
   // (depRouteOrder si calculé, sinon ordre de la DB)
+  const byId=Object.fromEntries(ivs.map(iv=>[iv.id,iv]))
   for(const techId of techIds){
     const tech=TB(techId)
     const startDepot=tech?.depotAddr||depot
     // Ordre optimisé si disponible, sinon ordre DB
-    const ordered=depRouteOrder[techId]?.length
-      ? depRouteOrder[techId]
+    const savedIds=depRouteOrder[techId]?.[date]
+    const ordered=savedIds?.length
+      ? savedIds.map(id=>byId[id]).filter(Boolean)
       : ivs.filter(i=>i.date===date&&i.techId===techId)
     if(!ordered.length) continue
     // Google Maps accepte max 10 waypoints intermédiaires
