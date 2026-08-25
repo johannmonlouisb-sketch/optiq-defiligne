@@ -2568,6 +2568,22 @@ function renderDaeStockList(){
 }
 
 let _daeTorchOn=false
+// Message d'erreur caméra différencié par cause réelle (partagé entre les deux
+// scanners) — un message générique unique ne permet pas au technicien (ni au
+// support à distance) de savoir s'il faut réessayer, changer un réglage
+// téléphone, ou juste basculer en saisie manuelle.
+function _cameraErrorMessage(err){
+  const name = err?.name || ''
+  if(name==='NotAllowedError'||name==='PermissionDeniedError')
+    return 'Accès caméra refusé — autorise la caméra dans les réglages du navigateur, ou utilise la saisie manuelle ci-dessous.'
+  if(name==='NotFoundError'||name==='DevicesNotFoundError')
+    return 'Aucune caméra détectée sur cet appareil — utilise la saisie manuelle ci-dessous.'
+  if(name==='NotReadableError'||name==='TrackStartError')
+    return 'Caméra déjà utilisée par une autre application — ferme-la puis réessaie, ou utilise la saisie manuelle.'
+  if(!window.isSecureContext)
+    return 'Connexion non sécurisée (HTTPS requis) — la caméra ne peut pas démarrer. Utilise la saisie manuelle ci-dessous.'
+  return 'Impossible d\'accéder à la caméra — utilise la saisie manuelle ci-dessous.'
+}
 function openDaeScan(){
   const ov=document.getElementById('dae-scan-overlay')
   ov.style.display='flex'
@@ -2614,8 +2630,8 @@ function openDaeScan(){
         zoomWrap.style.display='flex'
       }
     }catch(e){}
-  }).catch(()=>{
-    document.getElementById('dae-scan-reader').innerHTML='<p style="color:#fff;text-align:center;padding:20px">Impossible d\'accéder à la caméra — utilise la saisie manuelle ci-dessous.</p>'
+  }).catch(err=>{
+    document.getElementById('dae-scan-reader').innerHTML='<p style="color:#fff;text-align:center;padding:20px">'+_cameraErrorMessage(err)+'</p>'
   })
 }
 async function toggleDaeTorch(){
@@ -2825,8 +2841,8 @@ function stkOpenScan(){
         zoomWrap.style.display='flex'
       }
     }catch(e){}
-  }).catch(()=>{
-    document.getElementById('stk-scan-reader').innerHTML='<p style="color:#fff;text-align:center;padding:20px">Impossible d\'accéder à la caméra — utilise la saisie manuelle ci-dessous.</p>'
+  }).catch(err=>{
+    document.getElementById('stk-scan-reader').innerHTML='<p style="color:#fff;text-align:center;padding:20px">'+_cameraErrorMessage(err)+'</p>'
   })
 }
 async function stkToggleTorch(){
