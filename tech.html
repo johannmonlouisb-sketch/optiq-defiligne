@@ -2605,7 +2605,12 @@ function openDaeScan(){
     document.getElementById('dae-scan-reader').innerHTML='<p style="color:#fff;text-align:center;padding:20px">Scanner indisponible — utilise la saisie manuelle ci-dessous.</p>'
     return
   }
-  _daeScanner=new Html5Qrcode('dae-scan-reader')
+  // Formats DAE : DataMatrix (étiquettes GS1 des dispositifs médicaux) + QR (certaines
+  // étiquettes plus anciennes). Restreindre les formats (au lieu de tout tenter) laisse
+  // plus de cycles de décodage par seconde au DataMatrix, dont le décodeur JS pur est
+  // le plus lent/le moins fiable des deux.
+  const daeFormats=(typeof Html5QrcodeSupportedFormats!=='undefined')?[Html5QrcodeSupportedFormats.DATA_MATRIX,Html5QrcodeSupportedFormats.QR_CODE]:undefined
+  _daeScanner=new Html5Qrcode('dae-scan-reader', daeFormats?{formatsToSupport:daeFormats,verbose:false}:undefined)
   _daeScanner.start(
     { facingMode:{ideal:'environment'} },
     {
@@ -2620,7 +2625,13 @@ function openDaeScan(){
         facingMode:{ideal:'environment'},
         width:{ideal:1920}, height:{ideal:1080},
         advanced:[{focusMode:'continuous'}]
-      }
+      },
+      // Demande explicitement au navigateur d'utiliser son détecteur de codes-barres
+      // NATIF (BarcodeDetector / Shape Detection API) quand disponible, au lieu du
+      // décodeur JavaScript pur (ZXing-js) — sur Android Chrome c'est ML Kit de Google
+      // en dessous, nettement plus capable sur DataMatrix. Repli automatique et
+      // silencieux sur le décodeur JS si le navigateur ne le supporte pas.
+      experimentalFeatures:{ useBarCodeDetectorIfSupported:true }
     },
     decodedText=>{ onDaeCodeDetected(decodedText) },
     ()=>{} // ignorer les échecs de décodage image-par-image (normal en continu)
@@ -2836,7 +2847,10 @@ function stkOpenScan(){
         facingMode:{ideal:'environment'},
         width:{ideal:1920}, height:{ideal:1080},
         advanced:[{focusMode:'continuous'}]
-      }
+      },
+      // Détecteur de codes-barres natif du navigateur si disponible (ML Kit sous
+      // Android Chrome) plutôt que le décodeur JS pur — voir openDaeScan().
+      experimentalFeatures:{ useBarCodeDetectorIfSupported:true }
     },
     decodedText=>{ stkOnDetect(decodedText) },
     ()=>{}
