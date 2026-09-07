@@ -2948,6 +2948,7 @@ function rDepart(){
                 ${depETAs[iv.id]?`<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:5px">
                   ${depETAs[iv.id]?.travelMin?`<span style="font-size:11px;padding:2px 7px;border-radius:100px;background:#E3F2FD;color:#1565C0">🚗 ${fmtMin(depETAs[iv.id].travelMin)}</span>`:''}
                   ${depETAs[iv.id]?`<span style="font-size:11px;font-weight:600;padding:2px 7px;border-radius:100px;background:#E8F5E9;color:#2E7D32">🕐 ${depETAs[iv.id].eta} → ${depETAs[iv.id].leave}</span>`:''}
+                  ${depETAs[iv.id]?.delayMin>1?`<span title="Retard potentiel cumulé vs circulation fluide" style="font-size:11px;font-weight:600;padding:2px 7px;border-radius:100px;background:#FFF3E0;color:#E65100">🐢 +${fmtMin(depETAs[iv.id].delayMin)} trafic</span>`:''}
                 </div>`:''}
                 ${iv.notes?`<div style="font-size:12px;color:var(--orange);background:#FFF3E0;padding:5px 9px;border-radius:6px;margin-bottom:5px">📝 ${iv.notes}</div>`:""}
                 ${(iv.commercial||iv.nSerie||iv.dateFin)?`<div style="font-size:11px;background:#F8F9FA;border:1px solid #E9ECEF;padding:5px 9px;border-radius:6px;margin-bottom:5px;display:flex;gap:10px;flex-wrap:wrap">
@@ -3300,11 +3301,14 @@ async function initDepMap(){
         // Calculer les ETAs par arrêt depuis les durées de leg réelles (trafic)
         if(data.legs?.length){
           let curMin=_effStartMin
+          let delayAccum=0 // retard cumulé vs circulation fluide (somme des trafficDurationMin - durationMin)
           routeOrd.forEach(({iv},idx)=>{
-            curMin+=data.legs[idx]?.trafficDurationMin||0
+            const leg=data.legs[idx]
+            curMin+=leg?.trafficDurationMin||0
+            delayAccum+=Math.max(0,(leg?.trafficDurationMin||0)-(leg?.durationMin??(leg?.trafficDurationMin||0)))
             if(iv.timeStart){const[th,tm]=iv.timeStart.split(':').map(Number);if(curMin<th*60+tm)curMin=th*60+tm}
             const wm=dur(iv.type,iv.form)
-            depETAs[iv.id]={eta:toHM(curMin),leave:toHM(curMin+wm),travelMin:data.legs[idx]?.trafficDurationMin||0}
+            depETAs[iv.id]={eta:toHM(curMin),leave:toHM(curMin+wm),travelMin:leg?.trafficDurationMin||0,delayMin:Math.round(delayAccum)}
             curMin+=wm
           })
           // Retour dépôt : dernier leg de la matrice (après le dernier arrêt)
