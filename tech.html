@@ -847,7 +847,7 @@ function toHHMM(m){
 }
 function refreshLiveETAs(){
   if(!techRouteLegDurations.length||!_routeOrderedPts.length) return
-  const startHHMM=depStartTime()
+  const startHHMM=effectiveStartHHMM()
   const[sh,sm]=startHHMM.split(':').map(Number)
   const nowMin=nowMinParis()
   let curMin=sh*60+sm
@@ -1019,6 +1019,15 @@ function navigateToNextClient(provider){
   closeNextClientPopup()
 }
 function depStartTime(){return document.getElementById('dep-time')?.value||techCfg.startTime||'08:00'}
+// Une fois la tournée démarrée, les horaires clients doivent rester ancrés sur
+// l'heure de départ RÉELLE (figée par startTournee() dans tourStartTime, restaurée
+// après reload) — pas sur le champ dep-time, qui peut changer après coup (reset
+// automatique, réouverture de page...) et ferait dériver tous les horaires suivants
+// à chaque recalcul (refreshLiveETAs tourne toutes les 60s).
+function effectiveStartHHMM(){
+  if(tourRunning&&tourStartTime) return tourStartTime.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:TZ,hour12:false})
+  return depStartTime()
+}
 function myIvs(date){
   // techId===curTech → propre au tech | !techId (0/null/undefined) → non assigné → visible aussi
   return ivs.filter(i=>i.date===date&&(i.techId===curTech||!i.techId))
@@ -1102,7 +1111,7 @@ async function _calcETAsHeadless(){
     const ac=arrAddr?(gCache[arrAddr]||dc):dc
     const waypoints=techRoundTrip?[dc,...ordered.map(p=>p.c),ac]:[dc,...ordered.map(p=>p.c)]
     // Appel route-traffic (même API que admin)
-    const startHHMM=depStartTime()
+    const startHHMM=effectiveStartHHMM()
     const res=await fetch('/api/route-traffic',{method:'POST',headers:{'Content-Type':'application/json', ..._techAuthHeaders()},
       body:JSON.stringify({waypoints,departureHHMM:startHHMM})})
     if(!res.ok) return
@@ -1513,7 +1522,7 @@ function renderDepart(){
     if(etaThis!==null){
       const prevIv=idx>0?dayIvs[idx-1]:null
       const prevLeave=idx===0
-        ? tToMin(depStartTime())
+        ? tToMin(effectiveStartHHMM())
         : tToMin(techETAs[prevIv?.id]?.leave)
       if(prevLeave!==null){
         const totalGap=Math.max(0,etaThis-prevLeave)
@@ -2036,7 +2045,7 @@ async function calcMap(){
   // ── Ordre de tournée : priorité à l'ordre calculé par l'admin ──
   setProgress(68,"Optimisation...")
   let orderedPts=pts
-  const[sh,sm]=depStartTime().split(':').map(Number)
+  const[sh,sm]=effectiveStartHHMM().split(':').map(Number)
   if(pts.length>1){
     // 1. Récupérer l'ordre le plus récent depuis Supabase (posé par l'admin ou ce
     // technicien sur un autre appareil), puis charger depuis le cache local fusionné
@@ -2136,7 +2145,7 @@ async function calcMap(){
   if(orderedPts.length>0){
     const all=techRoundTrip?[dc,...orderedPts.map(p=>p.c),ac]:[dc,...orderedPts.map(p=>p.c)]
     try{
-      const startHHMM=depStartTime()
+      const startHHMM=effectiveStartHHMM()
       const res=await fetch('/api/route-traffic',{method:'POST',headers:{'Content-Type':'application/json', ..._techAuthHeaders()},body:JSON.stringify({waypoints:all,departureHHMM:startHHMM})})
       const data=await res.json()
       techRouteLegDurations=data.legs||[]
