@@ -10231,6 +10231,14 @@ async function pullFromNotion(dateFrom, dateTo, mode='merge'){
         ivs[existIdx] = {
           ...prev,
           notionId: page.id,
+          // Adresse (donc code postal) : PAS dans la même catégorie que les notes/contact
+          // ci-dessous — Notion est la source de vérité pour l'adresse du site (le bureau
+          // la corrige directement là-bas), donc Notion gagne ici. Avec un pattern
+          // "local si non-vide" comme les autres champs, une correction d'adresse dans
+          // Notion ne serait JAMAIS récupérée (l'adresse locale n'est presque jamais vide
+          // une fois l'intervention créée) — c'était le bug : le pull ignorait purement et
+          // simplement toute modification d'adresse faite dans Notion.
+          addr: iv.addr || prev.addr,
           // Local en priorité — Notion remplit uniquement les champs vides localement
           notes:         prev.notes         || iv.notes,
           contact:       prev.contact       || iv.contact,
