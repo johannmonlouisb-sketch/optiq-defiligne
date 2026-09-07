@@ -4190,7 +4190,11 @@ function openDaeScanAdmin(){
     document.getElementById('dae-scan-reader').innerHTML='<p style="color:#fff;text-align:center;padding:20px">Scanner indisponible — utilise la saisie manuelle ci-dessous.</p>'
     return
   }
-  _daeScannerAdmin=new Html5Qrcode('dae-scan-reader')
+  // Formats DAE : DataMatrix (étiquettes GS1) + QR. Restreindre les formats laisse
+  // plus de cycles de décodage par seconde au DataMatrix, le plus lent/fragile des deux
+  // avec le décodeur JS pur.
+  const daeFormatsAdmin=(typeof Html5QrcodeSupportedFormats!=='undefined')?[Html5QrcodeSupportedFormats.DATA_MATRIX,Html5QrcodeSupportedFormats.QR_CODE]:undefined
+  _daeScannerAdmin=new Html5Qrcode('dae-scan-reader', daeFormatsAdmin?{formatsToSupport:daeFormatsAdmin,verbose:false}:undefined)
   _daeScannerAdmin.start(
     { facingMode:{ideal:'environment'} },
     {
@@ -4201,7 +4205,10 @@ function openDaeScanAdmin(){
         facingMode:{ideal:'environment'},
         width:{ideal:1920}, height:{ideal:1080},
         advanced:[{focusMode:'continuous'}]
-      }
+      },
+      // Détecteur de codes-barres natif du navigateur si disponible (ML Kit sous
+      // Android Chrome) plutôt que le décodeur JS pur — bien plus fiable sur DataMatrix.
+      experimentalFeatures:{ useBarCodeDetectorIfSupported:true }
     },
     decodedText=>{ onDaeCodeDetectedAdmin(decodedText) },
     ()=>{}
@@ -4605,7 +4612,10 @@ function openStkScanAdmin(){
     { facingMode:{ideal:'environment'} },
     {
       fps:10, qrbox:{width:280,height:180}, aspectRatio:1.5,
-      videoConstraints:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080},advanced:[{focusMode:'continuous'}]}
+      videoConstraints:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080},advanced:[{focusMode:'continuous'}]},
+      // Détecteur de codes-barres natif du navigateur si disponible (ML Kit sous
+      // Android Chrome) plutôt que le décodeur JS pur — voir openDaeScanAdmin().
+      experimentalFeatures:{ useBarCodeDetectorIfSupported:true }
     },
     decodedText=>{ stkHandleScanAdmin(decodedText) },
     ()=>{}
