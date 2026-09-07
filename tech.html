@@ -852,11 +852,14 @@ function refreshLiveETAs(){
   const nowMin=nowMinParis()
   let curMin=sh*60+sm
   let lastLeaveMin=sh*60+sm
+  let delayAccum=0 // retard cumulé vs circulation fluide
   _routeOrderedPts.forEach((p,idx)=>{
-    curMin+=techRouteLegDurations[idx]?.trafficDurationMin||0
+    const leg=techRouteLegDurations[idx]
+    curMin+=leg?.trafficDurationMin||0
+    delayAccum+=Math.max(0,(leg?.trafficDurationMin||0)-(leg?.durationMin??(leg?.trafficDurationMin||0)))
     if(p.iv.timeStart){const[th,tm]=p.iv.timeStart.split(':').map(Number);if(curMin<th*60+tm)curMin=th*60+tm}
     if(tourRunning&&curMin<nowMin&&!validated[p.iv.id]&&!failed[p.iv.id]) curMin=nowMin
-    techETAs[p.iv.id]={eta:toHHMM(curMin),leave:toHHMM(curMin+dur(p.iv.type,p.iv.form))}
+    techETAs[p.iv.id]={eta:toHHMM(curMin),leave:toHHMM(curMin+dur(p.iv.type,p.iv.form)),delayMin:Math.round(delayAccum)}
     curMin+=dur(p.iv.type,p.iv.form)
     if(!validated[p.iv.id]&&!failed[p.iv.id]) lastLeaveMin=curMin
   })
@@ -1124,12 +1127,15 @@ async function _calcETAsHeadless(){
       const[sh,sm]=startHHMM.split(':').map(Number)
       const nowMin=nowMinParis()
       let curMin=sh*60+sm
+      let delayAccum=0 // retard cumulé vs circulation fluide
       ordered.forEach((p,idx)=>{
-        curMin+=data.legs[idx]?.trafficDurationMin||0
+        const leg=data.legs[idx]
+        curMin+=leg?.trafficDurationMin||0
+        delayAccum+=Math.max(0,(leg?.trafficDurationMin||0)-(leg?.durationMin??(leg?.trafficDurationMin||0)))
         if(p.iv.timeStart){const[th,tm]=p.iv.timeStart.split(':').map(Number);if(curMin<th*60+tm)curMin=th*60+tm}
         if(tourRunning&&curMin<nowMin&&!validated[p.iv.id]&&!failed[p.iv.id]) curMin=nowMin
         const wm=dur(p.iv.type,p.iv.form)
-        techETAs[p.iv.id]={eta:toHHMM(curMin),leave:toHHMM(curMin+wm),travelMin:data.legs[idx]?.trafficDurationMin||0}
+        techETAs[p.iv.id]={eta:toHHMM(curMin),leave:toHHMM(curMin+wm),travelMin:leg?.trafficDurationMin||0,delayMin:Math.round(delayAccum)}
         curMin+=wm
       })
     }
@@ -1599,6 +1605,7 @@ function renderDepart(){
         ${etaLate?`<span class="tag" style="background:#FFEBEE;color:#C62828;font-weight:700">⚠️ Créneau serré (−30min)</span>`:""}
         <span class="tag tag-info">🔧 ${fmin(workMin)} · ${(TYPES[iv.type]||TYPES.maintenance_simple).label}</span>
         ${techETAs[iv.id]?`<span class="tag" style="background:#E8F5E9;color:#2E7D32;font-weight:600">🕐 Arrivée ${techETAs[iv.id].eta} · fin ${techETAs[iv.id].leave}</span>`:""}
+        ${techETAs[iv.id]?.delayMin>1?`<span class="tag" title="Retard potentiel cumulé vs circulation fluide" style="background:#FFF3E0;color:#E65100;font-weight:600">🐢 +${fmin(techETAs[iv.id].delayMin)} trafic</span>`:""}
         ${iv.timeEnd&&!done?`<span class="tag" style="background:#F3F3F3;color:#757575;font-size:11px">⏰ Au plus tard ${iv.timeEnd}</span>`:""}
         ${unroutedIvs.includes(iv)?`<span class="tag" style="background:#FFF3E0;color:#E65100;font-weight:700">⚠️ Adresse non géolocalisée — hors itinéraire</span>`:""}
         ${done?`<span class="tag tag-ok">✅ Kizeo sync</span>`:""}
@@ -2182,10 +2189,13 @@ async function calcMap(){
           const[sh,sm]=startHHMM.split(':').map(Number)
           let curMin=sh*60+sm
           const nowMin=nowMinParis()
+          let delayAccum=0 // retard cumulé vs circulation fluide (legs avec données trafic seulement)
           orderedPts.forEach((p,idx)=>{
             // Sécurité : si moins de legs que de stops, utiliser Haversine pour les derniers
             if(idx<data.legs.length){
-              curMin+=data.legs[idx]?.trafficDurationMin||0
+              const leg=data.legs[idx]
+              curMin+=leg?.trafficDurationMin||0
+              delayAccum+=Math.max(0,(leg?.trafficDurationMin||0)-(leg?.durationMin??(leg?.trafficDurationMin||0)))
             } else {
               const prev=idx>0?orderedPts[idx-1].c:dc
               const dLat=(p.c.lat-prev.lat)*Math.PI/180,dLng=(p.c.lng-prev.lng)*Math.PI/180
@@ -2194,7 +2204,7 @@ async function calcMap(){
             }
             if(p.iv.timeStart){const[th,tm]=p.iv.timeStart.split(':').map(Number);if(curMin<th*60+tm)curMin=th*60+tm}
             if(tourRunning&&curMin<nowMin&&!validated[p.iv.id]&&!failed[p.iv.id]) curMin=nowMin
-            techETAs[p.iv.id]={eta:toHHMM(curMin),leave:toHHMM(curMin+dur(p.iv.type,p.iv.form))}
+            techETAs[p.iv.id]={eta:toHHMM(curMin),leave:toHHMM(curMin+dur(p.iv.type,p.iv.form)),delayMin:Math.round(delayAccum)}
             curMin+=dur(p.iv.type,p.iv.form)
           })
         }
