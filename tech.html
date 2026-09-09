@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#1565C0">
@@ -71,7 +71,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 #content{flex:1;overflow:hidden;position:relative}
 .view{display:none;position:absolute;inset:0}
 .view.on{display:flex;flex-direction:column}
-#tabs{height:var(--tab);background:#fff;border-top:2px solid var(--border);display:flex;flex-shrink:0}
+#tabs{height:calc(var(--tab) + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom);background:#fff;border-top:2px solid var(--border);display:flex;flex-shrink:0}
 .tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:none;background:transparent;cursor:pointer;position:relative;transition:background .1s}
 .tab:active{background:var(--blueLt)}
 .tab .ti{font-size:24px}
@@ -171,7 +171,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .inp:focus{outline:none;border-color:var(--blue)}
 
 /* ── TOAST ── */
-#toast{position:fixed;bottom:calc(var(--tab) + 16px);left:50%;transform:translateX(-50%);background:var(--dark);color:#fff;padding:11px 22px;border-radius:100px;font-size:13px;font-weight:600;z-index:999;box-shadow:0 4px 20px rgba(0,0,0,.25);white-space:nowrap;opacity:0;transition:opacity .3s;pointer-events:none}
+#toast{position:fixed;bottom:calc(var(--tab) + env(safe-area-inset-bottom) + 16px);left:50%;transform:translateX(-50%);background:var(--dark);color:#fff;padding:11px 22px;border-radius:100px;font-size:13px;font-weight:600;z-index:999;box-shadow:0 4px 20px rgba(0,0,0,.25);white-space:nowrap;opacity:0;transition:opacity .3s;pointer-events:none}
 #toast.show{opacity:1}
 
 /* ── KIZEO SYNC STATUS ── */
@@ -831,14 +831,14 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <!-- POPUP PROCHAINE DESTINATION -->
 <!-- Feuille générique tournée : bilan fin de tournée, alerte arrivée destination finale -->
 <div id="tour-sheet-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000" onclick="_tourSheetOverlayClick()"></div>
-<div id="tour-sheet" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#fff;border-radius:18px 18px 0 0;padding:20px 18px 32px;z-index:9001;box-shadow:0 -4px 24px rgba(0,0,0,.18);transform:translateY(100%);transition:transform .28s cubic-bezier(.4,0,.2,1)">
+<div id="tour-sheet" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#fff;border-radius:18px 18px 0 0;padding:20px 18px calc(32px + env(safe-area-inset-bottom));z-index:9001;box-shadow:0 -4px 24px rgba(0,0,0,.18);transform:translateY(100%);transition:transform .28s cubic-bezier(.4,0,.2,1)">
   <div id="tour-sheet-title" style="font-size:18px;font-weight:800;margin-bottom:10px"></div>
   <div id="tour-sheet-body" style="font-size:14px;line-height:1.5;color:#333;margin-bottom:16px"></div>
   <button id="tour-sheet-btn" onclick="_tourSheetBtnClick(1)" style="width:100%;padding:14px;background:#2E7D32;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;transition:opacity .2s"></button>
   <button id="tour-sheet-btn2" onclick="_tourSheetBtnClick(2)" style="display:none;width:100%;margin-top:8px;padding:12px;background:none;color:#757575;border:1.5px solid #E0E0E0;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;transition:opacity .2s"></button>
 </div>
 <div id="next-dest-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000" onclick="closeNextClientPopup()"></div>
-<div id="next-dest-sheet" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#fff;border-radius:18px 18px 0 0;padding:20px 18px 32px;z-index:9001;box-shadow:0 -4px 24px rgba(0,0,0,.18);transform:translateY(100%);transition:transform .28s cubic-bezier(.4,0,.2,1)">
+<div id="next-dest-sheet" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#fff;border-radius:18px 18px 0 0;padding:20px 18px calc(32px + env(safe-area-inset-bottom));z-index:9001;box-shadow:0 -4px 24px rgba(0,0,0,.18);transform:translateY(100%);transition:transform .28s cubic-bezier(.4,0,.2,1)">
   <div style="width:40px;height:4px;background:#ddd;border-radius:2px;margin:0 auto 16px"></div>
   <div style="font-size:13px;color:var(--gray);font-weight:600;margin-bottom:10px">DESTINATION SUIVANTE</div>
   <div id="next-dest-card" style="background:#F8FAFE;border-left:4px solid var(--blue);border-radius:10px;padding:12px 14px;margin-bottom:16px">
