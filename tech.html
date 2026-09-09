@@ -1176,7 +1176,11 @@ function _startTourInterval(){
   // relance le suivi GPS et récupère le planning de référence figé au démarrage.
   if(tourRunning){ _startPosWatch(); if(!_plannedETAs) _loadPlannedSnapshot() }
   function _tick(){
-    const elapsed=Math.floor((new Date()-tourStartTime)/60000)
+    // Temps actif = écoulé total - pauses déjà terminées (_pauseCumMs) - pause en
+    // cours si non reprise (_pauseStartTime) — mêmes variables que refreshLiveETAs(),
+    // ni l'une ni l'autre n'est modifiée ici, juste lues pour cet affichage.
+    const activeMs=(new Date()-tourStartTime)-_pauseCumMs-(_pauseStartTime?(new Date()-_pauseStartTime):0)
+    const elapsed=Math.floor(activeMs/60000)
     const el=document.getElementById('tour-timer')
     if(el) el.textContent=fmtDuration(elapsed)
     // Garder le bloc visible si tourRunning ET pas en pause (au cas où renderDepart l'aurait caché)
