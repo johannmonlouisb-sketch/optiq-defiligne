@@ -668,8 +668,8 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
 <div id="tour-sheet" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#fff;border-radius:18px 18px 0 0;padding:20px 18px 32px;z-index:9001;box-shadow:0 -4px 24px rgba(0,0,0,.18);transform:translateY(100%);transition:transform .28s cubic-bezier(.4,0,.2,1)">
   <div id="tour-sheet-title" style="font-size:18px;font-weight:800;margin-bottom:10px"></div>
   <div id="tour-sheet-body" style="font-size:14px;line-height:1.5;color:#333;margin-bottom:16px"></div>
-  <button id="tour-sheet-btn" onclick="_tourSheetCb&&_tourSheetCb()" style="width:100%;padding:14px;background:#2E7D32;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer"></button>
-  <button id="tour-sheet-btn2" onclick="_tourSheetCb2&&_tourSheetCb2()" style="display:none;width:100%;margin-top:8px;padding:12px;background:none;color:#757575;border:1.5px solid #E0E0E0;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer"></button>
+  <button id="tour-sheet-btn" onclick="_tourSheetBtnClick(1)" style="width:100%;padding:14px;background:#2E7D32;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;transition:opacity .2s"></button>
+  <button id="tour-sheet-btn2" onclick="_tourSheetBtnClick(2)" style="display:none;width:100%;margin-top:8px;padding:12px;background:none;color:#757575;border:1.5px solid #E0E0E0;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;transition:opacity .2s"></button>
 </div>
 <div id="next-dest-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000" onclick="closeNextClientPopup()"></div>
 <div id="next-dest-sheet" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#fff;border-radius:18px 18px 0 0;padding:20px 18px 32px;z-index:9001;box-shadow:0 -4px 24px rgba(0,0,0,.18);transform:translateY(100%);transition:transform .28s cubic-bezier(.4,0,.2,1)">
@@ -1027,21 +1027,37 @@ function showTourSheet(title,html,btnLabel,onClick,opts={}){
   _tourSheetCb=onClick||closeTourSheet
   _tourSheetPersistent=!!opts.persistent
   _tourSheetOpenedAt=Date.now()
-  const b2=document.getElementById('tour-sheet-btn2')
+  const b1=document.getElementById('tour-sheet-btn'), b2=document.getElementById('tour-sheet-btn2')
   if(opts.secondaryLabel){ b2.textContent=opts.secondaryLabel; b2.style.display='block'; _tourSheetCb2=opts.onSecondary||closeTourSheet }
   else { b2.style.display='none'; _tourSheetCb2=null }
+  // Boutons inactifs (grisés) pendant 1 s : sur mobile, le tap qui a ouvert la fiche
+  // (ex. "Fin tournée", en bas de liste) génère souvent un second click retardé exactement
+  // là où le bouton de la fiche vient d'apparaître — il fermait le bilan avant lecture.
+  ;[b1,b2].forEach(b=>{b.disabled=true;b.style.opacity='.45'})
+  setTimeout(()=>{[b1,b2].forEach(b=>{b.disabled=false;b.style.opacity='1'})},1000)
   const sh=document.getElementById('tour-sheet')
   document.getElementById('tour-sheet-overlay').style.display='block'; sh.style.display='block'
   setTimeout(()=>sh.style.transform='translateY(0)',10)
 }
+function _tourSheetBtnClick(n){
+  if(Date.now()-_tourSheetOpenedAt<1000) return // double sécurité contre le click fantôme
+  const cb=n===2?_tourSheetCb2:_tourSheetCb
+  if(cb) cb()
+}
 function _tourSheetOverlayClick(){
   if(_tourSheetPersistent) return
-  if(Date.now()-_tourSheetOpenedAt<700) return // ignore le tap fantôme juste après l'ouverture
+  if(Date.now()-_tourSheetOpenedAt<1000) return
   closeTourSheet()
 }
 function closeTourSheet(){
   const sh=document.getElementById('tour-sheet'); sh.style.transform='translateY(100%)'
   setTimeout(()=>{document.getElementById('tour-sheet-overlay').style.display='none';sh.style.display='none'},300)
+}
+// Réouvre le bilan de la tournée du jour depuis les données enregistrées (bouton 📊 Bilan)
+function showLastTourStats(){
+  const t=tourneesData[depDate()]
+  if(!t){ toast('Aucune tournée terminée aujourd\'hui','#757575'); return }
+  showTourStats(t.duration||0, t.gainMin??null, t.validated||0, t.failed||0, t.totalClients||0, t.plannedEnd||null, t.endTime||'')
 }
 function showTourStats(durationMin,gainMin,validatedCnt,failedCnt,total,plannedEnd,endTimeStr){
   let bilan
@@ -1644,6 +1660,7 @@ function renderDepart(){
   const locked=isTechRouteLocked(date)
   const toolbarHtml=dayIvs.length?`<div style="display:flex;align-items:center;gap:8px;padding:6px 2px 8px;flex-shrink:0">
     <span style="font-size:12px;color:var(--gray);flex:1">${locked?"🔒 Ordre verrouillé":"Glisser pour réordonner"}</span>
+    ${!tourRunning&&tourneesData[date]?`<button onclick="showLastTourStats()" title="Revoir le bilan de la tournée du jour" style="padding:5px 12px;font-size:12px;border-radius:8px;border:1.5px solid #2E7D32;background:#E8F5E9;color:#2E7D32;cursor:pointer;font-family:inherit;font-weight:700">📊 Bilan</button>`:""}
     <button onclick="reverseTechRoute()" style="padding:5px 12px;font-size:12px;border-radius:8px;border:1.5px solid var(--blue);background:#fff;color:var(--blue);cursor:pointer;font-family:inherit;font-weight:600">⇅ Inverser</button>
     <button onclick="toggleTechRouteLock()" style="padding:5px 12px;font-size:12px;border-radius:8px;border:1.5px solid ${locked?"#16a34a":"var(--border)"};background:${locked?"#f0fdf4":"#fff"};color:${locked?"#16a34a":"var(--gray)"};cursor:pointer;font-family:inherit;font-weight:600">${locked?"🔒 Verr.":"🔓 Libre"}</button>
   </div>`:""
