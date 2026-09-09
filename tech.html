@@ -412,6 +412,31 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .login-av{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;flex-shrink:0}
 </style>
 
+<!-- ═══ Système d'icônes — sprite SVG inline, style ligne unique, aucune
+     dépendance externe (pas de librairie/police/requête réseau). Utilisé
+     uniquement sur les composants de la refonte (nav, hero, actions rapides,
+     prochaine destination, stats) — le reste de l'app garde ses emojis
+     d'origine, changement volontairement borné pour limiter le risque sur
+     un fichier de cette taille sans pouvoir le tester visuellement. ═══ -->
+<svg style="display:none" aria-hidden="true">
+  <symbol id="ico-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></symbol>
+  <symbol id="ico-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></symbol>
+  <symbol id="ico-box" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.9 1.9l8 4a2 2 0 011.1 1.8v9a2 2 0 01-1.1 1.8l-8 4a2 2 0 01-1.8 0l-8-4a2 2 0 01-1.1-1.8v-9a2 2 0 011.1-1.8l8-4a2 2 0 011.8 0z"/><polyline points="2.3 6.2 12 11 21.7 6.2"/><line x1="12" y1="22.5" x2="12" y2="11"/></symbol>
+  <symbol id="ico-tag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4L13.4 20.6a2 2 0 01-2.8 0L2 12V2h10l8.6 8.6a2 2 0 010 2.8z"/><circle cx="7" cy="7" r="1.2" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="ico-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="4"/><path d="M4 21v-2a4 4 0 014-4h8a4 4 0 014 4v2"/></symbol>
+  <symbol id="ico-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 6.5-9 12-9 12s-9-5.5-9-12a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></symbol>
+  <symbol id="ico-nav" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></symbol>
+  <symbol id="ico-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.5 9a9 9 0 0114.85-3.36L23 10M1 14l4.65 4.36A9 9 0 0020.5 15"/></symbol>
+  <symbol id="ico-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></symbol>
+  <symbol id="ico-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></symbol>
+  <symbol id="ico-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></symbol>
+  <symbol id="ico-camera" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></symbol>
+  <symbol id="ico-play" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6 3 20 12 6 21 6 3"/></symbol>
+  <symbol id="ico-chevron-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></symbol>
+  <symbol id="ico-sliders" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="10"/><circle cx="4" cy="14" r="2"/><line x1="12" y1="21" x2="12" y2="15"/><circle cx="12" cy="11" r="2"/><line x1="20" y1="21" x2="20" y2="17"/><circle cx="20" cy="13" r="2"/></symbol>
+</svg>
+<style>.ico{width:1.1em;height:1.1em;vertical-align:-.18em;flex-shrink:0}</style>
+
 <div id="app">
 
   <!-- TOPBAR -->
@@ -451,12 +476,12 @@ button:disabled{opacity:.45;cursor:not-allowed}
         <!-- CTA unique : Démarrer (repos) OU minuteur+Fin tournée (en cours) — jamais les deux -->
         <div id="dep-tour-timer" style="display:none">
           <div id="dep-tour-timer-info">
-            <div class="ux-micro" style="text-transform:uppercase;letter-spacing:.06em;font-weight:700;color:var(--success)">⏱️ Tournée en cours</div>
+            <div class="ux-micro" style="text-transform:uppercase;letter-spacing:.06em;font-weight:700;color:var(--success);display:flex;align-items:center;gap:4px"><svg class="ico"><use href="#ico-clock"/></svg> Tournée en cours</div>
             <div id="tour-timer">0min</div>
           </div>
-          <button class="ux-cta ux-cta-secondary" onclick="endTournee()">✓ Fin tournée</button>
+          <button class="ux-cta ux-cta-secondary" onclick="endTournee()"><svg class="ico"><use href="#ico-check"/></svg> Fin tournée</button>
         </div>
-        <button id="btn-start-tour" class="ux-cta ux-cta-primary" onclick="startTournee()" title="Démarrer le minuteur de la tournée">▶️ Démarrer</button>
+        <button id="btn-start-tour" class="ux-cta ux-cta-primary" onclick="startTournee()" title="Démarrer le minuteur de la tournée"><svg class="ico"><use href="#ico-play"/></svg> Démarrer</button>
       </div>
 
       <!-- Avertissement créneau impossible -->
@@ -465,15 +490,15 @@ button:disabled{opacity:.45;cursor:not-allowed}
       <!-- ═══ PRIORITÉ 3 : statistiques rapides ═══ -->
       <div id="dep-rte-stats" style="display:none">
         <div class="ux-stat-tile">
-          <span class="ux-stat-ico" style="color:var(--primary)">🛣️</span>
+          <span class="ux-stat-ico" style="color:var(--primary)"><svg class="ico"><use href="#ico-nav"/></svg></span>
           <div><div class="ux-label">Distance</div><div id="tech-sk" class="ux-stat">—</div></div>
         </div>
         <div class="ux-stat-tile">
-          <span class="ux-stat-ico" style="color:var(--purple)">🚗</span>
+          <span class="ux-stat-ico" style="color:var(--purple)"><svg class="ico"><use href="#ico-clock"/></svg></span>
           <div><div class="ux-label">Trajet</div><div id="tech-st" class="ux-stat">—</div><div id="tech-st-sub" class="ux-micro"></div></div>
         </div>
         <div class="ux-stat-tile">
-          <span class="ux-stat-ico" style="color:var(--success)">📍</span>
+          <span class="ux-stat-ico" style="color:var(--success)"><svg class="ico"><use href="#ico-pin"/></svg></span>
           <div><div class="ux-label">Arrêts</div><div id="tech-ss" class="ux-stat">—</div></div>
         </div>
       </div>
@@ -484,24 +509,24 @@ button:disabled{opacity:.45;cursor:not-allowed}
         <div id="dep-ndc-client" class="ux-h2"></div>
         <div id="dep-ndc-addr" class="ux-sub" style="margin:2px 0 8px"></div>
         <div id="dep-ndc-meta" style="display:flex;gap:14px;margin-bottom:12px"></div>
-        <button class="ux-cta" style="margin-bottom:8px;padding:15px;background:var(--primary);color:#fff;font-size:15px;font-weight:800;box-shadow:0 2px 8px rgba(21,101,192,.25)" onclick="_depNdcNavigate('google')">🧭 Naviguer</button>
+        <button class="ux-cta" style="margin-bottom:8px;padding:15px;background:var(--primary);color:#fff;font-size:15px;font-weight:800;box-shadow:0 2px 8px rgba(21,101,192,.25)" onclick="_depNdcNavigate('google')"><svg class="ico"><use href="#ico-nav"/></svg> Naviguer</button>
         <div style="display:flex;gap:8px">
-          <button class="ux-nav-btn" onclick="_depNdcNavigate('google')">📍 Google Maps</button>
-          <button class="ux-nav-btn" onclick="_depNdcNavigate('waze')">🧭 Waze</button>
+          <button class="ux-nav-btn" onclick="_depNdcNavigate('google')"><svg class="ico"><use href="#ico-pin"/></svg> Google Maps</button>
+          <button class="ux-nav-btn" onclick="_depNdcNavigate('waze')"><svg class="ico"><use href="#ico-nav"/></svg> Waze</button>
         </div>
       </div>
 
       <!-- ═══ Actions rapides — seulement les 4 plus utilisées, pas 15 boutons ═══ -->
       <div id="dep-quick-actions">
-        <button class="ux-quick-btn" onclick="calcMap()" title="Recalculer l'itinéraire du jour"><span class="ux-quick-ico">🗺️</span><span>Itinéraire</span></button>
-        <button class="ux-quick-btn" onclick="goTab('materiel')" title="Voir le matériel sorti"><span class="ux-quick-ico">📦</span><span>Matériel</span></button>
-        <button class="ux-quick-btn" onclick="openDaeScan()" title="Scanner un DAE"><span class="ux-quick-ico">📷</span><span>Scanner</span></button>
-        <button class="ux-quick-btn" onclick="goTab('planning')" title="Voir le planning de la semaine"><span class="ux-quick-ico">📅</span><span>Planning</span></button>
+        <button class="ux-quick-btn" onclick="calcMap()" title="Recalculer l'itinéraire du jour"><span class="ux-quick-ico"><svg class="ico"><use href="#ico-nav"/></svg></span><span>Itinéraire</span></button>
+        <button class="ux-quick-btn" onclick="goTab('materiel')" title="Voir le matériel sorti"><span class="ux-quick-ico"><svg class="ico"><use href="#ico-box"/></svg></span><span>Matériel</span></button>
+        <button class="ux-quick-btn" onclick="openDaeScan()" title="Scanner un DAE"><span class="ux-quick-ico"><svg class="ico"><use href="#ico-camera"/></svg></span><span>Scanner</span></button>
+        <button class="ux-quick-btn" onclick="goTab('planning')" title="Voir le planning de la semaine"><span class="ux-quick-ico"><svg class="ico"><use href="#ico-calendar"/></svg></span><span>Planning</span></button>
       </div>
 
       <!-- ═══ Options tournée — secondaire, repliable ═══ -->
       <details id="dep-bar-wrap">
-        <summary>⚙️ Paramètres de tournée (itinéraire, date, Notion...)</summary>
+        <summary><svg class="ico"><use href="#ico-sliders"/></svg> Paramètres de tournée (itinéraire, date, Notion...)</summary>
         <div id="dep-bar">
           <input type="date" id="dep-date" style="font-size:14px;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit" onchange="onDepDateChange()"/>
           <input type="time" id="dep-time" value="08:00" title="Heure de départ du dépôt" style="font-size:14px;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit" onchange="techCfg.startTime=this.value;saveCfg();techETAs={};_routeOrderedPts=[];techRouteLegDurations=[];renderDepart();if(mapObj&&!building)calcMap();else _calcETAsHeadless()"/>
@@ -790,22 +815,22 @@ button:disabled{opacity:.45;cursor:not-allowed}
   <!-- TABS -->
   <div id="tabs">
     <button class="tab on" onclick="goTab('depart')" id="tab-depart">
-      <span class="ti">🏠</span><span class="tl">Accueil</span>
+      <span class="ti"><svg class="ico"><use href="#ico-home"/></svg></span><span class="tl">Accueil</span>
       <span class="tbadge" id="badge-dep"></span>
     </button>
     <button class="tab" onclick="goTab('planning')" id="tab-planning">
-      <span class="ti">📅</span><span class="tl">Planning</span>
+      <span class="ti"><svg class="ico"><use href="#ico-calendar"/></svg></span><span class="tl">Planning</span>
     </button>
     <button class="tab" onclick="goTab('materiel')" id="tab-materiel">
-      <span class="ti">📦</span><span class="tl">Matériel</span>
+      <span class="ti"><svg class="ico"><use href="#ico-box"/></svg></span><span class="tl">Matériel</span>
       <span class="tbadge" id="badge-mat"></span>
     </button>
     <button class="tab" onclick="goTab('stock')" id="tab-stock">
-      <span class="ti">🏷️</span><span class="tl">Stock</span>
+      <span class="ti"><svg class="ico"><use href="#ico-tag"/></svg></span><span class="tl">Stock</span>
       <span class="tbadge" id="badge-stock"></span>
     </button>
     <button class="tab" onclick="goTab('profil')" id="tab-profil">
-      <span class="ti">👤</span><span class="tl">Profil</span>
+      <span class="ti"><svg class="ico"><use href="#ico-user"/></svg></span><span class="tl">Profil</span>
     </button>
   </div>
 </div><!-- /app -->
@@ -1393,9 +1418,9 @@ function renderNextDestCard(){
   const leg=idx>=0?techRouteLegDurations[idx]:null
   const meta=document.getElementById('dep-ndc-meta')
   meta.innerHTML=[
-    leg?.distanceKm!=null?`<span class="ux-sub">📏 ${leg.distanceKm} km</span>`:'',
-    eta?`<span class="ux-sub" style="font-weight:700;color:var(--primary)">🕐 ETA ${eta}</span>`:'',
-    nextIv.timeStart?`<span class="ux-sub">🔔 Prévu ${nextIv.timeStart}</span>`:''
+    leg?.distanceKm!=null?`<span class="ux-sub"><svg class="ico"><use href="#ico-pin"/></svg> ${leg.distanceKm} km</span>`:'',
+    eta?`<span class="ux-sub" style="font-weight:700;color:var(--primary)"><svg class="ico"><use href="#ico-clock"/></svg> ETA ${eta}</span>`:'',
+    nextIv.timeStart?`<span class="ux-sub"><svg class="ico"><use href="#ico-clock"/></svg> Prévu ${nextIv.timeStart}</span>`:''
   ].filter(Boolean).join('')
   el.style.display='block'
 }
