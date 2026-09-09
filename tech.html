@@ -1100,9 +1100,12 @@ function endTournee(){
   const durationMin=Math.floor((endTime-tourStartTime)/60000)
   const startTimeStr=tourStartTime.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})
   const endTimeStr=endTime.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})
-  const validatedCnt=Object.values(validated).filter(Boolean).length
-  const failedCnt=Object.values(failed).filter(Boolean).length
-  const dayIvs=myIvs(date).length
+  // Compter UNIQUEMENT les interventions du jour : `validated`/`failed` sont des maps
+  // globales (toutes dates confondues) — le bilan affichait le cumul de tous les clients.
+  const todays=myIvs(date)
+  const validatedCnt=todays.filter(i=>validated[i.id]).length
+  const failedCnt=todays.filter(i=>failed[i.id]).length
+  const dayIvs=todays.length
   // Bilan vs planning de référence : >0 = fini avant l'heure prévue (temps gagné), <0 = retard
   let gainMin=null
   const plannedEnd=_plannedTourEnd
