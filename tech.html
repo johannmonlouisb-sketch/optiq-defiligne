@@ -265,6 +265,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .ux-status-pill:before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor}
 .ux-status-pill.st-wait{display:flex}
 .ux-status-pill.st-active{display:flex;background:rgba(76,217,100,.22);color:#B9FBC0}
+.ux-status-pill.st-paused{display:flex;background:rgba(255,183,77,.22);color:#FFE0B2}
 .ux-status-pill.st-done{display:flex;background:rgba(255,255,255,.16)}
 #dep-hero-meta{font-size:12.5px;color:rgba(255,255,255,.85);margin:8px 0 14px}
 #dep-hero-meta:empty{display:none}
@@ -276,13 +277,21 @@ button:disabled{opacity:.45;cursor:not-allowed}
 #dep-hero-progress-row{margin:10px 0 14px}
 #dep-hero-progress-track{height:8px;background:rgba(255,255,255,.25);border-radius:4px;overflow:hidden}
 #dep-hero-progress-fill{height:100%;width:0;background:#fff;border-radius:4px;transition:width .4s ease}
-#dep-tour-timer{display:none;align-items:center;justify-content:space-between;gap:12px}
+#dep-tour-timer{display:none;align-items:center;justify-content:space-between;gap:10px 12px;flex-wrap:wrap}
 #dep-tour-timer-info #tour-timer{font-size:30px;font-weight:800;font-family:ui-monospace,'SF Mono',Consolas,monospace;line-height:1.15}
+#dep-tour-timer-actions{display:flex;gap:8px;flex-shrink:0}
+#dep-tour-paused{display:none;align-items:center;justify-content:space-between;gap:10px 12px;flex-wrap:wrap}
+#dep-tour-paused-info #pause-timer{font-size:26px;font-weight:800;font-family:ui-monospace,'SF Mono',Consolas,monospace;line-height:1.15;color:#fff}
+#dep-tour-paused-info #pause-since{font-size:12px;color:rgba(255,255,255,.75);margin-top:1px}
 .ux-cta{width:100%;border:none;border-radius:var(--radius-md);font-family:inherit;cursor:pointer;transition:transform .1s,filter .15s}
 .ux-cta:active{transform:scale(.98)}
 .ux-cta-primary{padding:16px;background:#fff;color:var(--primary-dark);font-size:16px;font-weight:800;box-shadow:0 2px 10px rgba(0,0,0,.15)}
 .ux-cta-primary:hover{filter:brightness(1.03)}
 .ux-cta-secondary{width:auto;flex-shrink:0;padding:12px 18px;background:rgba(255,255,255,.18);color:#fff;font-size:14px;font-weight:700;border:1.5px solid rgba(255,255,255,.35)}
+/* Pause : secondaire, jamais rouge (réservé aux erreurs) — teinte orange
+   discrète, cohérente avec --warning mais adaptée au fond dégradé sombre
+   du hero (les tokens --warning/--warning-light sont pensés pour un fond clair). */
+.ux-cta-pause{width:auto;flex-shrink:0;padding:12px 14px;background:rgba(255,183,77,.22);color:#FFE0B2;font-size:13px;font-weight:700;border:1.5px solid rgba(255,183,77,.4)}
 
 #dep-rte-stats{display:none;grid-template-columns:repeat(3,1fr);gap:8px;padding:10px 12px;background:var(--surface);border-bottom:1px solid var(--border)}
 .ux-stat-tile{background:var(--surface-secondary);border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 10px;display:flex;align-items:center;gap:8px}
@@ -429,6 +438,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
   <symbol id="ico-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.5 9a9 9 0 0114.85-3.36L23 10M1 14l4.65 4.36A9 9 0 0020.5 15"/></symbol>
   <symbol id="ico-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></symbol>
   <symbol id="ico-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></symbol>
+  <symbol id="ico-pause" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></symbol>
   <symbol id="ico-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></symbol>
   <symbol id="ico-camera" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></symbol>
   <symbol id="ico-play" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6 3 20 12 6 21 6 3"/></symbol>
@@ -479,7 +489,20 @@ button:disabled{opacity:.45;cursor:not-allowed}
             <div class="ux-micro" style="text-transform:uppercase;letter-spacing:.06em;font-weight:700;color:var(--success);display:flex;align-items:center;gap:4px"><svg class="ico"><use href="#ico-clock"/></svg> Tournée en cours</div>
             <div id="tour-timer">0min</div>
           </div>
-          <button class="ux-cta ux-cta-secondary" onclick="endTournee()"><svg class="ico"><use href="#ico-check"/></svg> Fin tournée</button>
+          <div id="dep-tour-timer-actions">
+            <button class="ux-cta ux-cta-pause" onclick="pauseTournee()" title="Mettre la tournée en pause"><svg class="ico"><use href="#ico-pause"/></svg> Pause</button>
+            <button class="ux-cta ux-cta-secondary" onclick="endTournee()"><svg class="ico"><use href="#ico-check"/></svg> Fin tournée</button>
+          </div>
+        </div>
+        <!-- Bloc pause — n'existe que pour l'état "en pause" (tourRunning && _pauseStartTime),
+             jamais affiché en même temps que #dep-tour-timer (voir renderDepart). -->
+        <div id="dep-tour-paused" style="display:none">
+          <div id="dep-tour-paused-info">
+            <div class="ux-micro" style="text-transform:uppercase;letter-spacing:.06em;font-weight:700;color:#FFE0B2;display:flex;align-items:center;gap:4px"><svg class="ico"><use href="#ico-pause"/></svg> Tournée en pause</div>
+            <div id="pause-since">Depuis —</div>
+            <div id="pause-timer">0min</div>
+          </div>
+          <button class="ux-cta ux-cta-primary" onclick="resumeTournee()" title="Reprendre la tournée"><svg class="ico"><use href="#ico-play"/></svg> Reprendre</button>
         </div>
         <button id="btn-start-tour" class="ux-cta ux-cta-primary" onclick="startTournee()" title="Démarrer le minuteur de la tournée"><svg class="ico"><use href="#ico-play"/></svg> Démarrer</button>
       </div>
@@ -1156,11 +1179,18 @@ function _startTourInterval(){
     const elapsed=Math.floor((new Date()-tourStartTime)/60000)
     const el=document.getElementById('tour-timer')
     if(el) el.textContent=fmtDuration(elapsed)
-    // Garder le bloc visible si tourRunning (au cas où renderDepart l'aurait caché)
+    // Garder le bloc visible si tourRunning ET pas en pause (au cas où renderDepart l'aurait caché)
     const bloc=document.getElementById('dep-tour-timer')
-    if(bloc&&tourRunning) bloc.style.display='flex'
+    if(bloc&&tourRunning&&!_pauseStartTime) bloc.style.display='flex'
     const btnStart=document.getElementById('btn-start-tour')
     if(btnStart&&tourRunning) btnStart.style.display='none'
+    // Compteur de pause en cours — même minuteur 30s que le reste, pas de nouvelle horloge
+    if(tourRunning&&_pauseStartTime){
+      const pel=document.getElementById('pause-timer')
+      if(pel) pel.textContent=fmtDuration(Math.floor((new Date()-_pauseStartTime)/60000))
+      const pbloc=document.getElementById('dep-tour-paused')
+      if(pbloc) pbloc.style.display='flex'
+    }
   }
   _tick() // mise à jour immédiate
   tourTimer=setInterval(_tick, 30000) // toutes les 30s
@@ -1923,7 +1953,8 @@ function renderDepart(){
   _updateHeroMeta(dayIvs,doneN,failN)
   const statusPill=document.getElementById('dep-hero-status')
   if(statusPill){
-    if(tourRunning){statusPill.textContent='En cours';statusPill.className='ux-status-pill st-active'}
+    if(tourRunning&&_pauseStartTime){statusPill.textContent='En pause';statusPill.className='ux-status-pill st-paused'}
+    else if(tourRunning){statusPill.textContent='En cours';statusPill.className='ux-status-pill st-active'}
     else if(tourneesData[depDate()]){statusPill.textContent='Terminée';statusPill.className='ux-status-pill st-done'}
     else if(dayIvs.length){statusPill.textContent='En attente';statusPill.className='ux-status-pill st-wait'}
     else{statusPill.className='ux-status-pill'}
@@ -1935,10 +1966,19 @@ function renderDepart(){
   const empty=document.getElementById("dep-list-empty")
   const list=document.getElementById("dep-list")
   const timer=document.getElementById("dep-tour-timer")
+  const pausedBlock=document.getElementById("dep-tour-paused")
   const btnStart=document.getElementById("btn-start-tour")
-  if(!dayIvs.length){if(empty)empty.style.display="block";if(list)list.innerHTML="";if(timer)timer.style.display="none";if(btnStart)btnStart.style.display="none";return}
+  if(!dayIvs.length){if(empty)empty.style.display="block";if(list)list.innerHTML="";if(timer)timer.style.display="none";if(pausedBlock)pausedBlock.style.display="none";if(btnStart)btnStart.style.display="none";return}
   if(empty)empty.style.display="none"
-  if(timer)timer.style.display=tourRunning?"flex":"none"
+  const _isPaused=tourRunning&&!!_pauseStartTime
+  if(timer)timer.style.display=(tourRunning&&!_isPaused)?"flex":"none"
+  if(pausedBlock){
+    pausedBlock.style.display=_isPaused?"flex":"none"
+    if(_isPaused){
+      const since=document.getElementById('pause-since')
+      if(since) since.textContent='Depuis '+_pauseStartTime.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:TZ})
+    }
+  }
   if(btnStart)btnStart.style.display=tourRunning?"none":"block"
 
   // ── Barre résumé ETA ────────────────────────────────────────
