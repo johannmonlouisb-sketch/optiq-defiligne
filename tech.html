@@ -663,6 +663,13 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
 <div id="toast"></div>
 
 <!-- POPUP PROCHAINE DESTINATION -->
+<!-- Feuille générique tournée : bilan fin de tournée, alerte arrivée destination finale -->
+<div id="tour-sheet-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000" onclick="closeTourSheet()"></div>
+<div id="tour-sheet" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#fff;border-radius:18px 18px 0 0;padding:20px 18px 32px;z-index:9001;box-shadow:0 -4px 24px rgba(0,0,0,.18);transform:translateY(100%);transition:transform .28s cubic-bezier(.4,0,.2,1)">
+  <div id="tour-sheet-title" style="font-size:18px;font-weight:800;margin-bottom:10px"></div>
+  <div id="tour-sheet-body" style="font-size:14px;line-height:1.5;color:#333;margin-bottom:16px"></div>
+  <button id="tour-sheet-btn" onclick="_tourSheetCb&&_tourSheetCb()" style="width:100%;padding:14px;background:#2E7D32;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer"></button>
+</div>
 <div id="next-dest-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000" onclick="closeNextClientPopup()"></div>
 <div id="next-dest-sheet" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#fff;border-radius:18px 18px 0 0;padding:20px 18px 32px;z-index:9001;box-shadow:0 -4px 24px rgba(0,0,0,.18);transform:translateY(100%);transition:transform .28s cubic-bezier(.4,0,.2,1)">
   <div style="width:40px;height:4px;background:#ddd;border-radius:2px;margin:0 auto 16px"></div>
@@ -871,7 +878,7 @@ function refreshLiveETAs(){
 }
 function startLiveETAs(){
   clearInterval(etaRefreshTimer)
-  etaRefreshTimer=setInterval(refreshLiveETAs,60000)
+  etaRefreshTimer=setInterval(refreshLiveETAs,30000) // recalcul local (aucun appel API), aligné sur le tick du timer
 }
 function fmtDuration(mins){const h=Math.floor(mins/60);const m=mins%60;return h>0?`${h}h${String(m).padStart(2,'0')}`:`${m}min`}
 async function _acquireWakeLock(){
@@ -926,6 +933,9 @@ function saveTourProgress(status){
 // Lance l'intervalle du timer (factorisé pour init + startTournee)
 function _startTourInterval(){
   clearInterval(tourTimer)
+  // Point unique appelé au démarrage ET à la restauration après rechargement de page :
+  // relance le suivi GPS et récupère le planning de référence figé au démarrage.
+  if(tourRunning){ _startPosWatch(); if(!_plannedETAs) _loadPlannedSnapshot() }
   function _tick(){
     const elapsed=Math.floor((new Date()-tourStartTime)/60000)
     const el=document.getElementById('tour-timer')
@@ -940,21 +950,118 @@ function _startTourInterval(){
   tourTimer=setInterval(_tick, 30000) // toutes les 30s
 }
 
-function startTournee(){
+// ── Position en direct, planning de référence, arrivée destination finale ──────
+let _posWatchId=null,_posMarker=null,_lastPos=null,_arrivalAlerted=false
+let _plannedETAs=null,_plannedTourEnd=null,_tourSheetCb=null
+function _distM(a,b){
+  const R=6371000,dLat=(b.lat-a.lat)*Math.PI/180,dLng=(b.lng-a.lng)*Math.PI/180
+  const x=Math.sin(dLat/2)**2+Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLng/2)**2
+  return 2*R*Math.asin(Math.sqrt(x))
+}
+// Coordonnées du point final de la tournée : adresse d'arrivée si configurée, sinon dépôt
+function _finalDestCoords(){
+  const tc=TB(curTech)
+  const arr=(tc?.arrivalAddr||'').trim(), dep=tc?.depotAddr||DEPOT
+  return (arr&&gCache[arr])||gCache[dep]||null
+}
+// Point bleu "ma position" — un CircleMarker (pas un L.Marker) pour survivre au
+// nettoyage des marqueurs que fait calcMap() à chaque reconstruction de la carte.
+function _updatePosMarker(c){
+  if(!mapObj) return
+  if(!_posMarker) _posMarker=L.circleMarker([c.lat,c.lng],{radius:9,color:'#fff',weight:3,fillColor:'#1565C0',fillOpacity:1}).addTo(mapObj).bindPopup('📍 Ma position')
+  else _posMarker.setLatLng([c.lat,c.lng])
+}
+function _startPosWatch(){
+  if(_posWatchId!==null||!navigator.geolocation) return
+  _posWatchId=navigator.geolocation.watchPosition(pos=>{
+    const c={lat:pos.coords.latitude,lng:pos.coords.longitude}
+    if(!isFrance(c.lat,c.lng)) return
+    _lastPos={...c,ts:Date.now()}
+    _updatePosMarker(c)
+    _checkArrival(c)
+  },()=>{},{enableHighAccuracy:true,maximumAge:15000,timeout:20000})
+}
+function _stopPosWatch(){
+  if(_posWatchId!==null&&navigator.geolocation) navigator.geolocation.clearWatch(_posWatchId)
+  _posWatchId=null
+  if(_posMarker&&mapObj){try{mapObj.removeLayer(_posMarker)}catch(e){}}
+  _posMarker=null
+}
+// Alerte une seule fois par tournée : toutes les interventions traitées ET à moins de
+// 150 m du point final → rappel d'arrêter le timer.
+function _checkArrival(c){
+  if(!tourRunning||_arrivalAlerted) return
+  const pending=myIvs(depDate()).filter(i=>!validated[i.id]&&!failed[i.id])
+  if(pending.length) return
+  const dest=_finalDestCoords()
+  if(!dest||_distM(c,dest)>150) return
+  _arrivalAlerted=true
+  if(navigator.vibrate) navigator.vibrate([200,100,200,100,200])
+  showTourSheet('🏁 Arrivé à destination',
+    'Toutes les interventions sont traitées et tu es arrivé au point final de la tournée — n\'oublie pas d\'arrêter le timer.',
+    '✓ Fin tournée', ()=>{closeTourSheet();endTournee()})
+}
+// Planning de référence figé au démarrage : sert à mesurer avance/retard par client
+// pendant la journée, et le bilan temps gagné/perdu à la fin. Persisté pour survivre
+// à un rechargement de page en cours de tournée.
+function _plannedKey(){return `optiq_tour_planned_${curTech}_${depDate()}`}
+function _snapshotPlanned(){
+  _plannedETAs={}
+  Object.entries(techETAs).forEach(([id,e])=>{if(e?.eta)_plannedETAs[id]=e.eta})
+  _plannedTourEnd=window._tourEndETA||null
+  try{localStorage.setItem(_plannedKey(),JSON.stringify({etas:_plannedETAs,end:_plannedTourEnd}))}catch(e){}
+}
+function _loadPlannedSnapshot(){
+  try{const s=JSON.parse(localStorage.getItem(_plannedKey())||'null');if(s){_plannedETAs=s.etas||null;_plannedTourEnd=s.end||null}}catch(e){}
+}
+function showTourSheet(title,html,btnLabel,onClick){
+  document.getElementById('tour-sheet-title').textContent=title
+  document.getElementById('tour-sheet-body').innerHTML=html
+  document.getElementById('tour-sheet-btn').textContent=btnLabel
+  _tourSheetCb=onClick||closeTourSheet
+  const sh=document.getElementById('tour-sheet')
+  document.getElementById('tour-sheet-overlay').style.display='block'; sh.style.display='block'
+  setTimeout(()=>sh.style.transform='translateY(0)',10)
+}
+function closeTourSheet(){
+  const sh=document.getElementById('tour-sheet'); sh.style.transform='translateY(100%)'
+  setTimeout(()=>{document.getElementById('tour-sheet-overlay').style.display='none';sh.style.display='none'},300)
+}
+function showTourStats(durationMin,gainMin,validatedCnt,failedCnt,total,plannedEnd,endTimeStr){
+  let bilan
+  if(gainMin===null) bilan=`<div style="color:#757575">Pas de planning de référence pour cette tournée — impossible de calculer l'avance ou le retard.</div>`
+  else if(gainMin>=0) bilan=`<div style="background:#E8F5E9;color:#2E7D32;border-radius:10px;padding:12px;font-weight:800;font-size:16px">🎉 Temps gagné : ${fmtDuration(gainMin)}</div><div style="font-size:12px;color:#757575;margin-top:6px">Fin prévue ${plannedEnd} · fin réelle ${endTimeStr}</div>`
+  else bilan=`<div style="background:#FFEBEE;color:#C62828;border-radius:10px;padding:12px;font-weight:800;font-size:16px">⏱ Temps perdu : ${fmtDuration(-gainMin)}</div><div style="font-size:12px;color:#757575;margin-top:6px">Fin prévue ${plannedEnd} · fin réelle ${endTimeStr}</div>`
+  showTourSheet('✅ Tournée terminée',
+    `<div style="margin-bottom:10px">Durée totale : <strong>${fmtDuration(durationMin)}</strong></div>
+     <div style="margin-bottom:12px">Interventions : <strong style="color:#2E7D32">✓ ${validatedCnt}</strong> · <strong style="color:#C62828">✗ ${failedCnt}</strong> · ${total} au total</div>
+     ${bilan}`,
+    'Fermer', closeTourSheet)
+}
+
+async function startTournee(){
   if(tourRunning) return
   tourStartTime=new Date()
   tourRunning=true
+  _arrivalAlerted=false
   try{localStorage.setItem('optiq_tour_start_'+curTech, tourStartTime.toISOString())}catch(e){}
   saveTourProgress('running')
   _startTourInterval()
-  refreshLiveETAs()
-  startLiveETAs()
   _acquireWakeLock()
+  renderDepart()
+  // Recharge l'itinéraire depuis l'heure de départ réelle (figée), puis fige le
+  // planning de référence pour suivre l'avance/le retard tout au long de la journée
+  toast('🔄 Recalcul de l\'itinéraire depuis ton heure de départ...','#1565C0',3000)
+  try{ if(mapObj&&!building) await calcMap(); else await _calcETAsHeadless() }catch(e){}
+  refreshLiveETAs()
+  _snapshotPlanned()
+  startLiveETAs()
   renderDepart()
 }
 function endTournee(){
   if(!tourRunning) return
   clearInterval(tourTimer)
+  _stopPosWatch()
   _releaseWakeLock()
   const date=depDate()
   const endTime=new Date()
@@ -964,13 +1071,19 @@ function endTournee(){
   const validatedCnt=Object.values(validated).filter(Boolean).length
   const failedCnt=Object.values(failed).filter(Boolean).length
   const dayIvs=myIvs(date).length
-  tourneesData[date]={startTime:startTimeStr,endTime:endTimeStr,duration:durationMin,validated:validatedCnt,failed:failedCnt,totalClients:dayIvs}
+  // Bilan vs planning de référence : >0 = fini avant l'heure prévue (temps gagné), <0 = retard
+  let gainMin=null
+  const plannedEnd=_plannedTourEnd
+  if(plannedEnd){ const[ph,pm]=plannedEnd.split(':').map(Number); gainMin=(ph*60+pm)-nowMinParis() }
+  tourneesData[date]={startTime:startTimeStr,endTime:endTimeStr,duration:durationMin,validated:validatedCnt,failed:failedCnt,totalClients:dayIvs,plannedEnd,gainMin}
   try{localStorage.setItem("techTourneesData",JSON.stringify(tourneesData))}catch(e){}
   try{localStorage.removeItem('optiq_tour_start_'+curTech)}catch(e){}
+  try{localStorage.removeItem(_plannedKey())}catch(e){}
   tourRunning=false
   tourStartTime=null
+  _plannedETAs=null;_plannedTourEnd=null
   saveTourProgress('done')
-  toast("✅ Tournée terminée — "+fmtDuration(durationMin),"#2E7D32")
+  showTourStats(durationMin,gainMin,validatedCnt,failedCnt,dayIvs,plannedEnd,endTimeStr)
   renderDepart()
 }
 function showNextClientPopup(currentId){
@@ -1606,6 +1719,14 @@ function renderDepart(){
         <span class="tag tag-info">🔧 ${fmin(workMin)} · ${(TYPES[iv.type]||TYPES.maintenance_simple).label}</span>
         ${techETAs[iv.id]?`<span class="tag" style="background:#E8F5E9;color:#2E7D32;font-weight:600">🕐 Arrivée ${techETAs[iv.id].eta} · fin ${techETAs[iv.id].leave}</span>`:""}
         ${techETAs[iv.id]?.delayMin>1?`<span class="tag" title="Retard potentiel cumulé vs circulation fluide" style="background:#FFF3E0;color:#E65100;font-weight:600">🐢 +${fmin(techETAs[iv.id].delayMin)} trafic</span>`:""}
+        ${(()=>{ // avance/retard vs le planning figé au démarrage, pour les arrêts à venir
+          const pe=_plannedETAs?.[iv.id], ce=techETAs[iv.id]?.eta
+          if(!tourRunning||!pe||!ce||done||fail) return ''
+          const d=tToMin(ce)-tToMin(pe)
+          if(Math.abs(d)<2) return `<span class="tag" style="background:#E8F5E9;color:#2E7D32;font-weight:600">✅ À l'heure (prévu ${pe})</span>`
+          return d>0?`<span class="tag" style="background:#FFEBEE;color:#C62828;font-weight:700">⏱ Retard +${fmin(d)} (prévu ${pe})</span>`
+                    :`<span class="tag" style="background:#E8F5E9;color:#2E7D32;font-weight:700">⏱ Avance −${fmin(-d)} (prévu ${pe})</span>`
+        })()}
         ${iv.timeEnd&&!done?`<span class="tag" style="background:#F3F3F3;color:#757575;font-size:11px">⏰ Au plus tard ${iv.timeEnd}</span>`:""}
         ${unroutedIvs.includes(iv)?`<span class="tag" style="background:#FFF3E0;color:#E65100;font-weight:700">⚠️ Adresse non géolocalisée — hors itinéraire</span>`:""}
         ${done?`<span class="tag tag-ok">✅ Kizeo sync</span>`:""}
