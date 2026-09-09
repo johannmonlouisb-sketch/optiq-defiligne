@@ -664,11 +664,12 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
 
 <!-- POPUP PROCHAINE DESTINATION -->
 <!-- Feuille générique tournée : bilan fin de tournée, alerte arrivée destination finale -->
-<div id="tour-sheet-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000" onclick="closeTourSheet()"></div>
+<div id="tour-sheet-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000" onclick="_tourSheetOverlayClick()"></div>
 <div id="tour-sheet" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#fff;border-radius:18px 18px 0 0;padding:20px 18px 32px;z-index:9001;box-shadow:0 -4px 24px rgba(0,0,0,.18);transform:translateY(100%);transition:transform .28s cubic-bezier(.4,0,.2,1)">
   <div id="tour-sheet-title" style="font-size:18px;font-weight:800;margin-bottom:10px"></div>
   <div id="tour-sheet-body" style="font-size:14px;line-height:1.5;color:#333;margin-bottom:16px"></div>
   <button id="tour-sheet-btn" onclick="_tourSheetCb&&_tourSheetCb()" style="width:100%;padding:14px;background:#2E7D32;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer"></button>
+  <button id="tour-sheet-btn2" onclick="_tourSheetCb2&&_tourSheetCb2()" style="display:none;width:100%;margin-top:8px;padding:12px;background:none;color:#757575;border:1.5px solid #E0E0E0;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer"></button>
 </div>
 <div id="next-dest-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000" onclick="closeNextClientPopup()"></div>
 <div id="next-dest-sheet" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#fff;border-radius:18px 18px 0 0;padding:20px 18px 32px;z-index:9001;box-shadow:0 -4px 24px rgba(0,0,0,.18);transform:translateY(100%);transition:transform .28s cubic-bezier(.4,0,.2,1)">
@@ -999,7 +1000,8 @@ function _checkArrival(c){
   if(navigator.vibrate) navigator.vibrate([200,100,200,100,200])
   showTourSheet('🏁 Arrivé à destination',
     'Toutes les interventions sont traitées et tu es arrivé au point final de la tournée — n\'oublie pas d\'arrêter le timer.',
-    '✓ Fin tournée', ()=>{closeTourSheet();endTournee()})
+    '✓ Fin tournée', ()=>{closeTourSheet();endTournee()},
+    {persistent:true, secondaryLabel:'Plus tard — je garde le timer', onSecondary:closeTourSheet})
 }
 // Planning de référence figé au démarrage : sert à mesurer avance/retard par client
 // pendant la journée, et le bilan temps gagné/perdu à la fin. Persisté pour survivre
@@ -1014,14 +1016,28 @@ function _snapshotPlanned(){
 function _loadPlannedSnapshot(){
   try{const s=JSON.parse(localStorage.getItem(_plannedKey())||'null');if(s){_plannedETAs=s.etas||null;_plannedTourEnd=s.end||null}}catch(e){}
 }
-function showTourSheet(title,html,btnLabel,onClick){
+// opts.persistent : un tap sur le fond ne ferme PAS la fiche — il faut cliquer un bouton.
+// Indispensable sur mobile : le bilan de fin de tournée disparaissait avant d'être lu
+// (tap fantôme / doigt encore posé après avoir appuyé sur "Fin tournée").
+let _tourSheetCb2=null,_tourSheetPersistent=false,_tourSheetOpenedAt=0
+function showTourSheet(title,html,btnLabel,onClick,opts={}){
   document.getElementById('tour-sheet-title').textContent=title
   document.getElementById('tour-sheet-body').innerHTML=html
   document.getElementById('tour-sheet-btn').textContent=btnLabel
   _tourSheetCb=onClick||closeTourSheet
+  _tourSheetPersistent=!!opts.persistent
+  _tourSheetOpenedAt=Date.now()
+  const b2=document.getElementById('tour-sheet-btn2')
+  if(opts.secondaryLabel){ b2.textContent=opts.secondaryLabel; b2.style.display='block'; _tourSheetCb2=opts.onSecondary||closeTourSheet }
+  else { b2.style.display='none'; _tourSheetCb2=null }
   const sh=document.getElementById('tour-sheet')
   document.getElementById('tour-sheet-overlay').style.display='block'; sh.style.display='block'
   setTimeout(()=>sh.style.transform='translateY(0)',10)
+}
+function _tourSheetOverlayClick(){
+  if(_tourSheetPersistent) return
+  if(Date.now()-_tourSheetOpenedAt<700) return // ignore le tap fantôme juste après l'ouverture
+  closeTourSheet()
 }
 function closeTourSheet(){
   const sh=document.getElementById('tour-sheet'); sh.style.transform='translateY(100%)'
@@ -1036,7 +1052,7 @@ function showTourStats(durationMin,gainMin,validatedCnt,failedCnt,total,plannedE
     `<div style="margin-bottom:10px">Durée totale : <strong>${fmtDuration(durationMin)}</strong></div>
      <div style="margin-bottom:12px">Interventions : <strong style="color:#2E7D32">✓ ${validatedCnt}</strong> · <strong style="color:#C62828">✗ ${failedCnt}</strong> · ${total} au total</div>
      ${bilan}`,
-    'Fermer', closeTourSheet)
+    '✓ J\'ai lu — fermer', closeTourSheet, {persistent:true})
 }
 
 async function startTournee(){
