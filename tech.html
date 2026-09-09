@@ -18,14 +18,44 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
-  --blue:#1565C0;--blueDk:#0D47A1;--blueLt:#E3F2FD;
-  --green:#2E7D32;--greenLt:#E8F5E9;
-  --orange:#E65100;--red:#C62828;--purple:#6A1B9A;
-  --gray:#757575;--border:#E0E0E0;--bg:#F5F5F5;--dark:#212121;
-  --tab:68px;--top:58px;
+  /* ── Design system OptiTechX ── noms sémantiques (nouveaux composants) ── */
+  --primary:#1565C0;--primary-dark:#0D47A1;--primary-light:#E3F2FD;
+  --background:#F5F5F5;--surface:#FFFFFF;--surface-secondary:#FAFBFC;
+  --text:#17202A;--text-secondary:#5A6472;--text-tertiary:#8A94A0;
+  --border:#E4E7EC;--border-strong:#D0D5DD;
+  --success:#1B8A45;--success-light:#E8F5E9;
+  --warning:#B45309;--warning-light:#FFF3E0;
+  --danger:#C62828;--danger-light:#FFEBEE;
+  --purple:#6A1B9A;--purple-light:#F3E5F5;
+  --radius-sm:8px;--radius-md:12px;--radius-lg:16px;--radius-xl:20px;
+  --shadow-sm:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.06);
+  --shadow-md:0 2px 8px rgba(16,24,40,.08),0 1px 2px rgba(16,24,40,.04);
+  --shadow-lg:0 8px 24px rgba(16,24,40,.12);
+  --tab:68px;--top:58px;--sidebar:0px;
+
+  /* ── Alias legacy : tout le CSS/JS existant continue de fonctionner tel quel ── */
+  --blue:var(--primary);--blueDk:var(--primary-dark);--blueLt:var(--primary-light);
+  --green:var(--success);--greenLt:var(--success-light);
+  --orange:var(--warning);--red:var(--danger);
+  --gray:var(--text-secondary);--bg:var(--background);--dark:var(--text);
 }
-html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--dark)}
+html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:var(--background);color:var(--text);-webkit-font-smoothing:antialiased}
 #app{display:flex;flex-direction:column;height:100vh;height:100dvh}
+
+/* ── Typographie ── hiérarchie explicite pour les nouveaux composants ── */
+.ux-h1{font-size:22px;font-weight:800;letter-spacing:-.02em;color:var(--text);line-height:1.2}
+.ux-h2{font-size:15px;font-weight:700;color:var(--text);letter-spacing:-.01em}
+.ux-label{font-size:11px;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.06em}
+.ux-stat{font-size:26px;font-weight:800;color:var(--text);letter-spacing:-.02em;line-height:1}
+.ux-sub{font-size:12.5px;color:var(--text-secondary)}
+.ux-micro{font-size:10.5px;color:var(--text-tertiary)}
+
+/* ── Accessibilité ── zone tactile mini 44px sur les actions principales
+   (pas en blanket sur tous les boutons : casserait les icônes rondes 32px
+   existantes des overlays scanner/torche) ── */
+.btn-md,.tab,.vbtn,.ux-cta{min-height:44px}
+button:focus-visible,.btn:focus-visible,.tab:focus-visible,input:focus-visible,a:focus-visible{outline:2.5px solid var(--primary);outline-offset:2px}
+button:disabled{opacity:.45;cursor:not-allowed}
 
 /* ── TOPBAR ── */
 #topbar{height:var(--top);background:var(--blueDk);display:flex;align-items:center;padding:0 14px;gap:10px;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.3)}
@@ -218,6 +248,78 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
   .dc-num{width:34px;height:34px}
   .dc-client{font-size:14px}
 }
+
+/* ═══════════════════════════════════════════
+   ACCUEIL — hero tournée, stats, prochaine destination
+   ═══════════════════════════════════════════ */
+#dep-scroll-top{flex-shrink:0;background:var(--surface)}
+
+#dep-hero{background:linear-gradient(160deg,var(--primary-dark),var(--primary));padding:16px;color:#fff}
+#dep-hero .ux-label{color:rgba(255,255,255,.75)}
+#dep-hero-progress-row{margin:10px 0 14px}
+#dep-hero-progress-track{height:8px;background:rgba(255,255,255,.25);border-radius:4px;overflow:hidden}
+#dep-hero-progress-fill{height:100%;width:0;background:#fff;border-radius:4px;transition:width .4s ease}
+#dep-tour-timer{display:none;align-items:center;justify-content:space-between;gap:12px}
+#dep-tour-timer-info #tour-timer{font-size:30px;font-weight:800;font-family:ui-monospace,'SF Mono',Consolas,monospace;line-height:1.15}
+.ux-cta{width:100%;border:none;border-radius:var(--radius-md);font-family:inherit;cursor:pointer;transition:transform .1s,filter .15s}
+.ux-cta:active{transform:scale(.98)}
+.ux-cta-primary{padding:16px;background:#fff;color:var(--primary-dark);font-size:16px;font-weight:800;box-shadow:0 2px 10px rgba(0,0,0,.15)}
+.ux-cta-primary:hover{filter:brightness(1.03)}
+.ux-cta-secondary{width:auto;flex-shrink:0;padding:12px 18px;background:rgba(255,255,255,.18);color:#fff;font-size:14px;font-weight:700;border:1.5px solid rgba(255,255,255,.35)}
+
+#dep-rte-stats{display:none;grid-template-columns:repeat(3,1fr);gap:8px;padding:10px 12px;background:var(--surface);border-bottom:1px solid var(--border)}
+.ux-stat-tile{background:var(--surface-secondary);border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 10px;display:flex;align-items:center;gap:8px}
+.ux-stat-ico{font-size:16px;flex-shrink:0}
+
+#dep-ndc{display:none;margin:10px 12px;padding:14px;background:var(--surface);border:1.5px solid var(--primary-light);border-radius:var(--radius-lg);box-shadow:var(--shadow-sm)}
+.ux-nav-btn{flex:1;padding:11px;border:none;border-radius:var(--radius-sm);color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.ux-nav-btn:active{filter:brightness(.92)}
+
+#dep-bar-wrap{margin:6px 12px 8px}
+#dep-bar-wrap summary{list-style:none;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--text-secondary);padding:8px 4px;user-select:none}
+#dep-bar-wrap summary::-webkit-details-marker{display:none}
+#dep-bar-wrap summary::before{content:'▸ ';color:var(--text-tertiary)}
+#dep-bar-wrap[open] summary::before{content:'▾ '}
+#dep-bar{padding:8px 4px;background:transparent;border-bottom:none;flex-shrink:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+/* Timeline verticale — statut visuel par arrêt (terminé / actuel / à venir) */
+.dc{position:relative}
+.dc-num{position:relative}
+.dc:not(:last-child) .dc-num::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);width:2px;height:14px;background:var(--border-strong)}
+.dc.vdone .dc-num{background:var(--success)}
+.dc.vfail .dc-num{background:var(--danger)}
+
+@media (max-width:639px){
+  #dep-hero{padding:14px}
+  .ux-stat{font-size:22px}
+  #dep-ndc{margin:8px 8px}
+  #dep-bar-wrap{margin:4px 8px}
+}
+
+/* ═══════════════════════════════════════════
+   DESKTOP (≥1024px) — sidebar + grille 2 colonnes
+   ═══════════════════════════════════════════ */
+@media (min-width:1024px){
+  :root{--sidebar:220px}
+  #app{flex-direction:row}
+  #topbar{position:fixed;top:0;left:var(--sidebar);right:0;z-index:50}
+  #content{margin-top:var(--top);margin-left:var(--sidebar);height:calc(100vh - var(--top));height:calc(100dvh - var(--top))}
+  #tabs{position:fixed;top:0;left:0;bottom:0;width:var(--sidebar);height:100vh;height:100dvh;flex-direction:column;border-top:none;border-right:1px solid var(--border);padding-top:calc(var(--top) + 12px);justify-content:flex-start;gap:4px}
+  .tab{flex:none;flex-direction:row;justify-content:flex-start;gap:12px;padding:12px 20px;border-radius:0 24px 24px 0;margin-right:12px}
+  .tab .ti{font-size:20px}
+  .tab .tl{font-size:14px}
+  .tab.on{background:var(--primary-light)}
+  .tab.on::after{display:none}
+  .tbadge{top:8px;right:16px}
+
+  #v-depart{display:grid;grid-template-columns:1.6fr 1fr;grid-template-rows:auto 1fr;gap:16px;padding:16px;overflow-y:auto}
+  #dep-scroll-top{grid-column:1/2;background:transparent}
+  #dep-conflict-warn{grid-column:1/3}
+  #dep-rte-stats{display:grid!important;background:transparent;border:none;padding:0;margin:10px 0 0}
+  #dep-ndc{grid-column:2/3;grid-row:1/3;margin:0;align-self:start}
+  #dep-split{grid-column:1/2;grid-row:2/3;border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow-sm)}
+  #dep-hero{border-radius:var(--radius-lg)}
+}
 </style>
 </head>
 <body>
@@ -311,46 +413,79 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
 
     <!-- ═══ DÉPART DU JOUR ═══ -->
     <div id="v-depart" class="view on">
-      <!-- Barre date + actions -->
-      <div id="dep-bar">
-        <input type="date" id="dep-date" style="font-size:14px;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit" onchange="onDepDateChange()"/>
-        <input type="time" id="dep-time" value="08:00" title="Heure de départ du dépôt" style="font-size:14px;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit" onchange="techCfg.startTime=this.value;saveCfg();techETAs={};_routeOrderedPts=[];techRouteLegDurations=[];renderDepart();if(mapObj&&!building)calcMap();else _calcETAsHeadless()"/>
-        <button class="btn btn-blue btn-sm" onclick="calcMap()">🗺️ Itinéraire</button>
-        <button id="dep-traffic-btn" class="btn btn-gray btn-sm" onclick="toggleDepTrafficLayer()" title="Afficher/masquer le trafic temps réel">🚦</button>
-        <button id="btn-map-toggle" class="btn btn-gray btn-sm" style="display:none" onclick="toggleDepMap()">📋 Liste</button>
-        <button id="btn-reoptimize" class="btn btn-green btn-sm" style="display:none" onclick="reoptimizeFromDepot()" title="Recalculer depuis votre position GPS (ou dépôt si GPS indisponible)">📍 Recalculer</button>
-        <button id="btn-notion-pull" class="btn btn-sm" style="background:#F3E5F5;color:#6A1B9A;border:1.5px solid #CE93D8" onclick="showNotionPanelTech()">🔄 Notion</button>
-        <button id="btn-start-tour" class="btn btn-sm" style="background:#4CAF50;color:#fff;border:1.5px solid #4CAF50;font-weight:700" onclick="startTournee()" title="Démarrer le minuteur de la tournée">▶️ Démarrer</button>
-        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:var(--gray)">
-          <input type="checkbox" id="tech-opt-return" checked style="width:auto" onchange="techRoundTrip=this.checked;calcMap()"/> Retour dépôt
-        </label>
-        <div id="dep-kpi" style="display:none;margin-left:auto;gap:14px;font-size:13px">
-          <span><strong id="dep-km" style="color:var(--blue)">—</strong> km</span>
-          <span><strong id="dep-dur" style="color:var(--purple)">—</strong> trajet</span>
-          <span><strong id="dep-done" style="color:var(--green)">0/0</strong> ✓</span>
+      <div id="dep-scroll-top">
+      <!-- ═══ PRIORITÉ 1-2 : carte tournée principale ═══ -->
+      <div id="dep-hero">
+        <div class="ux-label">Tournée du jour</div>
+        <div id="dep-hero-progress-row">
+          <div id="dep-hero-progress-track"><div id="dep-hero-progress-fill"></div></div>
         </div>
+        <!-- CTA unique : Démarrer (repos) OU minuteur+Fin tournée (en cours) — jamais les deux -->
+        <div id="dep-tour-timer" style="display:none">
+          <div id="dep-tour-timer-info">
+            <div class="ux-micro" style="text-transform:uppercase;letter-spacing:.06em;font-weight:700;color:var(--success)">⏱️ Tournée en cours</div>
+            <div id="tour-timer">0min</div>
+          </div>
+          <button class="ux-cta ux-cta-secondary" onclick="endTournee()">✓ Fin tournée</button>
+        </div>
+        <button id="btn-start-tour" class="ux-cta ux-cta-primary" onclick="startTournee()" title="Démarrer le minuteur de la tournée">▶️ Démarrer</button>
       </div>
 
       <!-- Avertissement créneau impossible -->
       <div id="dep-conflict-warn" style="display:none;background:#FFF3E0;color:#E65100;padding:6px 14px;font-size:12px;font-weight:600;border-bottom:1px solid #FFCC80"></div>
 
-      <!-- Stats tournée (identiques admin) -->
-      <div id="dep-rte-stats" style="display:none;grid-template-columns:repeat(3,1fr);gap:8px;padding:8px 12px;background:#fff;border-bottom:1px solid var(--border)">
-        <div style="border-left:3px solid var(--blue);background:#F8FAFE;border-radius:8px;padding:8px 10px;display:flex;align-items:center;gap:8px">
-          <span style="font-size:16px">🛣️</span>
-          <div><div style="font-size:10px;color:var(--gray);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Distance</div><div id="tech-sk" style="font-size:15px;font-weight:700;color:var(--blue)">—</div></div>
+      <!-- ═══ PRIORITÉ 3 : statistiques rapides ═══ -->
+      <div id="dep-rte-stats" style="display:none">
+        <div class="ux-stat-tile">
+          <span class="ux-stat-ico" style="color:var(--primary)">🛣️</span>
+          <div><div class="ux-label">Distance</div><div id="tech-sk" class="ux-stat">—</div></div>
         </div>
-        <div style="border-left:3px solid #7B1FA2;background:#F8F4FF;border-radius:8px;padding:8px 10px;display:flex;align-items:center;gap:8px">
-          <span style="font-size:16px">🚗</span>
-          <div><div style="font-size:10px;color:var(--gray);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Trajet</div><div id="tech-st" style="font-size:15px;font-weight:700;color:#7B1FA2">—</div><div id="tech-st-sub" style="font-size:10px;font-weight:500;margin-top:1px"></div></div>
+        <div class="ux-stat-tile">
+          <span class="ux-stat-ico" style="color:var(--purple)">🚗</span>
+          <div><div class="ux-label">Trajet</div><div id="tech-st" class="ux-stat">—</div><div id="tech-st-sub" class="ux-micro"></div></div>
         </div>
-        <div style="border-left:3px solid var(--green);background:#F1F8E9;border-radius:8px;padding:8px 10px;display:flex;align-items:center;gap:8px">
-          <span style="font-size:16px">📍</span>
-          <div><div style="font-size:10px;color:var(--gray);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Arrêts</div><div id="tech-ss" style="font-size:15px;font-weight:700;color:var(--green)">—</div></div>
+        <div class="ux-stat-tile">
+          <span class="ux-stat-ico" style="color:var(--success)">📍</span>
+          <div><div class="ux-label">Arrêts</div><div id="tech-ss" class="ux-stat">—</div></div>
         </div>
       </div>
 
-      <!-- SPLIT CARTE + LISTE -->
+      <!-- ═══ Prochaine destination — carte dédiée, Maps/Waze secondaires ═══ -->
+      <div id="dep-ndc" style="display:none">
+        <div class="ux-label" style="margin-bottom:6px">Prochaine destination</div>
+        <div id="dep-ndc-client" class="ux-h2"></div>
+        <div id="dep-ndc-addr" class="ux-sub" style="margin:2px 0 8px"></div>
+        <div id="dep-ndc-meta" style="display:flex;gap:14px;margin-bottom:10px"></div>
+        <div style="display:flex;gap:8px">
+          <button class="ux-nav-btn" style="background:#4285F4" onclick="_depNdcNavigate('google')">📍 Google Maps</button>
+          <button class="ux-nav-btn" style="background:#33CCFF" onclick="_depNdcNavigate('waze')">🧭 Waze</button>
+        </div>
+      </div>
+
+      <!-- ═══ Options tournée — secondaire, repliable ═══ -->
+      <details id="dep-bar-wrap">
+        <summary>⚙️ Options de la tournée (itinéraire, date, Notion...)</summary>
+        <div id="dep-bar">
+          <input type="date" id="dep-date" style="font-size:14px;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit" onchange="onDepDateChange()"/>
+          <input type="time" id="dep-time" value="08:00" title="Heure de départ du dépôt" style="font-size:14px;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit" onchange="techCfg.startTime=this.value;saveCfg();techETAs={};_routeOrderedPts=[];techRouteLegDurations=[];renderDepart();if(mapObj&&!building)calcMap();else _calcETAsHeadless()"/>
+          <button class="btn btn-blue btn-sm" onclick="calcMap()">🗺️ Itinéraire</button>
+          <button id="dep-traffic-btn" class="btn btn-gray btn-sm" onclick="toggleDepTrafficLayer()" title="Afficher/masquer le trafic temps réel">🚦</button>
+          <button id="btn-map-toggle" class="btn btn-gray btn-sm" style="display:none" onclick="toggleDepMap()">📋 Liste</button>
+          <button id="btn-reoptimize" class="btn btn-green btn-sm" style="display:none" onclick="reoptimizeFromDepot()" title="Recalculer depuis votre position GPS (ou dépôt si GPS indisponible)">📍 Recalculer</button>
+          <button id="btn-notion-pull" class="btn btn-sm" style="background:#F3E5F5;color:#6A1B9A;border:1.5px solid #CE93D8" onclick="showNotionPanelTech()">🔄 Notion</button>
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:var(--gray)">
+            <input type="checkbox" id="tech-opt-return" checked style="width:auto" onchange="techRoundTrip=this.checked;calcMap()"/> Retour dépôt
+          </label>
+          <div id="dep-kpi" style="display:none;margin-left:auto;gap:14px;font-size:13px">
+            <span><strong id="dep-km" style="color:var(--blue)">—</strong> km</span>
+            <span><strong id="dep-dur" style="color:var(--purple)">—</strong> trajet</span>
+            <span><strong id="dep-done" style="color:var(--green)">0/0</strong> ✓</span>
+          </div>
+        </div>
+      </details>
+      </div><!-- /dep-scroll-top -->
+
+      <!-- ═══ PRIORITÉ 3 (suite) : itinéraire + timeline interventions ═══ -->
       <div id="dep-split">
 
         <!-- Carte -->
@@ -373,20 +508,13 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
           </div>
         </div>
 
-        <!-- Liste clients — droite fixe 300px -->
+        <!-- Liste clients — timeline -->
         <div id="dep-list-col">
           <div id="dep-list-head">
             <span id="dep-list-hd">Clients du jour</span>
             <span id="dep-list-badge" style="background:rgba(255,255,255,.2);border-radius:8px;padding:2px 8px;font-size:11px"></span>
           </div>
           <div id="dep-list-scroll">
-            <div id="dep-tour-timer" style="display:none;background:linear-gradient(135deg,#E8F5E9,#F1F8E9);border-left:4px solid #2E7D32;border-radius:8px;padding:14px;margin:8px;display:flex;gap:12px;align-items:center">
-              <div>
-                <div style="font-size:12px;color:var(--gray);font-weight:600;margin-bottom:4px">⏱️ TOURNÉE EN COURS</div>
-                <div style="font-size:28px;font-weight:700;color:#2E7D32;font-family:monospace" id="tour-timer">0min</div>
-              </div>
-              <button onclick="endTournee()" style="padding:10px 16px;background:#2E7D32;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;flex-shrink:0">✓ Fin tournée</button>
-            </div>
             <div id="dep-eta-banner" style="display:none"></div>
             <div id="dep-list-empty" style="padding:32px 12px;text-align:center;color:var(--gray);font-size:14px">
               Aucune intervention ce jour
@@ -425,6 +553,17 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
         </div>
         <div id="dae-stock-list" style="font-size:12px;color:var(--gray)">Aucun matériel scanné</div>
       </div>
+
+      <!-- ═══ Accès Stock consommables (ex-onglet séparé) ═══ -->
+      <button onclick="goTab('stock')" style="display:flex;align-items:center;gap:12px;width:calc(100% - 24px);margin:0 12px 10px;padding:14px;background:var(--purple-light);border:1.5px solid var(--purple);border-radius:12px;cursor:pointer;font-family:inherit;text-align:left">
+        <span style="font-size:22px">🏷️</span>
+        <span style="flex:1">
+          <span style="display:block;font-size:13px;font-weight:700;color:var(--purple)">Stock consommables</span>
+          <span style="display:block;font-size:11.5px;color:var(--text-secondary)">Pad-Pak, électrodes, batteries — scanner, entrée, sortie</span>
+        </span>
+        <span style="color:var(--purple);font-size:18px">›</span>
+      </button>
+
       <div style="flex:1;overflow-y:auto">
         <div id="mat-totaux"></div>
         <div style="padding:10px 14px 2px;font-size:12px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px">Détail par client — appuyer pour voir la fiche</div>
@@ -435,7 +574,10 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
 
     <!-- ═══ STOCK CONSOMMABLES (Pad-Pak, électrodes, batteries...) ═══ -->
     <div id="v-stock" class="view">
-      <div style="padding:12px 14px 4px;font-size:13px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px">📦 Stock</div>
+      <div style="display:flex;align-items:center;gap:8px;padding:10px 10px 4px">
+        <button onclick="goTab('materiel')" title="Retour à Matériel" style="border:none;background:var(--surface-secondary);border-radius:50%;width:34px;height:34px;font-size:18px;cursor:pointer;flex-shrink:0">←</button>
+        <div style="font-size:13px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px">📦 Stock consommables</div>
+      </div>
       <div id="stk-alert-banner"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px 14px">
         <button onclick="stkOpenScan('lookup')" style="grid-column:1/3;padding:18px;background:var(--blue);color:#fff;border:none;border-radius:14px;font-size:17px;font-weight:800;cursor:pointer;box-shadow:0 3px 10px rgba(21,101,192,.3)">📷 SCANNER</button>
@@ -552,6 +694,9 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
           </div>
         </div>
 
+        <!-- ═══ ADMINISTRATION / PARAMÈTRES ═══ -->
+        <div class="ux-label" style="margin:18px 4px 8px">⚙️ Administration</div>
+
         <!-- Config Kizeo -->
         <div class="card" style="margin:0 0 12px">
           <div style="font-size:14px;font-weight:700;margin-bottom:12px">🔗 Kizeo Forms</div>
@@ -608,7 +753,7 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
   <!-- TABS -->
   <div id="tabs">
     <button class="tab on" onclick="goTab('depart')" id="tab-depart">
-      <span class="ti">🚀</span><span class="tl">Départ</span>
+      <span class="ti">🏠</span><span class="tl">Accueil</span>
       <span class="tbadge" id="badge-dep"></span>
     </button>
     <button class="tab" onclick="goTab('planning')" id="tab-planning">
@@ -618,7 +763,10 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-seri
       <span class="ti">📦</span><span class="tl">Matériel</span>
       <span class="tbadge" id="badge-mat"></span>
     </button>
-    <button class="tab" onclick="goTab('stock')" id="tab-stock">
+    <!-- Stock consommables : plus un onglet de niveau 1 (priorité 4 vs "Démarrer" en
+         priorité 1) — reste accessible depuis une carte dans Matériel. L'élément et
+         goTab('stock') restent fonctionnels au cas où un lien y pointerait encore. -->
+    <button class="tab" onclick="goTab('stock')" id="tab-stock" style="display:none">
       <span class="ti">🏷️</span><span class="tl">Stock</span>
       <span class="tbadge" id="badge-stock"></span>
     </button>
@@ -1169,6 +1317,39 @@ function navigateToNextClient(provider){
   window.open(url,'_blank')
   closeNextClientPopup()
 }
+// ── Carte "Prochaine destination" persistante sur l'accueil (Priorité 1) ──
+// Réutilise le même repère d'ordre que showNextClientPopup (techRouteOrder),
+// mais cherche le PREMIER arrêt encore en attente (pas "après tel id") : c'est
+// une vue permanente, pas déclenchée par une validation.
+let _depNdcAddr=''
+function renderNextDestCard(){
+  const el=document.getElementById('dep-ndc')
+  if(!el) return
+  const date=depDate()
+  const order=techRouteOrder[date]||myIvs(date).map(i=>i.id)
+  const nextId=order.find(id=>!validated[id]&&!failed[id])
+  if(!nextId){ el.style.display='none'; return }
+  const nextIv=ivs.find(i=>i.id===nextId)
+  if(!nextIv){ el.style.display='none'; return }
+  _depNdcAddr=nextIv.addr||''
+  document.getElementById('dep-ndc-client').textContent=nextIv.client||'Client'
+  document.getElementById('dep-ndc-addr').textContent=nextIv.addr||''
+  const eta=techETAs[nextId]?.eta
+  const idx=_routeOrderedPts.findIndex(p=>p.iv.id===nextId)
+  const leg=idx>=0?techRouteLegDurations[idx]:null
+  const meta=document.getElementById('dep-ndc-meta')
+  meta.innerHTML=[
+    leg?.distanceKm!=null?`<span class="ux-sub">📏 ${leg.distanceKm} km</span>`:'',
+    eta?`<span class="ux-sub" style="font-weight:700;color:var(--primary)">🕐 ETA ${eta}</span>`:''
+  ].filter(Boolean).join('')
+  el.style.display='block'
+}
+function _depNdcNavigate(provider){
+  if(!_depNdcAddr) return
+  const addr=encodeURIComponent(_depNdcAddr)
+  const url=provider==='waze'?`https://waze.com/ul?q=${addr}&navigate=yes`:`https://www.google.com/maps/dir/?api=1&destination=${addr}`
+  window.open(url,'_blank')
+}
 function depStartTime(){return document.getElementById('dep-time')?.value||techCfg.startTime||'08:00'}
 // Une fois la tournée démarrée, les horaires clients doivent rester ancrés sur
 // l'heure de départ RÉELLE (figée par startTournee() dans tourStartTime, restaurée
@@ -1631,6 +1812,9 @@ function renderDepart(){
   document.getElementById("dep-list-hd").textContent=`${dayIvs.length} client${dayIvs.length>1?"s":""}`
   document.getElementById("dep-list-badge").textContent=`✓${doneN} ✗${failN}`
   document.getElementById("dep-done").textContent=doneN+"/"+dayIvs.length
+  const heroFill=document.getElementById("dep-hero-progress-fill")
+  if(heroFill) heroFill.style.width=(dayIvs.length?Math.round((doneN+failN)/dayIvs.length*100):0)+"%"
+  renderNextDestCard()
   const kpi=document.getElementById("dep-kpi")
   if(kpi&&kpi.style.display!=="none") kpi.style.display=dayIvs.length?"flex":"none"
 
