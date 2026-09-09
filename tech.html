@@ -256,6 +256,14 @@ button:disabled{opacity:.45;cursor:not-allowed}
 
 #dep-hero{background:linear-gradient(160deg,var(--primary-dark),var(--primary));padding:16px;color:#fff}
 #dep-hero .ux-label{color:rgba(255,255,255,.75)}
+#dep-hero-count{font-size:24px;font-weight:800;letter-spacing:-.02em;margin-top:4px}
+#dep-hero-meta{font-size:12.5px;color:rgba(255,255,255,.85);margin:8px 0 14px}
+#dep-hero-meta:empty{display:none}
+
+#dep-quick-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 12px}
+.ux-quick-btn{display:flex;flex-direction:column;align-items:center;gap:5px;padding:12px 4px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);cursor:pointer;font-family:inherit;font-size:11px;font-weight:600;color:var(--text-secondary)}
+.ux-quick-btn:active{background:var(--surface-secondary)}
+.ux-quick-ico{font-size:20px}
 #dep-hero-progress-row{margin:10px 0 14px}
 #dep-hero-progress-track{height:8px;background:rgba(255,255,255,.25);border-radius:4px;overflow:hidden}
 #dep-hero-progress-fill{height:100%;width:0;background:#fff;border-radius:4px;transition:width .4s ease}
@@ -417,9 +425,14 @@ button:disabled{opacity:.45;cursor:not-allowed}
       <!-- ═══ PRIORITÉ 1-2 : carte tournée principale ═══ -->
       <div id="dep-hero">
         <div class="ux-label">Tournée du jour</div>
+        <div id="dep-hero-count">— / —</div>
         <div id="dep-hero-progress-row">
           <div id="dep-hero-progress-track"><div id="dep-hero-progress-fill"></div></div>
         </div>
+        <!-- Distance parcourue/restante + arrêts restants — dérivés des mêmes legs que
+             les ETAs existants (aucune nouvelle logique de calcul, juste une lecture
+             supplémentaire des mêmes données). -->
+        <div id="dep-hero-meta"></div>
         <!-- CTA unique : Démarrer (repos) OU minuteur+Fin tournée (en cours) — jamais les deux -->
         <div id="dep-tour-timer" style="display:none">
           <div id="dep-tour-timer-info">
@@ -460,6 +473,14 @@ button:disabled{opacity:.45;cursor:not-allowed}
           <button class="ux-nav-btn" style="background:#4285F4" onclick="_depNdcNavigate('google')">📍 Google Maps</button>
           <button class="ux-nav-btn" style="background:#33CCFF" onclick="_depNdcNavigate('waze')">🧭 Waze</button>
         </div>
+      </div>
+
+      <!-- ═══ Actions rapides — seulement les 4 plus utilisées, pas 15 boutons ═══ -->
+      <div id="dep-quick-actions">
+        <button class="ux-quick-btn" onclick="calcMap()"><span class="ux-quick-ico">🗺️</span><span>Itinéraire</span></button>
+        <button class="ux-quick-btn" onclick="goTab('materiel')"><span class="ux-quick-ico">📦</span><span>Matériel</span></button>
+        <button class="ux-quick-btn" onclick="openDaeScan()"><span class="ux-quick-ico">📷</span><span>Scanner</span></button>
+        <button class="ux-quick-btn" onclick="goTab('planning')"><span class="ux-quick-ico">📅</span><span>Planning</span></button>
       </div>
 
       <!-- ═══ Options tournée — secondaire, repliable ═══ -->
@@ -763,10 +784,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
       <span class="ti">📦</span><span class="tl">Matériel</span>
       <span class="tbadge" id="badge-mat"></span>
     </button>
-    <!-- Stock consommables : plus un onglet de niveau 1 (priorité 4 vs "Démarrer" en
-         priorité 1) — reste accessible depuis une carte dans Matériel. L'élément et
-         goTab('stock') restent fonctionnels au cas où un lien y pointerait encore. -->
-    <button class="tab" onclick="goTab('stock')" id="tab-stock" style="display:none">
+    <button class="tab" onclick="goTab('stock')" id="tab-stock">
       <span class="ti">🏷️</span><span class="tl">Stock</span>
       <span class="tbadge" id="badge-stock"></span>
     </button>
@@ -1317,6 +1335,26 @@ function navigateToNextClient(provider){
   window.open(url,'_blank')
   closeNextClientPopup()
 }
+// ── Distance parcourue / restante — dérivée des legs déjà calculés par
+// route-traffic (aucun nouveau calcul métier, juste une agrégation différente
+// des mêmes données que celles qui alimentent déjà les ETAs). ──
+function _updateHeroMeta(dayIvs,doneN,failN){
+  const el=document.getElementById('dep-hero-meta')
+  if(!el) return
+  if(!dayIvs.length||!_routeOrderedPts.length||!techRouteLegDurations.length){ el.textContent=''; return }
+  let totalKm=0,remainingKm=0
+  _routeOrderedPts.forEach((p,idx)=>{
+    const km=techRouteLegDurations[idx]?.distanceKm||0
+    totalKm+=km
+    if(!validated[p.iv.id]&&!failed[p.iv.id]) remainingKm+=km
+  })
+  const doneKm=Math.max(0,totalKm-remainingKm)
+  const remaining=dayIvs.length-doneN-failN
+  const fmtKm=n=>n.toFixed(1).replace('.',',')+' km'
+  const parts=totalKm?[`${fmtKm(doneKm)} parcourus`,`${fmtKm(remainingKm)} restants`]:[]
+  parts.push(`${remaining} restante${remaining>1?'s':''}`)
+  el.textContent=parts.join(' · ')
+}
 // ── Carte "Prochaine destination" persistante sur l'accueil (Priorité 1) ──
 // Réutilise le même repère d'ordre que showNextClientPopup (techRouteOrder),
 // mais cherche le PREMIER arrêt encore en attente (pas "après tel id") : c'est
@@ -1340,7 +1378,8 @@ function renderNextDestCard(){
   const meta=document.getElementById('dep-ndc-meta')
   meta.innerHTML=[
     leg?.distanceKm!=null?`<span class="ux-sub">📏 ${leg.distanceKm} km</span>`:'',
-    eta?`<span class="ux-sub" style="font-weight:700;color:var(--primary)">🕐 ETA ${eta}</span>`:''
+    eta?`<span class="ux-sub" style="font-weight:700;color:var(--primary)">🕐 ETA ${eta}</span>`:'',
+    nextIv.timeStart?`<span class="ux-sub">🔔 Prévu ${nextIv.timeStart}</span>`:''
   ].filter(Boolean).join('')
   el.style.display='block'
 }
@@ -1812,8 +1851,11 @@ function renderDepart(){
   document.getElementById("dep-list-hd").textContent=`${dayIvs.length} client${dayIvs.length>1?"s":""}`
   document.getElementById("dep-list-badge").textContent=`✓${doneN} ✗${failN}`
   document.getElementById("dep-done").textContent=doneN+"/"+dayIvs.length
+  const heroCount=document.getElementById("dep-hero-count")
+  if(heroCount) heroCount.textContent=`${doneN} / ${dayIvs.length} intervention${dayIvs.length>1?'s':''}`
   const heroFill=document.getElementById("dep-hero-progress-fill")
   if(heroFill) heroFill.style.width=(dayIvs.length?Math.round((doneN+failN)/dayIvs.length*100):0)+"%"
+  _updateHeroMeta(dayIvs,doneN,failN)
   renderNextDestCard()
   const kpi=document.getElementById("dep-kpi")
   if(kpi&&kpi.style.display!=="none") kpi.style.display=dayIvs.length?"flex":"none"
