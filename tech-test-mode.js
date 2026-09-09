@@ -8,8 +8,9 @@
 // But : rejouer la logique réelle de tournée (démarrage, ETA, retard/pause,
 // arrivée) depuis un ordinateur, sans GPS ni déplacement réel, en réutilisant
 // directement les fonctions de production (refreshLiveETAs, startLiveETAs,
-// _startTourInterval, _startPosWatch/_stopPosWatch) — pas une réécriture de
-// leur logique, pour pouvoir réellement détecter les bugs qui s'y trouvent.
+// _startTourInterval, _startPosWatch/_stopPosWatch, pauseTournee/resumeTournee)
+// — pas une réécriture de leur logique, pour pouvoir réellement détecter les
+// bugs qui s'y trouvent.
 //
 // Garanties d'isolation :
 //  - tourRunning / tourStartTime / techRouteLegDurations / _routeOrderedPts
@@ -187,6 +188,7 @@
   function simPause(){
     if (!simActive || simGpsPaused) return
     simGpsPaused = true
+    if (typeof pauseTournee === 'function') pauseTournee() // fonction réelle (tech.html) — mémorise l'heure de pause
     simLog.pause = simHHMM()
     simLog.etaAvantPause = simEtaOf(_nextPendingSimId())
     simLogLine('⏸ pause à ' + simLog.pause + ' — ETA avant pause : ' + (simLog.etaAvantPause || '—'))
@@ -195,6 +197,7 @@
   function simResume(){
     if (!simActive || !simGpsPaused) return
     simGpsPaused = false
+    if (typeof resumeTournee === 'function') resumeTournee() // fonction réelle (tech.html) — cumule la durée de pause et recalcule les ETA
     simLog.reprise = simHHMM()
     const p = _hhmmToMin(simLog.pause), r = _hhmmToMin(simLog.reprise)
     simLog.dureePause = (p != null && r != null) ? (r - p) : null

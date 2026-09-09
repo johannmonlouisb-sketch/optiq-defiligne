@@ -1020,6 +1020,10 @@ let techETAs={}  // { [ivId]: {eta:"08:32", leave:"08:47"} }
 let techRouteLegDurations=[], etaRefreshTimer=null, _nextDestAddr='', _routeOrderedPts=[]
 let tourStartTime=null, tourTimer=null, tourRunning=false, tourneesData={}
 let techRoundTrip=true
+// Pause tournée — mémoire minimale (RAM uniquement, jamais persistée) du temps
+// réellement perdu, pour décaler les ETA d'autant. _pauseStartTime non-null =
+// pause en cours ; _pauseCumMs = somme des pauses déjà terminées ce jour.
+let _pauseStartTime=null, _pauseCumMs=0
 try{const s=localStorage.getItem("techTourneesData");if(s)tourneesData=JSON.parse(s)}catch(e){}
 function syncVFFromIvs(){
   validated={};failed={}
@@ -1063,8 +1067,14 @@ function refreshLiveETAs(){
   const startHHMM=effectiveStartHHMM()
   const[sh,sm]=startHHMM.split(':').map(Number)
   const nowMin=nowMinParis()
-  let curMin=sh*60+sm
-  let lastLeaveMin=sh*60+sm
+  // Pauses déjà terminées + pause en cours si non reprise — ajouté UNE SEULE FOIS
+  // au départ du calcul (pas par arrêt) pour que le décalage se propage tel quel
+  // à travers toute la boucle, sans être compté plusieurs fois sur les arrêts
+  // suivants. Idempotent tant qu'aucune nouvelle pause/reprise n'a eu lieu entre
+  // deux appels, puisque _pauseCumMs ne change qu'au moment de resumeTournee().
+  const pauseMin=Math.round((_pauseCumMs+(_pauseStartTime?(new Date()-_pauseStartTime):0))/60000)
+  let curMin=sh*60+sm+pauseMin
+  let lastLeaveMin=sh*60+sm+pauseMin
   let delayAccum=0 // retard cumulé vs circulation fluide
   _routeOrderedPts.forEach((p,idx)=>{
     const leg=techRouteLegDurations[idx]
@@ -1281,6 +1291,7 @@ async function startTournee(){
   tourStartTime=new Date()
   tourRunning=true
   _arrivalAlerted=false
+  _pauseStartTime=null;_pauseCumMs=0
   try{localStorage.setItem('optiq_tour_start_'+curTech, tourStartTime.toISOString())}catch(e){}
   saveTourProgress('running')
   _startTourInterval()
@@ -1322,9 +1333,24 @@ function endTournee(){
   tourRunning=false
   tourStartTime=null
   _plannedETAs=null;_plannedTourEnd=null
+  _pauseStartTime=null;_pauseCumMs=0
   saveTourProgress('done')
   showTourStats(durationMin,gainMin,validatedCnt,failedCnt,dayIvs,plannedEnd,endTimeStr)
   renderDepart()
+}
+// Pause / reprise tournée — décale les ETA du temps réellement perdu (voir
+// refreshLiveETAs). État volontairement non persisté (RAM uniquement) : une
+// pause n'a de sens que dans la session de navigation en cours.
+function pauseTournee(){
+  if(!tourRunning||_pauseStartTime) return
+  _pauseStartTime=new Date()
+  refreshLiveETAs()
+}
+function resumeTournee(){
+  if(!tourRunning||!_pauseStartTime) return
+  _pauseCumMs+=(new Date()-_pauseStartTime)
+  _pauseStartTime=null
+  refreshLiveETAs()
 }
 function showNextClientPopup(currentId){
   const date=depDate()
