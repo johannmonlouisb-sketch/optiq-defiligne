@@ -19,9 +19,9 @@
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
   /* ── Design system OptiTechX ── noms sémantiques (nouveaux composants) ── */
-  --primary:#1565C0;--primary-dark:#0D47A1;--primary-light:#E3F2FD;
-  --background:#F5F5F5;--surface:#FFFFFF;--surface-secondary:#FAFBFC;
-  --text:#17202A;--text-secondary:#5A6472;--text-tertiary:#8A94A0;
+  --primary:#1565C0;--primary-dark:#0D47A1;--primary-hover:#0D47A1;--primary-light:#E3F2FD;
+  --background:#F5F5F5;--surface:#FFFFFF;--surface-secondary:#FAFBFC;--surface-elevated:#FFFFFF;
+  --text:#17202A;--text-secondary:#5A6472;--text-tertiary:#8A94A0;--text-muted:#8A94A0;
   --border:#E4E7EC;--border-strong:#D0D5DD;
   --success:#1B8A45;--success-light:#E8F5E9;
   --warning:#B45309;--warning-light:#FFF3E0;
@@ -43,7 +43,7 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 #app{display:flex;flex-direction:column;height:100vh;height:100dvh}
 
 /* ── Typographie ── hiérarchie explicite pour les nouveaux composants ── */
-.ux-h1{font-size:22px;font-weight:800;letter-spacing:-.02em;color:var(--text);line-height:1.2}
+.ux-h1{font-size:26px;font-weight:800;letter-spacing:-.02em;color:var(--text);line-height:1.2}
 .ux-h2{font-size:15px;font-weight:700;color:var(--text);letter-spacing:-.01em}
 .ux-label{font-size:11px;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.06em}
 .ux-stat{font-size:26px;font-weight:800;color:var(--text);letter-spacing:-.02em;line-height:1}
@@ -123,7 +123,8 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .vbtn-f.active{background:var(--red);color:#fff}
 
 /* ── CARTES GENERIQUES ── */
-.card{background:#fff;border-radius:14px;padding:14px;margin:8px 12px;box-shadow:0 1px 6px rgba(0,0,0,.06)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin:8px 12px;box-shadow:var(--shadow-sm);transition:box-shadow .15s,border-color .15s}
+@media (hover:hover){.card:hover{box-shadow:var(--shadow-md);border-color:var(--border-strong)}}
 .tag{display:inline-block;font-size:11px;font-weight:600;padding:3px 9px;border-radius:100px;white-space:nowrap}
 .tag-warn{background:#FFF3E0;color:var(--orange)}
 .tag-ok{background:var(--greenLt);color:var(--green)}
@@ -257,6 +258,14 @@ button:disabled{opacity:.45;cursor:not-allowed}
 #dep-hero{background:linear-gradient(160deg,var(--primary-dark),var(--primary));padding:16px;color:#fff}
 #dep-hero .ux-label{color:rgba(255,255,255,.75)}
 #dep-hero-count{font-size:24px;font-weight:800;letter-spacing:-.02em;margin-top:4px}
+/* Pastille de statut — pas de gros bloc coloré, juste un point + texte court.
+   Uniquement les états réellement présents dans l'app (tourRunning booléen +
+   tourneesData du jour) — pas de "pause"/"erreur" qui n'existent pas côté code. */
+.ux-status-pill{display:none;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:3px 9px 3px 7px;border-radius:100px;background:rgba(255,255,255,.16);color:#fff}
+.ux-status-pill:before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor}
+.ux-status-pill.st-wait{display:flex}
+.ux-status-pill.st-active{display:flex;background:rgba(76,217,100,.22);color:#B9FBC0}
+.ux-status-pill.st-done{display:flex;background:rgba(255,255,255,.16)}
 #dep-hero-meta{font-size:12.5px;color:rgba(255,255,255,.85);margin:8px 0 14px}
 #dep-hero-meta:empty{display:none}
 
@@ -280,8 +289,8 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .ux-stat-ico{font-size:16px;flex-shrink:0}
 
 #dep-ndc{display:none;margin:10px 12px;padding:14px;background:var(--surface);border:1.5px solid var(--primary-light);border-radius:var(--radius-lg);box-shadow:var(--shadow-sm)}
-.ux-nav-btn{flex:1;padding:11px;border:none;border-radius:var(--radius-sm);color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer}
-.ux-nav-btn:active{filter:brightness(.92)}
+.ux-nav-btn{flex:1;padding:10px;border:1.5px solid var(--border);background:var(--surface);border-radius:var(--radius-sm);color:var(--text-secondary);font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;transition:background .12s}
+.ux-nav-btn:active{background:var(--surface-secondary)}
 
 #dep-bar-wrap{margin:6px 12px 8px}
 #dep-bar-wrap summary{list-style:none;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--text-secondary);padding:8px 4px;user-select:none}
@@ -296,6 +305,9 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .dc:not(:last-child) .dc-num::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);width:2px;height:14px;background:var(--border-strong)}
 .dc.vdone .dc-num{background:var(--success)}
 .dc.vfail .dc-num{background:var(--danger)}
+/* Intervention "en cours" (premier arrêt encore en attente) légèrement mise en avant */
+.dc.vcurrent{background:var(--primary-light)}
+.dc.vcurrent .dc-num{box-shadow:0 0 0 3px rgba(21,101,192,.25)}
 
 @media (max-width:639px){
   #dep-hero{padding:14px}
@@ -320,7 +332,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
   .tab.on::after{display:none}
   .tbadge{top:8px;right:16px}
 
-  #v-depart{display:grid;grid-template-columns:1.6fr 1fr;grid-template-rows:auto 1fr;gap:16px;padding:16px;overflow-y:auto}
+  #v-depart{display:grid;grid-template-columns:1.6fr 1fr;grid-template-rows:auto 1fr;gap:16px;padding:16px;overflow-y:auto;max-width:1400px;margin:0 auto;width:100%}
   #dep-scroll-top{grid-column:1/2;background:transparent}
   #dep-conflict-warn{grid-column:1/3}
   #dep-rte-stats{display:grid!important;background:transparent;border:none;padding:0;margin:10px 0 0}
@@ -424,7 +436,10 @@ button:disabled{opacity:.45;cursor:not-allowed}
       <div id="dep-scroll-top">
       <!-- ═══ PRIORITÉ 1-2 : carte tournée principale ═══ -->
       <div id="dep-hero">
-        <div class="ux-label">Tournée du jour</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+          <div class="ux-label">Tournée du jour</div>
+          <span id="dep-hero-status" class="ux-status-pill"></span>
+        </div>
         <div id="dep-hero-count">— / —</div>
         <div id="dep-hero-progress-row">
           <div id="dep-hero-progress-track"><div id="dep-hero-progress-fill"></div></div>
@@ -468,24 +483,25 @@ button:disabled{opacity:.45;cursor:not-allowed}
         <div class="ux-label" style="margin-bottom:6px">Prochaine destination</div>
         <div id="dep-ndc-client" class="ux-h2"></div>
         <div id="dep-ndc-addr" class="ux-sub" style="margin:2px 0 8px"></div>
-        <div id="dep-ndc-meta" style="display:flex;gap:14px;margin-bottom:10px"></div>
+        <div id="dep-ndc-meta" style="display:flex;gap:14px;margin-bottom:12px"></div>
+        <button class="ux-cta" style="margin-bottom:8px;padding:15px;background:var(--primary);color:#fff;font-size:15px;font-weight:800;box-shadow:0 2px 8px rgba(21,101,192,.25)" onclick="_depNdcNavigate('google')">🧭 Naviguer</button>
         <div style="display:flex;gap:8px">
-          <button class="ux-nav-btn" style="background:#4285F4" onclick="_depNdcNavigate('google')">📍 Google Maps</button>
-          <button class="ux-nav-btn" style="background:#33CCFF" onclick="_depNdcNavigate('waze')">🧭 Waze</button>
+          <button class="ux-nav-btn" onclick="_depNdcNavigate('google')">📍 Google Maps</button>
+          <button class="ux-nav-btn" onclick="_depNdcNavigate('waze')">🧭 Waze</button>
         </div>
       </div>
 
       <!-- ═══ Actions rapides — seulement les 4 plus utilisées, pas 15 boutons ═══ -->
       <div id="dep-quick-actions">
-        <button class="ux-quick-btn" onclick="calcMap()"><span class="ux-quick-ico">🗺️</span><span>Itinéraire</span></button>
-        <button class="ux-quick-btn" onclick="goTab('materiel')"><span class="ux-quick-ico">📦</span><span>Matériel</span></button>
-        <button class="ux-quick-btn" onclick="openDaeScan()"><span class="ux-quick-ico">📷</span><span>Scanner</span></button>
-        <button class="ux-quick-btn" onclick="goTab('planning')"><span class="ux-quick-ico">📅</span><span>Planning</span></button>
+        <button class="ux-quick-btn" onclick="calcMap()" title="Recalculer l'itinéraire du jour"><span class="ux-quick-ico">🗺️</span><span>Itinéraire</span></button>
+        <button class="ux-quick-btn" onclick="goTab('materiel')" title="Voir le matériel sorti"><span class="ux-quick-ico">📦</span><span>Matériel</span></button>
+        <button class="ux-quick-btn" onclick="openDaeScan()" title="Scanner un DAE"><span class="ux-quick-ico">📷</span><span>Scanner</span></button>
+        <button class="ux-quick-btn" onclick="goTab('planning')" title="Voir le planning de la semaine"><span class="ux-quick-ico">📅</span><span>Planning</span></button>
       </div>
 
       <!-- ═══ Options tournée — secondaire, repliable ═══ -->
       <details id="dep-bar-wrap">
-        <summary>⚙️ Options de la tournée (itinéraire, date, Notion...)</summary>
+        <summary>⚙️ Paramètres de tournée (itinéraire, date, Notion...)</summary>
         <div id="dep-bar">
           <input type="date" id="dep-date" style="font-size:14px;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit" onchange="onDepDateChange()"/>
           <input type="time" id="dep-time" value="08:00" title="Heure de départ du dépôt" style="font-size:14px;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit" onchange="techCfg.startTime=this.value;saveCfg();techETAs={};_routeOrderedPts=[];techRouteLegDurations=[];renderDepart();if(mapObj&&!building)calcMap();else _calcETAsHeadless()"/>
@@ -1856,6 +1872,13 @@ function renderDepart(){
   const heroFill=document.getElementById("dep-hero-progress-fill")
   if(heroFill) heroFill.style.width=(dayIvs.length?Math.round((doneN+failN)/dayIvs.length*100):0)+"%"
   _updateHeroMeta(dayIvs,doneN,failN)
+  const statusPill=document.getElementById('dep-hero-status')
+  if(statusPill){
+    if(tourRunning){statusPill.textContent='En cours';statusPill.className='ux-status-pill st-active'}
+    else if(tourneesData[depDate()]){statusPill.textContent='Terminée';statusPill.className='ux-status-pill st-done'}
+    else if(dayIvs.length){statusPill.textContent='En attente';statusPill.className='ux-status-pill st-wait'}
+    else{statusPill.className='ux-status-pill'}
+  }
   renderNextDestCard()
   const kpi=document.getElementById("dep-kpi")
   if(kpi&&kpi.style.display!=="none") kpi.style.display=dayIvs.length?"flex":"none"
@@ -1940,7 +1963,9 @@ function renderDepart(){
     const workMin=dur(iv.type,iv.form)
     const _mini=(done||fail)&&!_techExpanded.has(iv.id)
     const _open=!_mini&&_techDetailOpen.has(iv.id)
-    const _cls=`dc${done?" vdone":fail?" vfail":""}${_mini?" mini":""}${_open?" open":""}`
+    // Timeline : met en avant le PREMIER arrêt encore en attente — l'intervention "en cours"
+    const _isCurrent=!done&&!fail&&dayIvs.slice(0,idx).every(x=>validated[x.id]||failed[x.id])
+    const _cls=`dc${done?" vdone":fail?" vfail":""}${_isCurrent?" vcurrent":""}${_mini?" mini":""}${_open?" open":""}`
     return `<div class="${_cls}" id="dc-${iv.id}"
       draggable="true"
       ondragstart="_dragId=${iv.id};event.dataTransfer.effectAllowed='move'"
