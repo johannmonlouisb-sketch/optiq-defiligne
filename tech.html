@@ -2099,13 +2099,15 @@ function renderDepart(){
         <span class="tag tag-info">🔧 ${fmin(workMin)} · ${(TYPES[iv.type]||TYPES.maintenance_simple).label}</span>
         ${techETAs[iv.id]?`<span class="tag" style="background:#E8F5E9;color:#2E7D32;font-weight:600">🕐 Arrivée ${techETAs[iv.id].eta} · fin ${techETAs[iv.id].leave}</span>`:""}
         ${techETAs[iv.id]?.delayMin>1?`<span class="tag" title="Retard potentiel cumulé vs circulation fluide" style="background:#FFF3E0;color:#E65100;font-weight:600">🐢 +${fmin(techETAs[iv.id].delayMin)} trafic</span>`:""}
-        ${(()=>{ // avance/retard vs le planning figé au démarrage, pour les arrêts à venir
-          const pe=_plannedETAs?.[iv.id], ce=techETAs[iv.id]?.eta
-          if(!tourRunning||!pe||!ce||done||fail) return ''
-          const d=tToMin(ce)-tToMin(pe)
-          if(Math.abs(d)<2) return `<span class="tag" style="background:#E8F5E9;color:#2E7D32;font-weight:600">✅ À l'heure (prévu ${pe})</span>`
-          return d>0?`<span class="tag" style="background:#FFEBEE;color:#C62828;font-weight:700">⏱ Retard +${fmin(d)} (prévu ${pe})</span>`
-                    :`<span class="tag" style="background:#E8F5E9;color:#2E7D32;font-weight:700">⏱ Avance −${fmin(-d)} (prévu ${pe})</span>`
+        ${(()=>{ // avance/retard vs l'heure initiale du RDV (iv.timeStart, Notion) — référence
+          // absolue, indépendante des recalculs. _plannedETAs n'intervient plus ici (reste
+          // utilisé uniquement pour le bilan de fin de tournée, ailleurs).
+          const initial=iv.timeStart, ce=techETAs[iv.id]?.eta
+          if(!tourRunning||!initial||!ce||done||fail) return ''
+          const d=tToMin(ce)-tToMin(initial)
+          if(Math.abs(d)<2) return `<span class="tag" style="background:#E8F5E9;color:#2E7D32;font-weight:600">✅ À l'heure (prévu ${initial})</span>`
+          return d>0?`<span class="tag" style="background:#FFEBEE;color:#C62828;font-weight:700">⏱ Retard +${fmin(d)} (prévu ${initial})</span>`
+                    :`<span class="tag" style="background:#E8F5E9;color:#2E7D32;font-weight:700">⏱ Avance −${fmin(-d)} (prévu ${initial})</span>`
         })()}
         ${iv.timeEnd&&!done?`<span class="tag" style="background:#F3F3F3;color:#757575;font-size:11px">⏰ Au plus tard ${iv.timeEnd}</span>`:""}
         ${unroutedIvs.includes(iv)?`<span class="tag" style="background:#FFF3E0;color:#E65100;font-weight:700">⚠️ Adresse non géolocalisée — hors itinéraire</span>`:""}
