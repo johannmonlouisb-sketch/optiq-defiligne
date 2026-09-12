@@ -98,24 +98,17 @@
   const SIM_STOP_IDS = ['__SIM_A', '__SIM_B', '__SIM_C']
 
   let simGpsIdx = 0
-  let simGpsProgress = 0 // 0..1 — avancement fictif entre SIM_WAYPOINTS[simGpsIdx] et le suivant
   let simGpsPaused = false
   let simGpsTimer = null
   let simGeoCb = null
-
-  function _simCurrentCoords(){
-    const a = SIM_WAYPOINTS[simGpsIdx], b = SIM_WAYPOINTS[Math.min(simGpsIdx + 1, SIM_WAYPOINTS.length - 1)]
-    const t = simGpsProgress
-    return {lat: a.lat + (b.lat - a.lat) * t, lng: a.lng + (b.lng - a.lng) * t}
-  }
 
   navigator.geolocation.watchPosition = function(successCb, errorCb, opts){
     if (!simActive) return realWatchPosition(successCb, errorCb, opts)
     simGeoCb = successCb
     simGpsTimer = setInterval(() => {
       if (simGpsPaused || !simGeoCb) return
-      const c = _simCurrentCoords()
-      simGeoCb({coords:{latitude:c.lat, longitude:c.lng, accuracy:5}})
+      const p = SIM_WAYPOINTS[simGpsIdx]
+      simGeoCb({coords:{latitude:p.lat, longitude:p.lng, accuracy:5}})
     }, 2000)
     return SIM_WATCH_ID
   }
@@ -125,32 +118,8 @@
   }
   navigator.geolocation.getCurrentPosition = function(successCb, errorCb, opts){
     if (!simActive) return realGetCurrentPosition(successCb, errorCb, opts)
-    const c = _simCurrentCoords()
-    successCb({coords:{latitude:c.lat, longitude:c.lng, accuracy:5}})
-  }
-
-  // ─────────────────────────── route-traffic simulé (jamais de vrai appel) ────
-  // _refreshRemainingLegFromGPS() (tech.html) appelle POST /api/route-traffic avec
-  // la position GPS courante. On intercepte UNIQUEMENT cette route pendant la
-  // simulation et on répond localement (distance réelle via _distM déjà présent
-  // dans tech.html + vitesse fictive réglable) — jamais d'appel réseau vers la
-  // vraie API (payante) pendant un test.
-  const realFetch = window.fetch.bind(window)
-  let simGpsEtaSpeedKmh = 40 // vitesse fictive ; réduire pour simuler un retard réel (TEST 4)
-  window.fetch = function(url, opts){
-    const href = (typeof url === 'string') ? url : ((url && url.url) || '')
-    if (simActive && href.includes('/api/route-traffic')) {
-      let body = {}
-      try { body = JSON.parse((opts && opts.body) || '{}') } catch(e) {}
-      const wps = body.waypoints || []
-      let distanceKm = 0
-      if (wps.length >= 2 && typeof _distM === 'function') distanceKm = _distM(wps[0], wps[1]) / 1000
-      const durationMin = Math.max(1, Math.round(distanceKm / simGpsEtaSpeedKmh * 60))
-      const fakeLeg = {distanceKm: Math.round(distanceKm * 10) / 10, durationMin, trafficDurationMin: durationMin}
-      const payload = JSON.stringify({legs:[fakeLeg], totalDistanceKm:fakeLeg.distanceKm, totalDurationMin:durationMin, trafficDurationMin:durationMin, source:'sim'})
-      return Promise.resolve(new Response(payload, {status:200, headers:{'Content-Type':'application/json'}}))
-    }
-    return realFetch(url, opts)
+    const p = SIM_WAYPOINTS[simGpsIdx]
+    successCb({coords:{latitude:p.lat, longitude:p.lng, accuracy:5}})
   }
 
   // ─────────────────────────── État simulation ─────────────────────────────
@@ -207,7 +176,6 @@
   function simNext(){
     if (!simActive) return
     if (simGpsIdx >= 1 && simGpsIdx <= 3) validated[SIM_STOP_IDS[simGpsIdx - 1]] = true
-    simGpsProgress = 0
     if (simGpsIdx < SIM_WAYPOINTS.length - 1) {
       simGpsIdx++
       simLogLine('➡ passage au point suivant : ' + SIM_WAYPOINTS[simGpsIdx].label)
@@ -215,15 +183,6 @@
       simLogLine('🏁 arrivée simulée au point final')
     }
     refreshLiveETAs()
-  }
-
-  function simSetProgress(frac){
-    simGpsProgress = Math.max(0, Math.min(1, Number(frac) || 0))
-    simLogLine('📍 position simulée : ' + Math.round(simGpsProgress * 100) + '% du trajet vers ' + (SIM_WAYPOINTS[Math.min(simGpsIdx + 1, SIM_WAYPOINTS.length - 1)] || {}).label)
-  }
-  function simSetGpsSpeed(kmh){
-    simGpsEtaSpeedKmh = Math.max(1, Number(kmh) || 40)
-    simLogLine('🚗 vitesse GPS simulée réglée à ' + simGpsEtaSpeedKmh + ' km/h')
   }
 
   function simPause(){
@@ -387,8 +346,7 @@
   window.OptiSim = {
     start: simStart, pause: simPause, resume: simResume, next: simNext, end: simEnd,
     setSpeed: setSimSpeed, jumpMinutes, runAllScenarios, runScenario,
-    setProgress: simSetProgress, setGpsSpeed: simSetGpsSpeed,
-    _debug: () => ({simActive, simLog, simGpsIdx, simGpsProgress, simGpsEtaSpeedKmh, techRouteLegDurations, _routeOrderedPts}),
+    _debug: () => ({simActive, simLog, simGpsIdx, techRouteLegDurations, _routeOrderedPts}),
   }
 
   document.addEventListener('DOMContentLoaded', simRenderPanel)
