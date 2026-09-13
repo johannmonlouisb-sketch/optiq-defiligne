@@ -83,7 +83,6 @@ button:disabled{opacity:.45;cursor:not-allowed}
 #top-title{color:#fff;font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #top-sub{color:rgba(255,255,255,.65);font-size:11px}
 #btn-tech{background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:20px;padding:6px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap}
-#btn-gps-all{background:#2E7D32;color:#fff;border:none;border-radius:20px;padding:6px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:none}
 
 /* ── CONTENT + TABS ── */
 #content{flex:1;overflow:hidden;position:relative}
@@ -279,7 +278,6 @@ button:disabled{opacity:.45;cursor:not-allowed}
   #top-title{font-size:15px}
   #top-sub{font-size:10px}
   #btn-tech{padding:5px 10px;font-size:12px}
-  #btn-gps-all{padding:5px 10px;font-size:12px}
 
   /* Départ : carte masquée par défaut, liste pleine hauteur */
   #dep-split{flex-direction:column}
@@ -571,7 +569,6 @@ button:disabled{opacity:.45;cursor:not-allowed}
       <div id="top-title">OptiTechX Tech</div>
       <div id="top-sub"></div>
     </div>
-    <button id="btn-gps-all" onclick="openGPSAll()"><svg class="ico"><use href="#ico-nav"/></svg> Ouvrir Maps</button>
     <div id="sb-status" title="Statut Supabase" style="width:8px;height:8px;border-radius:50%;background:#666;flex-shrink:0;cursor:pointer" onclick="showSbStatus()"></div>
     <button id="btn-tech" onclick="openTechSelect()"><svg class="ico"><use href="#ico-user"/></svg> —</button>
   </div>
@@ -617,7 +614,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
           </div>
           <button class="ux-cta ux-cta-primary" onclick="resumeTournee()" title="Reprendre la tournée"><svg class="ico"><use href="#ico-play"/></svg> Reprendre</button>
         </div>
-        <button id="btn-start-tour" class="ux-cta ux-cta-primary" onclick="startTournee()" title="Démarrer le minuteur de la tournée"><svg class="ico"><use href="#ico-play"/></svg> Démarrer</button>
+        <button id="btn-start-tour" class="ux-cta ux-cta-primary" onclick="startTourneeAndNavigate()" title="Démarrer le trajet vers le premier client (ouvre Waze)"><svg class="ico"><use href="#ico-play"/></svg> Démarrer le trajet</button>
       </div>
 
       <!-- Avertissement créneau impossible -->
@@ -639,16 +636,24 @@ button:disabled{opacity:.45;cursor:not-allowed}
         </div>
       </div>
 
-      <!-- ═══ Prochaine destination — carte dédiée, Maps/Waze secondaires ═══ -->
+      <!-- ═══ Prochaine destination — actions métier (Valider/Échec) en principal,
+           navigation (Waze/Maps) en secondaire ; Waze se relance automatiquement
+           après Valider/Échec, voir _autoNavigateAfterStatus() ═══ -->
       <div id="dep-ndc" style="display:none">
         <div class="ux-label" style="margin-bottom:6px">Prochaine destination</div>
         <div id="dep-ndc-client" class="ux-h2"></div>
         <div id="dep-ndc-addr" class="ux-sub" style="margin:2px 0 8px"></div>
         <div id="dep-ndc-meta" style="display:flex;gap:14px;margin-bottom:12px"></div>
-        <button class="ux-cta" style="margin-bottom:8px;padding:15px;background:var(--primary);color:#fff;font-size:15px;font-weight:800;box-shadow:0 2px 8px rgba(21,101,192,.25)" onclick="_depNdcNavigate('google')"><svg class="ico"><use href="#ico-nav"/></svg> Naviguer</button>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <button class="vbtn vbtn-v" onclick="validateIv(_depNdcId)"><svg class="ico"><use href="#ico-check"/></svg> Valider</button>
+          <button class="vbtn vbtn-f" onclick="failIv(_depNdcId)"><svg class="ico"><use href="#ico-x"/></svg> Échec</button>
+        </div>
         <div style="display:flex;gap:8px">
-          <button class="ux-nav-btn" onclick="_depNdcNavigate('google')"><svg class="ico"><use href="#ico-pin"/></svg> Google Maps</button>
-          <button class="ux-nav-btn" onclick="_depNdcNavigate('waze')"><svg class="ico"><use href="#ico-nav"/></svg> Waze</button>
+          <button class="ux-nav-btn" onclick="_depNdcNavigate('waze')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-2px"><path d="M20.54 6.63C19.26 3.1 15.97 1 12.25 1 7.32 1 3.28 4.81 3.28 9.65c0 2.17.8 4.24 2.25 5.85l.12 3.55 3.36-1.49c1 .29 2.01.44 3.02.44.11 0 .22 0 .33-.01l.03.01c.67 0 1.33-.07 1.97-.2l3.62 1.61-.13-3.74c1.44-1.35 2.34-3.11 2.5-5.02.03-.35.05-.69.05-1.02 0-.67-.08-1.35-.22-2h-.02l-.64 2.5z"/></svg>
+            Waze
+          </button>
+          <button class="ux-nav-btn" onclick="_depNdcNavigate('google')"><svg class="ico"><use href="#ico-map"/></svg> Maps</button>
         </div>
       </div>
 
@@ -1030,11 +1035,15 @@ button:disabled{opacity:.45;cursor:not-allowed}
     <div id="next-dest-addr" style="font-size:13px;color:var(--gray)"></div>
     <div id="next-dest-eta" style="font-size:12px;color:var(--blue);font-weight:600;margin-top:6px"></div>
   </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-    <button onclick="navigateToNextClient('google')" style="padding:13px;border-radius:10px;border:none;background:#1565C0;color:#fff;font-size:14px;font-weight:700;cursor:pointer">🗺️ Google Maps</button>
-    <button onclick="navigateToNextClient('waze')" style="padding:13px;border-radius:10px;border:none;background:#33CCFF;color:#fff;font-size:14px;font-weight:700;cursor:pointer">🚗 Waze</button>
+  <!-- Boutons Waze/Maps retirés (Pass 11) : Waze est désormais lancé automatiquement
+       par _autoNavigateAfterStatus() juste avant l'ouverture de cette popup, et Google
+       Maps reste disponible manuellement sur la carte "Prochaine destination" — les
+       proposer ici aussi était redondant. navigateToNextClient()/_depNdcNavigate()
+       ne sont pas supprimées, seulement plus appelées depuis cette popup. -->
+  <div id="next-dest-nav-banner" style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--success-light);border-radius:10px;margin-bottom:10px;color:var(--success);font-size:13px;font-weight:700">
+    <svg class="ico"><use href="#ico-check"/></svg> Navigation lancée avec Waze
   </div>
-  <button onclick="closeNextClientPopup()" style="width:100%;padding:13px;border-radius:10px;border:1.5px solid var(--border);background:#fff;font-size:14px;font-weight:600;color:var(--gray);cursor:pointer">Plus tard</button>
+  <button onclick="closeNextClientPopup()" style="width:100%;min-height:44px;padding:13px;border-radius:10px;border:1.5px solid var(--border);background:#fff;font-size:14px;font-weight:600;color:var(--gray);cursor:pointer">Plus tard</button>
 </div>
 
 <script>
@@ -1462,6 +1471,17 @@ async function startTournee(){
   startLiveETAs()
   renderDepart()
 }
+// Bouton "Démarrer le trajet" du hero : démarre la tournée (logique/ETA de
+// startTournee() intégralement inchangée) puis ouvre Waze vers le premier
+// client encore en attente. Ne fait rien d'autre que startTournee() ne
+// faisait déjà + un seul appel de navigation explicite (clic utilisateur) —
+// jamais déclenché automatiquement à l'ouverture de l'app ou de l'Accueil.
+// Réutilise _depNdcAddr/_depNdcNavigate, tenus à jour par renderNextDestCard()
+// (appelée via renderDepart() en fin de startTournee()).
+async function startTourneeAndNavigate(){
+  await startTournee()
+  _depNdcNavigate('waze')
+}
 function endTournee(){
   if(!tourRunning) return
   clearInterval(tourTimer)
@@ -1516,11 +1536,16 @@ function showNextClientPopup(currentId){
 
   const ov=document.getElementById('next-dest-overlay')
   const sh=document.getElementById('next-dest-sheet')
-  function _showSheet(name,addr,etaTxt){
+  function _showSheet(name,addr,etaTxt,navigating){
     _nextDestAddr=addr
     document.getElementById('next-dest-name').textContent=name
     document.getElementById('next-dest-addr').textContent=addr
     document.getElementById('next-dest-eta').textContent=etaTxt||''
+    // Bandeau "Navigation lancée avec Waze" : uniquement quand c'est vrai (un
+    // prochain client existe, donc _autoNavigateAfterStatus() vient de lancer
+    // Waze) — pas dans le cas fin de tournée, où aucune navigation n'a eu lieu.
+    const banner=document.getElementById('next-dest-nav-banner')
+    if(banner) banner.style.display=navigating?'flex':'none'
     ov.style.display='block'; sh.style.display='block'
     setTimeout(()=>sh.style.transform='translateY(0)',10)
   }
@@ -1530,14 +1555,14 @@ function showNextClientPopup(currentId){
     const tc=TB(curTech)
     const returnAddr=(tc?.arrivalAddr||'').trim()||(tc?.depotAddr||'').trim()
     if(!returnAddr) return
-    _showSheet('🏁 Fin de tournée — Retour', returnAddr, 'Toutes les interventions sont terminées')
+    _showSheet('🏁 Fin de tournée — Retour', returnAddr, 'Toutes les interventions sont terminées', false)
     return
   }
 
   const nextIv=ivs.find(i=>i.id===nextId)
   if(!nextIv) return
   const eta=techETAs[nextId]?.eta||''
-  _showSheet(nextIv.client||'Client', nextIv.addr||'', eta?`Arrivée estimée : ${eta}`:'')
+  _showSheet(nextIv.client||'Client', nextIv.addr||'', eta?`Arrivée estimée : ${eta}`:'', true)
 }
 function closeNextClientPopup(){
   const sh=document.getElementById('next-dest-sheet')
@@ -1581,15 +1606,21 @@ function _updateHeroMeta(dayIvs,doneN,failN){
 // mais cherche le PREMIER arrêt encore en attente (pas "après tel id") : c'est
 // une vue permanente, pas déclenchée par une validation.
 let _depNdcAddr=''
+let _depNdcId=null
 function renderNextDestCard(){
   const el=document.getElementById('dep-ndc')
   if(!el) return
   const date=depDate()
   const order=techRouteOrder[date]||myIvs(date).map(i=>i.id)
   const nextId=order.find(id=>!validated[id]&&!failed[id])
-  if(!nextId){ el.style.display='none'; return }
+  // Réinitialiser explicitement : sans ça, _depNdcAddr garderait l'adresse du
+  // DERNIER "prochain client" connu (ex: le client qui vient d'être validé),
+  // et la navigation automatique post-VALIDÉ/ÉCHEC repartirait vers lui au
+  // lieu de ne rien lancer quand la tournée est terminée.
+  if(!nextId){ _depNdcAddr='';_depNdcId=null;el.style.display='none'; return }
   const nextIv=ivs.find(i=>i.id===nextId)
-  if(!nextIv){ el.style.display='none'; return }
+  if(!nextIv){ _depNdcAddr='';_depNdcId=null;el.style.display='none'; return }
+  _depNdcId=nextId
   _depNdcAddr=nextIv.addr||''
   document.getElementById('dep-ndc-client').textContent=nextIv.client||'Client'
   document.getElementById('dep-ndc-addr').textContent=nextIv.addr||''
@@ -1848,7 +1879,6 @@ function goTab(tab){
   document.querySelectorAll(".tab").forEach(t=>t.classList.remove("on"))
   document.getElementById("v-"+tab).classList.add("on")
   document.getElementById("tab-"+tab).classList.add("on")
-  document.getElementById("btn-gps-all").style.display=tab==="depart"?"block":"none"
   if(tab==="depart"){
     renderDepart()
     // Leaflet perd sa taille quand le conteneur était caché — forcer recalcul
@@ -2292,9 +2322,24 @@ function focusClient(id){
 // ════════════════════════════════════════════
 // VALIDATION + KIZEO + PROCHAINE MAINTENANCE
 // ════════════════════════════════════════════
+// Navigation automatique après VALIDÉ/ÉCHEC — voir _depNdcNavigate()/renderNextDestCard().
+// Appelée uniquement après renderDepart() (donc après que _depNdcAddr ait été
+// recalculée pour le NOUVEAU prochain client) : jamais avant, sinon Waze
+// repartirait vers le client qui vient d'être terminé. Verrou minimal contre
+// un double-clic rapide sur Valider/Échec déclenchant Waze deux fois.
+let _autoNavInFlight=false
+function _autoNavigateAfterStatus(){
+  if(_autoNavInFlight) return
+  if(!_depNdcAddr) return // dernier client de la journée, ou adresse absente
+  _autoNavInFlight=true
+  _depNdcNavigate('waze')
+  setTimeout(()=>{_autoNavInFlight=false},1500)
+}
+
 async function validateIv(id){
   const wasValidated=validated[id]
   validated[id]=!wasValidated
+  const justCompleted=validated[id]
   if(validated[id]){
     failed[id]=false
     _techExpanded.delete(id);_techDetailOpen.delete(id)
@@ -2312,11 +2357,13 @@ async function validateIv(id){
   }
   saveVF();updateMarkerCol(id);renderDepart()
   saveTourProgress(tourRunning?'running':'done')
+  if(justCompleted) _autoNavigateAfterStatus()
 }
 
 async function failIv(id){
   const wasFailed=failed[id]
   failed[id]=!wasFailed
+  const justFailed=failed[id]
   if(failed[id]){
     validated[id]=false
     _techExpanded.delete(id);_techDetailOpen.delete(id)
@@ -2330,6 +2377,7 @@ async function failIv(id){
   }
   saveVF();updateMarkerCol(id);renderDepart()
   saveTourProgress(tourRunning?'running':'done')
+  if(justFailed) _autoNavigateAfterStatus()
 }
 
 function toggleTechMini(id){
@@ -2611,7 +2659,6 @@ async function calcMap(){
   const date=depDate()
   const dayIvs=myIvs(date)
   document.getElementById("dep-init-msg").style.display="none"
-  document.getElementById("btn-gps-all").style.display="block"
   document.getElementById("dep-conflict-warn").style.display="none"
   mapMarkers={}
 
