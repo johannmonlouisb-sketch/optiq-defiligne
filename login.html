@@ -282,6 +282,14 @@ body::after{
 .btn-login:active{transform:scale(.98)}
 .btn-login:disabled{opacity:.4;cursor:not-allowed;transform:none;filter:none}
 
+.link-btn{
+  display:block;width:100%;margin-top:10px;padding:0;
+  background:none;border:none;color:var(--text3);
+  font-size:12.5px;font-family:inherit;text-align:center;
+  cursor:pointer;text-decoration:underline;text-underline-offset:2px;
+}
+.link-btn:hover{color:var(--amber)}
+
 .spin{
   width:14px;height:14px;border-radius:50%;
   border:2px solid rgba(255,255,255,.25);border-top-color:#fff;
@@ -402,6 +410,23 @@ body::after{
       <button class="btn-login" id="btn-adm-login" onclick="loginAdmin()">
         Se connecter
       </button>
+      <button class="link-btn" type="button" onclick="requestPasswordReset()">Mot de passe oublié ?</button>
+    </div>
+
+    <!-- ── NOUVEAU MOT DE PASSE (lien reçu par email) ──────────── -->
+    <div class="section" id="sec-reset-pass">
+      <div class="lbl">Nouveau mot de passe</div>
+      <div class="field">
+        <input type="password" id="reset-pass1" placeholder=" " autocomplete="new-password">
+        <label>Nouveau mot de passe</label>
+      </div>
+      <div class="field">
+        <input type="password" id="reset-pass2" placeholder=" " autocomplete="new-password">
+        <label>Confirmer le mot de passe</label>
+      </div>
+      <button class="btn-login" id="btn-reset-pass" onclick="submitNewPassword()">
+        Valider le nouveau mot de passe
+      </button>
     </div>
 
   </div>
@@ -436,7 +461,7 @@ const sb = window.supabase.createClient(SB_URL, SB_KEY)
 // ── Config ────────────────────────────────────────────────────────────────
 const KEY_SUB = {'2':'ABC','3':'DEF','4':'GHI','5':'JKL','6':'MNO','7':'PQRS','8':'TUV','9':'WXYZ','0':'+'}
 const PIN_LEN = 4
-let currentPin = '', selectedTech = '', selectedColor = '#2563EB', isLoading = false, ddOpen = false
+let currentPin = '', selectedTech = '', selectedTechId = null, selectedColor = '#2563EB', isLoading = false, ddOpen = false
 let techData = [] // [{nom, color}]
 
 // ── Couleur → rgba ────────────────────────────────────────────────────────
@@ -526,7 +551,7 @@ function buildDropdown(techs) {
     const color = t.color || '#1565C0'
     const initials = nom.slice(0,2).toUpperCase()
     const {r,g,b} = hexToRgb(color)
-    return `<button class="dd-item" onclick="selectTech('${nom}')">
+    return `<button class="dd-item" onclick="selectTech('${nom}', ${t.id != null ? t.id : 'null'})">
       <div class="dd-avatar" style="background:rgba(${r},${g},${b},.18);border-color:rgba(${r},${g},${b},.3);color:${color}">${initials}</div>
       ${nom}
       <svg class="dd-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
@@ -536,8 +561,9 @@ function buildDropdown(techs) {
   }).join('')
 }
 
-function selectTech(nom) {
+function selectTech(nom, id) {
   selectedTech = nom
+  selectedTechId = id != null ? id : null
   const tech = techData.find(t => (t.nom || t) === nom)
   const color = tech?.color || '#2563EB'
 
@@ -596,7 +622,7 @@ async function loginTech() {
   try {
     const r = await fetch('/api/auth/login', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ type:'tech', nom:selectedTech, pin:currentPin })
+      body: JSON.stringify({ type:'tech', nom:selectedTech, pin:currentPin, techId:selectedTechId })
     })
     const d = await r.json()
     if (!r.ok || !d.ok) { pinError(); showMsg(d.error || 'Code PIN incorrect') }
@@ -640,6 +666,55 @@ async function loginAdmin() {
   } catch { showMsg('Erreur réseau — réessayez') }
   finally { btn.disabled=false; btn.innerHTML='Se connecter' }
 }
+
+// ── Mot de passe oublié ──────────────────────────────────────────────────
+async function requestPasswordReset() {
+  const email = document.getElementById('adm-user').value.trim()
+  if (!email) { showMsg('Renseigne ton email d\'abord'); return }
+  const btn = document.getElementById('btn-adm-login')
+  btn.disabled = true
+  try {
+    // redirectTo doit pointer vers CETTE page : Supabase y ramène l'utilisateur
+    // avec un token de récupération dans l'URL, détecté automatiquement par le
+    // SDK (onAuthStateChange déclenche PASSWORD_RECOVERY, cf. plus bas).
+    await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + '/login' })
+    // Message volontairement identique que le compte existe ou non (pas de fuite d'info).
+    showMsg('Si ce compte existe, un email de réinitialisation vient d\'être envoyé.', 'success')
+  } catch { showMsg('Erreur réseau — réessayez') }
+  finally { btn.disabled = false }
+}
+
+// Bascule l'écran entier sur le formulaire "nouveau mot de passe" (lien email).
+function showResetPasswordUI() {
+  document.querySelector('.tabs').style.display = 'none'
+  document.getElementById('sec-tech').classList.remove('on')
+  document.getElementById('sec-admin').classList.remove('on')
+  document.getElementById('sec-reset-pass').classList.add('on')
+  clearMsg()
+}
+
+async function submitNewPassword() {
+  const p1 = document.getElementById('reset-pass1').value
+  const p2 = document.getElementById('reset-pass2').value
+  if (p1.length < 8) { showMsg('8 caractères minimum'); return }
+  if (p1 !== p2) { showMsg('Les deux mots de passe ne correspondent pas'); return }
+  const btn = document.getElementById('btn-reset-pass')
+  btn.disabled = true; btn.innerHTML = '<div class="spin"></div>Validation…'
+  try {
+    const { error } = await sb.auth.updateUser({ password: p1 })
+    if (error) { showMsg(error.message || 'Erreur lors de la mise à jour'); return }
+    showMsg('Mot de passe mis à jour — connexion…', 'success')
+    setTimeout(() => location.href = '/defiligne', 800)
+  } catch { showMsg('Erreur réseau — réessayez') }
+  finally { btn.disabled = false; btn.innerHTML = 'Valider le nouveau mot de passe' }
+}
+
+// La session de récupération créée par le lien email déclenche cet évènement —
+// c'est le seul moyen fiable de savoir qu'on doit afficher le formulaire de
+// nouveau mot de passe plutôt que l'écran de connexion normal.
+sb.auth.onAuthStateChange((event) => {
+  if (event === 'PASSWORD_RECOVERY') showResetPasswordUI()
+})
 
 // ── Session / Init ────────────────────────────────────────────────────────
 function saveSession(data, remember) {

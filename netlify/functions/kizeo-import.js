@@ -13,9 +13,29 @@
 const NOTION_VERSION = '2022-06-28'
 const NOTION_BASE    = 'https://api.notion.com/v1'
 const CORS = {
-  'Access-Control-Allow-Origin':  '*',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Cache-Control': 'no-store',
+  'Access-Control-Allow-Origin':  'https://optitechx.netlify.app',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Content-Type':                 'application/json'
+}
+
+// SÉCURITÉ : import en masse réservé à l'admin (session Supabase Auth avec
+// profiles.role = 'admin'), jamais à un technicien ni à un appelant anonyme.
+async function verifyAdmin(authHeader) {
+  const token = (authHeader || '').startsWith('Bearer ') ? authHeader.slice(7) : null
+  const SB_URL = (process.env.SUPABASE_URL || '').replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '')
+  const SB_ANON = process.env.SUPABASE_ANON_KEY
+  if (!token || !SB_URL || !SB_ANON) return false
+  try {
+    const userRes = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: SB_ANON, Authorization: `Bearer ${token}` } })
+    if (!userRes.ok) return false
+    const user = await userRes.json()
+    if (!user?.id) return false
+    const profRes = await fetch(`${SB_URL}/rest/v1/profiles?id=eq.${user.id}&select=role`, { headers: { apikey: SB_ANON, Authorization: `Bearer ${token}` } })
+    if (!profRes.ok) return false
+    const rows = await profRes.json()
+    return rows?.[0]?.role === 'admin'
+  } catch { return false }
 }
 
 // Ordre exact des colonnes dans le CSV Kizeo
@@ -41,6 +61,12 @@ exports.handler = async (event) => {
     body: JSON.stringify({ error: 'Méthode non autorisée — utilisez POST' })
   }
 
+  const authHeader = event.headers?.authorization || event.headers?.Authorization || ''
+  if (!(await verifyAdmin(authHeader))) return {
+    statusCode: 403, headers: CORS,
+    body: JSON.stringify({ error: 'Réservé aux administrateurs' })
+  }
+
   const token = process.env.NOTION_TOKEN
   const dbId  = process.env.NOTION_DB_ID || '3ab30393-8dd2-4f10-98e4-b7f7b1c91f60'
 
@@ -58,6 +84,11 @@ exports.handler = async (event) => {
   if (!csv || typeof csv !== 'string') return {
     statusCode: 400, headers: CORS,
     body: JSON.stringify({ error: 'Champ "csv" manquant ou invalide dans le body' })
+  }
+  const MAX_CSV_BYTES = 5 * 1024 * 1024 // 5 Mo — largement suffisant pour un export Kizeo
+  if (Buffer.byteLength(csv, 'utf8') > MAX_CSV_BYTES) return {
+    statusCode: 413, headers: CORS,
+    body: JSON.stringify({ error: `Fichier CSV trop volumineux (max ${MAX_CSV_BYTES / 1024 / 1024} Mo)` })
   }
 
   // ── 1. Parser le CSV ───────────────────────────────────────────────────────

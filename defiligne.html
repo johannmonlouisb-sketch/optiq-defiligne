@@ -3,11 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>OptiQ — OptiQ</title>
+<title>OptiTechX — Admin</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/stock-module.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--blue:#1565C0;--blueDark:#0D47A1;--blueLight:#E3F2FD;--green:#1B5E20;--greenLight:#E8F5E9;--orange:#E65100;--red:#C62828;--purple:#6A1B9A;--gray:#757575;--border:#E0E0E0;--bg:#F5F5F5;--white:#fff;--dark:#1A1A1A}
@@ -132,6 +134,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--blue);border-col
 .dep-card.done{border-left-color:#4CAF50;opacity:0.72}
 .dep-card:hover:not(.done){box-shadow:0 2px 12px rgba(0,0,0,0.1)}
 .dep-card.drag-over{outline:2px dashed var(--blue);background:var(--blueLight,#EFF6FF)}
+.dep-card.sel{outline:2px solid var(--blue);background:var(--blueLight,#EFF6FF)}
 .dep-num{width:32px;height:32px;background:var(--blue);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0}
 .dep-card.done .dep-num{background:#4CAF50}
 .dep-drag{color:#ccc;font-size:18px;cursor:grab;flex-shrink:0;user-select:none;-webkit-user-select:none;padding:0 2px;line-height:1;align-self:center}
@@ -224,7 +227,7 @@ tr:hover td{background:var(--bg)}
       <line x1="20" y1="15.5" x2="22" y2="15.5" stroke="rgba(255,255,255,.92)" stroke-width="2" stroke-linecap="round"/>
     </svg>
     <div>
-      <div style="font-size:18px;font-weight:800;color:#fff;letter-spacing:-.5px;line-height:1.1">OptiQ</div>
+      <div style="font-size:18px;font-weight:800;color:#fff;letter-spacing:-.5px;line-height:1.1">OptiTechX</div>
       <div style="font-size:10px;color:rgba(255,255,255,.55);letter-spacing:.5px;text-transform:uppercase">Gestion DEA</div>
     </div>
   </div>
@@ -234,6 +237,7 @@ tr:hover td{background:var(--bg)}
   <div class="ni" onclick="SV('zones')" id="n-zones"><span class="ic">🗂️</span><span>Zones & Techs</span></div>
   <div class="ni" onclick="SV('interventions')" id="n-interventions"><span class="ic">📋</span><span>Interventions</span></div>
   <div class="ni" onclick="SV('materiel')" id="n-materiel"><span class="ic">📦</span><span>Matériel</span></div>
+  <div class="ni" onclick="SV('stock')" id="n-stock"><span class="ic">🏷️</span><span>Stock</span></div>
   <div class="ni" onclick="SV('previsions')" id="n-previsions"><span class="ic">📊</span><span>Prévisions</span></div>
   <div class="ni" onclick="SV('analyse')" id="n-analyse"><span class="ic">📈</span><span>Analyse</span></div>
   <div class="ni" onclick="SV('notifications')" id="n-notifications"><span class="ic">🔔</span><span>Notifications</span></div>
@@ -242,7 +246,7 @@ tr:hover td{background:var(--bg)}
   <div class="ni" onclick="window.open('/report/index.html','_blank')" id="n-rapport-planning" title="Rapport Planning multi-agents" style="margin-top:4px;border-top:1px solid rgba(255,255,255,.1);padding-top:10px"><span class="ic">📊</span><span>Rapport Planning</span></div>
   <div id="sb-foot">
     <div onclick="admLogout()" style="font-size:12px;color:rgba(255,255,255,.45);cursor:pointer;padding:6px 0;display:flex;align-items:center;gap:6px;margin-bottom:4px" onmouseover="this.style.color='rgba(255,255,255,.8)'" onmouseout="this.style.color='rgba(255,255,255,.45)'">🔒 Déconnexion</div>
-    <p>OptiQ · v1.0</p>
+    <p>OptiTechX · v1.0</p>
     <span id="sb-count">1 209 interventions</span>
   </div>
 </div>
@@ -341,6 +345,9 @@ tr:hover td{background:var(--bg)}
 
   <!-- MATÉRIEL -->
   <div id="p-materiel" class="vp" style="padding:18px;gap:14px"><div id="d-mat"></div></div>
+
+  <!-- STOCK DAE -->
+  <div id="p-stock" class="vp" style="padding:18px;gap:14px"><div id="d-stock"></div></div>
 
   <!-- PRÉVISIONS -->
   <div id="p-previsions" class="vp" style="padding:18px;gap:14px"><div id="d-prev"></div></div>
@@ -482,6 +489,7 @@ tr:hover td{background:var(--bg)}
             <option value="0">Tous les techs</option>
           </select>
         </div>
+        <p id="date-existing-warn" style="font-size:11px;color:#1565C0;background:#fff;border-radius:6px;padding:6px 8px;margin:0 0 8px;display:none"></p>
         <div id="date-slots" style="display:grid;gap:6px"></div>
         <p id="date-suggest-warn" style="font-size:11px;color:#E65100;margin-top:6px;display:none"></p>
       </div>
@@ -497,6 +505,7 @@ tr:hover td{background:var(--bg)}
         <div class="np-lbl">📅 Date <span style="font-size:10px;color:var(--blue);font-weight:normal">(auto-suggérée)</span></div>
         <input type="date" id="m-date" class="np-val" onchange="onDateChange();autoSaveFieldNow()"/>
       </div>
+      <p id="m-next-iv-info" style="font-size:11px;color:#1565C0;background:var(--blueLight);border-radius:6px;padding:6px 8px;margin:-6px 20px 10px;display:none"></p>
       <div class="np-prop">
         <div class="np-lbl">👤 Technicien</div>
         <select id="m-tech" class="np-val" onchange="autoSaveFieldNow()"></select>
@@ -577,6 +586,10 @@ tr:hover td{background:var(--bg)}
         </select>
       </div>
       <div class="np-prop">
+        <div class="np-lbl">🔢 N° série DAE</div>
+        <input id="m-nserie" class="np-val" placeholder="Numéro de série" onblur="autoSaveField()"/>
+      </div>
+      <div class="np-prop">
         <div class="np-lbl">⚡ Changer Pad Pak</div>
         <div style="flex:1;display:flex;align-items:center;gap:8px;padding:3px 7px">
           <input type="checkbox" id="m-padpak" class="np-val" onchange="autoSaveField()"/>
@@ -654,6 +667,53 @@ tr:hover td{background:var(--bg)}
   </div>
 </div>
 
+<!-- MODAL SCAN DAE -->
+<div id="dae-scan-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1000;flex-direction:column">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px">
+    <span style="color:#fff;font-size:14px;font-weight:700">📷 Scanner l'étiquette du DAE</span>
+    <div style="display:flex;align-items:center;gap:8px">
+      <button id="dae-torch-btn" onclick="toggleDaeTorchAdmin()" style="display:none;border:none;background:rgba(255,255,255,.15);color:#fff;border-radius:50%;width:32px;height:32px;font-size:16px;cursor:pointer">🔦</button>
+      <button onclick="closeDaeScanAdmin()" style="border:none;background:rgba(255,255,255,.15);color:#fff;border-radius:50%;width:32px;height:32px;font-size:18px;cursor:pointer">✕</button>
+    </div>
+  </div>
+  <div id="dae-scan-reader" style="width:100%;max-width:480px;margin:0 auto"></div>
+  <p style="color:#aaa;font-size:11px;text-align:center;margin:8px 16px 0">Recule à ~20-25 cm (distance où le téléphone arrive à faire le point), et utilise le zoom ci-dessous pour agrandir l'étiquette si besoin</p>
+  <div id="dae-zoom-wrap" style="display:none;padding:6px 24px;align-items:center;gap:8px">
+    <span style="color:#fff;font-size:14px">🔍</span>
+    <input type="range" id="dae-zoom-slider" style="flex:1" oninput="onDaeZoomChangeAdmin(this.value)"/>
+  </div>
+  <p id="dae-scan-raw-hint" style="display:none;color:#FFD54F;font-size:11px;text-align:center;margin:6px 16px 0;word-break:break-all"></p>
+  <div style="padding:16px;text-align:center">
+    <p style="color:#ccc;font-size:12px;margin-bottom:8px">Vérifie/corrige le numéro de série avant de valider :</p>
+    <input id="dae-scan-input" placeholder="Saisir le numéro de série" style="width:100%;max-width:320px;padding:10px 12px;border-radius:8px;border:none;font-size:14px"/>
+    <div style="margin-top:8px;display:flex;gap:8px;justify-content:center">
+      <button onclick="daeScanRescanAdmin()" style="padding:10px 16px;background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">🔄 Rescanner</button>
+      <button onclick="onDaeScanSuccessAdmin(document.getElementById('dae-scan-input').value.trim())" style="padding:10px 20px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">✅ Valider</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL SCAN STOCK CONSOMMABLES — séparé du scan DAE ci-dessus -->
+<div id="stk-scan-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1000;flex-direction:column">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px">
+    <span style="color:#fff;font-size:14px;font-weight:700">📷 Scanner un article</span>
+    <div style="display:flex;align-items:center;gap:8px">
+      <button id="stk-torch-btn" onclick="stkToggleTorchAdmin()" style="display:none;border:none;background:rgba(255,255,255,.15);color:#fff;border-radius:50%;width:32px;height:32px;font-size:16px;cursor:pointer">🔦</button>
+      <button onclick="closeStkScanAdmin()" style="border:none;background:rgba(255,255,255,.15);color:#fff;border-radius:50%;width:32px;height:32px;font-size:18px;cursor:pointer">✕</button>
+    </div>
+  </div>
+  <div id="stk-scan-reader" style="width:100%;max-width:480px;margin:0 auto"></div>
+  <p style="color:#aaa;font-size:11px;text-align:center;margin:8px 16px 0">Vise le code-barres de l'article (EAN-13, EAN-8, UPC ou QR)</p>
+  <div id="stk-zoom-wrap" style="display:none;padding:6px 24px;align-items:center;gap:8px">
+    <span style="color:#fff;font-size:14px">🔍</span>
+    <input type="range" id="stk-zoom-slider" style="flex:1" oninput="stkOnZoomChangeAdmin(this.value)"/>
+  </div>
+  <div style="padding:16px;text-align:center">
+    <input id="stk-scan-manual-input" placeholder="Ou saisir le code-barres manuellement" style="width:100%;max-width:320px;padding:10px 12px;border-radius:8px;border:none;font-size:14px"/>
+    <button onclick="stkHandleScanAdmin(document.getElementById('stk-scan-manual-input').value.trim())" style="margin-top:8px;padding:10px 20px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">Valider</button>
+  </div>
+</div>
+
 <!-- MODAL IMPORT UNIVERSEL -->
 <div id="m-csv" class="mo">
   <div class="md" style="max-width:680px">
@@ -694,7 +754,7 @@ tr:hover td{background:var(--bg)}
     <!-- Mapping des colonnes -->
     <div id="col-mapping" style="display:none;margin-top:14px">
       <h3 style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--dark)">🔗 Association des colonnes</h3>
-      <p style="font-size:12px;color:var(--gray);margin-bottom:10px">Vérifiez que les colonnes de votre fichier correspondent aux champs OptiQ :</p>
+      <p style="font-size:12px;color:var(--gray);margin-bottom:10px">Vérifiez que les colonnes de votre fichier correspondent aux champs OptiTechX :</p>
       <table style="width:100%;font-size:12px;border-collapse:collapse" id="mapping-table"></table>
       <div style="display:flex;gap:10px;margin-top:12px;justify-content:flex-end">
         <button class="bg bsm" onclick="closeImport()">Annuler</button>
@@ -1939,7 +1999,10 @@ let _depExpanded=new Set()
 let depMapObj=null,depRGroup=null,depMarkers={}
 let depSelectedTechs=[]
 let depTechDropdownOpen=false
-let depRouteOrder={}  // {techId:[iv,...]} ordre optimisé de la dernière carte calculée
+let depRouteOrder={}  // {techId:{date:[id,...]}} — ORDRE seulement (ids). Même pattern que
+                       // techRouteOrder côté tech.html : l'intervention est toujours relue
+                       // fraîche depuis `ivs` par id, jamais un objet mis en cache ici (sinon
+                       // carte et panneau peuvent afficher des noms différents pour "1").
 let depETAs={}        // {ivId:{eta:"08:32",leave:"08:47"}} calculé lors du dernier initDepMap
 let depTourEnd={}      // {techId:"18:24"} heure de retour au dépôt estimée (trajet retour inclus)
 let depRouteLines={}  // {techId: L.GeoJSON layer} pour mise à jour sans recalcul complet
@@ -2022,6 +2085,7 @@ function sBdg(s,clickFn=""){const st=STATUSES[s];return bdg(st.label,st.color,st
 function ava(init,sz=28,col="#1565C0"){return `<div class="ava" style="width:${sz}px;height:${sz}px;background:${col}22;color:${col};font-size:${Math.round(sz*.33)}px">${init}</div>`}
 function TB(id){return TECHS.find(t=>t.id===id)||{name:"?",init:"?"}}
 function fd(d){return new Date(d+"T12:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"short"})}
+function fdy(d){return new Date(d+"T12:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"short",year:"numeric"})}
 function fdl(d){return new Date(d+"T12:00:00").toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}
 function addYears(d,n){const dt=new Date(d+"T12:00:00");dt.setFullYear(dt.getFullYear()+n);return dt.toISOString().split("T")[0]}
 function daysUntil(d){return Math.round((new Date(d+"T12:00:00")-new Date())/(1000*60*60*24))}
@@ -2127,7 +2191,7 @@ function clearDepTechs(e){
 // ═══════════════════════════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════════════════════════
-const VT={dashboard:"Tableau de bord",depart:"Départ du jour & Itinéraire",planning:"Planning de la semaine",zones:"Zones & Techniciens",interventions:"Toutes les interventions",materiel:"Matériel du jour",previsions:"Prévisions maintenances",analyse:"Analyse",notifications:"Notifications clients",parametres:"Paramètres",import:"Import Kizeo"}
+const VT={dashboard:"Tableau de bord",depart:"Départ du jour & Itinéraire",planning:"Planning de la semaine",zones:"Zones & Techniciens",interventions:"Toutes les interventions",materiel:"Matériel du jour",stock:"Stock",previsions:"Prévisions maintenances",analyse:"Analyse",notifications:"Notifications clients",parametres:"Paramètres",import:"Import Kizeo"}
 let _depSubTab="depart"
 function switchDepSub(tab){ _depSubTab=tab; _saveUIState() }
 function _syncMapDate(){
@@ -2190,6 +2254,7 @@ function SV(v){
   else if(v==="planning")rPlan()
   else if(v==="interventions")rIv()
   else if(v==="materiel"){matFilter.date=selDate;rMat()}
+  else if(v==="stock")rStock()
   else if(v==="previsions")rPrev()
   else if(v==="zones")rZones()
   else if(v==="analyse")rAnalyse()
@@ -2259,7 +2324,7 @@ async function _fetchNotionMonth(ym){
     const dateTo=ym+'-'+String(lastDay).padStart(2,'0')
     const res=await fetch('/api/notion',{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{'Content-Type':'application/json', ...(await _apiAuthHeaders())},
       body:JSON.stringify({action:'fetch_archive',dateFrom,dateTo})
     })
     if(!res.ok) throw new Error('HTTP '+res.status)
@@ -2450,8 +2515,8 @@ function saveRouteOrder(date){
   try{
     const stored=JSON.parse(localStorage.getItem("optiq_route_order")||"{}")
     TECHS.forEach(t=>{
-      const ord=(depRouteOrder[t.id]||[]).filter(iv=>iv.date===date)
-      if(ord.length) stored[`${t.id}_${date}`]=ord.map(iv=>iv.id)
+      const ord=depRouteOrder[t.id]?.[date]
+      if(ord?.length) stored[`${t.id}_${date}`]=ord
       else delete stored[`${t.id}_${date}`] // ordre vidé (reset/déverrouillage) → ne pas laisser une valeur périmée
     })
     localStorage.setItem("optiq_route_order",JSON.stringify(stored))
@@ -2467,12 +2532,8 @@ function loadRouteOrder(date){
     TECHS.forEach(t=>{
       const ids=stored[`${t.id}_${date}`]
       if(ids?.length){
-        const byId=Object.fromEntries(ivs.map(iv=>[iv.id,iv]))
-        const ordered=ids.map(id=>byId[id]).filter(Boolean)
-        if(ordered.length){
-          const other=(depRouteOrder[t.id]||[]).filter(iv=>iv.date!==date)
-          depRouteOrder[t.id]=[...ordered,...other]
-        }
+        if(!depRouteOrder[t.id]) depRouteOrder[t.id]={}
+        depRouteOrder[t.id][date]=ids
       }
     })
   }catch(e){}
@@ -2510,7 +2571,7 @@ function setRouteLock(techId,date,val){
 function resetRouteOrder(techId,date){
   if(!confirm("Effacer l'ordre sauvegardé et relancer une optimisation complète pour ce technicien ?")) return
   setRouteLock(techId,date,false)
-  depRouteOrder[techId]=(depRouteOrder[techId]||[]).filter(iv=>iv.date!==date)
+  if(depRouteOrder[techId]) delete depRouteOrder[techId][date]
   saveRouteOrder(date)
   ivs.filter(i=>i.date===date&&i.techId===techId).forEach(i=>delete depETAs[i.id])
   _schedDepMap()
@@ -2524,7 +2585,7 @@ function toggleRouteLock(techId){
     saveRouteOrder(date)
   } else {
     // Déverrouillage : on efface l'ordre sauvegardé pour permettre une ré-optimisation
-    depRouteOrder[techId]=(depRouteOrder[techId]||[]).filter(iv=>iv.date!==date)
+    if(depRouteOrder[techId]) delete depRouteOrder[techId][date]
     saveRouteOrder(date)
     ivs.filter(i=>i.date===date&&i.techId===techId).forEach(i=>delete depETAs[i.id])
     _schedDepMap()
@@ -2536,7 +2597,10 @@ function toggleRouteLock(techId){
 async function redrawDepRoute(techId){
   if(!depMapObj||!depRGroup) return
   const date=selDate
-  const ord=(depRouteOrder[techId]||[]).filter(iv=>iv.date===date)
+  const ids=depRouteOrder[techId]?.[date]
+  if(!ids?.length) return
+  const byId=Object.fromEntries(ivs.map(iv=>[iv.id,iv]))
+  const ord=ids.map(id=>byId[id]).filter(Boolean)
   if(!ord.length) return
   const tc=TB(techId)
   const techCol=tc.color||'#1565C0'
@@ -2559,17 +2623,18 @@ async function redrawDepRoute(techId){
 // ── Inverser l'ordre d'une tournée technicien ─────────────────────
 function reverseDepRoute(techId){
   const date=selDate
-  let ord=(depRouteOrder[techId]||[]).filter(iv=>iv.date===date)
-  if(!ord.length) ord=ivs.filter(i=>i.date===date&&i.techId===techId)
-  depRouteOrder[techId]=[...ord.reverse(),...(depRouteOrder[techId]||[]).filter(iv=>iv.date!==date)]
+  let ids=depRouteOrder[techId]?.[date]
+  ids=(ids?.length?[...ids]:ivs.filter(i=>i.date===date&&i.techId===techId).map(i=>i.id)).reverse()
+  if(!depRouteOrder[techId]) depRouteOrder[techId]={}
+  depRouteOrder[techId][date]=ids
   setRouteLock(techId,date,true)
   saveRouteOrder(date)
   ivs.filter(i=>i.date===date&&i.techId===techId).forEach(i=>delete depETAs[i.id])
   rDepart()
   _schedDepMap()
   if(depMapObj){
-    ;(depRouteOrder[techId]||[]).filter(iv=>iv.date===date).forEach((iv,idx)=>{
-      if(depMarkers[iv.id]){depMarkers[iv.id]._num=idx+1;updateDepMarker(iv.id)}
+    ids.forEach((id,idx)=>{
+      if(depMarkers[id]){depMarkers[id]._num=idx+1;updateDepMarker(id)}
     })
     redrawDepRoute(techId)
   }
@@ -2578,21 +2643,22 @@ function reverseDepRoute(techId){
 // ── Déplacer une intervention en première position ────────────────
 function setFirstDepIv(ivId,techId){
   const date=selDate
-  let ord=(depRouteOrder[techId]||[]).filter(iv=>iv.date===date)
-  if(!ord.length) ord=ivs.filter(i=>i.date===date&&i.techId===techId)
-  const idx=ord.findIndex(iv=>iv.id===ivId)
+  let ids=depRouteOrder[techId]?.[date]
+  ids=ids?.length?[...ids]:ivs.filter(i=>i.date===date&&i.techId===techId).map(i=>i.id)
+  const idx=ids.indexOf(ivId)
   if(idx<=0) return  // déjà premier ou introuvable
-  const [item]=ord.splice(idx,1)
-  ord.unshift(item)
-  depRouteOrder[techId]=[...ord,...(depRouteOrder[techId]||[]).filter(iv=>iv.date!==date)]
+  ids.splice(idx,1)
+  ids.unshift(ivId)
+  if(!depRouteOrder[techId]) depRouteOrder[techId]={}
+  depRouteOrder[techId][date]=ids
   setRouteLock(techId,date,true)
   saveRouteOrder(date)
   ivs.filter(i=>i.date===date&&i.techId===techId).forEach(i=>delete depETAs[i.id])
   rDepart()
   _schedDepMap()
   if(depMapObj){
-    ord.forEach((iv,i)=>{
-      if(depMarkers[iv.id]){depMarkers[iv.id]._num=i+1;updateDepMarker(iv.id)}
+    ids.forEach((id,i)=>{
+      if(depMarkers[id]){depMarkers[id]._num=i+1;updateDepMarker(id)}
     })
     redrawDepRoute(techId)
   }
@@ -2603,15 +2669,13 @@ function dropDepCard(targetId){
   const targetIv=ivs.find(i=>i.id===targetId)
   if(!targetIv||targetIv.techId!==_dragTechId){_dragId=null;return}
   const techId=_dragTechId
-  let order=(depRouteOrder[techId]||[]).filter(iv=>iv.date===date).map(iv=>iv.id)
-  if(!order.length) order=ivs.filter(i=>i.date===date&&i.techId===techId).map(i=>i.id)
+  let order=depRouteOrder[techId]?.[date]
+  order=order?.length?[...order]:ivs.filter(i=>i.date===date&&i.techId===techId).map(i=>i.id)
   const fi=order.indexOf(_dragId),ti=order.indexOf(targetId)
   if(fi===-1||ti===-1){_dragId=null;return}
   order.splice(fi,1);order.splice(ti,0,_dragId)
-  const byId=Object.fromEntries(ivs.map(iv=>[iv.id,iv]))
-  const orderedIvs=order.map(id=>byId[id]).filter(Boolean)
-  const other=(depRouteOrder[techId]||[]).filter(iv=>iv.date!==date)
-  depRouteOrder[techId]=[...orderedIvs,...other]
+  if(!depRouteOrder[techId]) depRouteOrder[techId]={}
+  depRouteOrder[techId][date]=order
   saveRouteOrder(date)
   _dragId=null
   // Vider les ETAs obsolètes du tech reordonné pour éviter d'afficher de mauvaises heures
@@ -2619,8 +2683,8 @@ function dropDepCard(targetId){
   rDepart()
   _schedDepMap()
   if(depMapObj){
-    orderedIvs.forEach((iv,idx)=>{
-      if(depMarkers[iv.id]){depMarkers[iv.id]._num=idx+1;updateDepMarker(iv.id)}
+    order.forEach((id,idx)=>{
+      if(depMarkers[id]){depMarkers[id]._num=idx+1;updateDepMarker(id)}
     })
     redrawDepRoute(techId)
   }
@@ -2776,9 +2840,17 @@ function rDepart(){
     displayIvs=[]
     const techOrder=depSelectedTechs.length?depSelectedTechs:TECHS.map(t=>t.id)
     const seenIds=new Set()
+    const byId=Object.fromEntries(ivs.map(iv=>[iv.id,iv]))
     techOrder.forEach(tid=>{
-      const ord=depRouteOrder[tid]
-      if(ord) ord.filter(iv=>iv.date===date&&!seenIds.has(iv.id)).forEach(iv=>{seenIds.add(iv.id);displayIvs.push(iv)})
+      const ids=depRouteOrder[tid]?.[date]
+      // depRouteOrder ne garde que l'ORDRE (ids) : on relit toujours l'intervention
+      // fraîche depuis ivs par id (une synchro Notion peut avoir changé le nom/
+      // l'adresse depuis que cet ordre a été sauvegardé — sinon carte et panneau divergent).
+      if(ids) ids.forEach(id=>{
+        if(seenIds.has(id)) return
+        const fresh=byId[id]
+        if(fresh){seenIds.add(id);displayIvs.push(fresh)}
+      })
     })
     dayIvs.filter(iv=>!seenIds.has(iv.id)).forEach(iv=>{seenIds.add(iv.id);displayIvs.push(iv)})
   } else {
@@ -2853,7 +2925,7 @@ function rDepart(){
           ondragover="event.preventDefault();if(${iv.techId}===_dragTechId)this.classList.add('drag-over')"
           ondragleave="this.classList.remove('drag-over')"
           ondrop="event.preventDefault();this.classList.remove('drag-over');dropDepCard(${iv.id})"
-          ${_mini?`onclick="toggleDepMini(${iv.id})"`:""}>
+          onclick="focusDepCard(${iv.id})">
           <div style="display:flex;gap:10px;align-items:${_mini?"center":"flex-start"}">
             <div class="dep-drag" onclick="event.stopPropagation()" title="Déplacer">☰</div>
             <div class="dep-num" style="background:${done?"#4CAF50":fail?"#C62828":techCol}">${done?"✓":fail?"✗":techIdx+1}</div>
@@ -2876,6 +2948,7 @@ function rDepart(){
                 ${depETAs[iv.id]?`<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:5px">
                   ${depETAs[iv.id]?.travelMin?`<span style="font-size:11px;padding:2px 7px;border-radius:100px;background:#E3F2FD;color:#1565C0">🚗 ${fmtMin(depETAs[iv.id].travelMin)}</span>`:''}
                   ${depETAs[iv.id]?`<span style="font-size:11px;font-weight:600;padding:2px 7px;border-radius:100px;background:#E8F5E9;color:#2E7D32">🕐 ${depETAs[iv.id].eta} → ${depETAs[iv.id].leave}</span>`:''}
+                  ${depETAs[iv.id]?.delayMin>1?`<span title="Retard potentiel cumulé vs circulation fluide" style="font-size:11px;font-weight:600;padding:2px 7px;border-radius:100px;background:#FFF3E0;color:#E65100">🐢 +${fmtMin(depETAs[iv.id].delayMin)} trafic</span>`:''}
                 </div>`:''}
                 ${iv.notes?`<div style="font-size:12px;color:var(--orange);background:#FFF3E0;padding:5px 9px;border-radius:6px;margin-bottom:5px">📝 ${iv.notes}</div>`:""}
                 ${(iv.commercial||iv.nSerie||iv.dateFin)?`<div style="font-size:11px;background:#F8F9FA;border:1px solid #E9ECEF;padding:5px 9px;border-radius:6px;margin-bottom:5px;display:flex;gap:10px;flex-wrap:wrap">
@@ -2929,6 +3002,23 @@ function toggleDepMini(id){
   rDepart()
 }
 
+// Clic sur une carte intervention → centre la carte sur son marqueur (même
+// comportement que focusClient() côté tech.html).
+function focusDepCard(id){
+  if(depValidated[id]||depFailed[id]){
+    if(_depExpanded.has(id))_depExpanded.delete(id)
+    else _depExpanded.add(id)
+    rDepart()
+  }
+  document.querySelectorAll('.dep-card').forEach(el=>el.classList.remove('sel'))
+  const card=document.getElementById('dc-'+id)
+  if(card){card.classList.add('sel');card.scrollIntoView({block:'nearest',behavior:'smooth'})}
+  if(depMarkers[id]&&depMapObj){
+    depMapObj.panTo(depMarkers[id].getLatLng(),{animate:true})
+    depMarkers[id].openPopup()
+  }
+}
+
 function updateDepMarker(id){
   if(!depMapObj||!depMarkers[id])return
   const iv=ivs.find(i=>i.id===id)
@@ -2959,7 +3049,10 @@ let depBuilding=false
 // Recalcule les horaires depuis une nouvelle heure de départ sans refaire la carte
 async function refreshDepETAs(techId, startHHMM){
   const date=selDate
-  const savedOrd=(depRouteOrder[techId]||[]).filter(iv=>iv.date===date)
+  const savedIds=depRouteOrder[techId]?.[date]
+  if(!savedIds?.length) return
+  const byId=Object.fromEntries(ivs.map(iv=>[iv.id,iv]))
+  const savedOrd=savedIds.map(id=>byId[id]).filter(Boolean)
   if(!savedOrd.length) return
   const[sh,sm]=startHHMM.split(':').map(Number)
   if(isNaN(sh)||isNaN(sm)) return
@@ -2975,7 +3068,7 @@ async function refreshDepETAs(techId, startHHMM){
   const tech=TB(techId)
   const dc=gcache[tech?.depotAddr||depot]||{lat:window.dispatchCfg?.depotLat||48.96,lng:window.dispatchCfg?.depotLng||1.97}
   try{
-    const res=await fetch('/api/optimize-route',{method:'POST',headers:{'Content-Type':'application/json'},
+    const res=await fetch('/api/optimize-route',{method:'POST',headers:{'Content-Type':'application/json', ...(await _apiAuthHeaders())},
       body:JSON.stringify({techs:[{id:techId,depot:dc,startH:sh,startMin:sm,stops}]})})
     if(!res.ok) return
     const data=await res.json()
@@ -3074,17 +3167,17 @@ async function initDepMap(){
       if(c){ivcRaw.push({iv:techIvs[i],coords:c});allBounds.push([c.lat,c.lng])}
       stepsDone++
     }
-    // ── Faisabilité ──
-    const {feasible:feasibleIvs,skipped:skippedIvs,reason:feasReason}=filterFeasibleIvs(tech.id,date,techIvs)
-    const feasibleIds=new Set(feasibleIvs.map(i=>i.id))
-    const ivcFiltered=ivcRaw.filter(x=>feasibleIds.has(x.iv.id))
+    // Toutes les interventions sont gardées sur la carte (pas de filtrage silencieux
+    // par faisabilité légale — ça désynchronisait la numérotation entre la carte et
+    // le panneau latéral, qui lui n'a jamais appliqué ce filtre).
+    const ivcFiltered=ivcRaw
 
     // ── Séparer stops terminés (dans leur ordre actuel) vs restants ──────────
-    const savedOrd=(depRouteOrder[tech.id]||[]).filter(iv=>iv.date===date)
+    const savedIds=depRouteOrder[tech.id]?.[date]||[]
     const byIdAll=Object.fromEntries(ivcFiltered.map(x=>[x.iv.id,x]))
     // Stops terminés/échoués : garder l'ordre sauvegardé, sinon ordre DB
-    const ivcDone = (savedOrd.length
-      ? savedOrd.map(iv=>byIdAll[iv.id]).filter(Boolean)
+    const ivcDone = (savedIds.length
+      ? savedIds.map(id=>byIdAll[id]).filter(Boolean)
       : ivcFiltered
     ).filter(x=>depValidated[x.iv.id]||depFailed[x.iv.id])
     const doneIds=new Set(ivcDone.map(x=>x.iv.id))
@@ -3096,9 +3189,9 @@ async function initDepMap(){
 
     let ivcOptimized
     // ── Si ordre sauvegardé (glisser-déposer) ou verrouillé : respecter cet ordre ──
-    if(isRouteLocked(tech.id,date)||savedOrd.length){
-      const lockedPending=savedOrd.length
-        ? savedOrd.map(iv=>byIdAll[iv.id]).filter(Boolean).filter(x=>!doneIds.has(x.iv.id))
+    if(isRouteLocked(tech.id,date)||savedIds.length){
+      const lockedPending=savedIds.length
+        ? savedIds.map(id=>byIdAll[id]).filter(Boolean).filter(x=>!doneIds.has(x.iv.id))
         : ivcPending
       const lockedIds=new Set(lockedPending.map(x=>x.iv.id))
       const newOnes=ivcPending.filter(x=>!lockedIds.has(x.iv.id))
@@ -3124,7 +3217,7 @@ async function initDepMap(){
           duration:dur(x.iv.type,x.iv.form),
           timeWindow:(x.iv.timeStart||x.iv.timeEnd)?{start:x.iv.timeStart||"00:00",end:x.iv.timeEnd||"23:59"}:null
         }))}]}
-        const res=await fetch('/api/optimize-route',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+        const res=await fetch('/api/optimize-route',{method:'POST',headers:{'Content-Type':'application/json', ...(await _apiAuthHeaders())},body:JSON.stringify(payload)})
         if(res.ok){
           const data=await res.json()
           const r=data.results?.[tech.id]
@@ -3169,15 +3262,15 @@ async function initDepMap(){
 
     // Quand verrouillé : respecter l'ordre original (les terminés ne remontent pas en tête)
     // sinon le cadenas changerait l'ordre à chaque validation
-    const _locked=isRouteLocked(tech.id,date)&&savedOrd.length
+    const _locked=isRouteLocked(tech.id,date)&&savedIds.length
     const _freshById=Object.fromEntries(ivc.map(x=>[x.iv.id,x]))
     const routeOrd=_locked
-      ? savedOrd.map(sv=>_freshById[sv.id]).filter(Boolean)
+      ? savedIds.map(id=>_freshById[id]).filter(Boolean)
       : ivc
 
     // Persister l'ordre (sans réintroduire le done-first sur un ordre verrouillé)
-    const _otherDates=(depRouteOrder[tech.id]||[]).filter(iv=>iv.date!==date)
-    depRouteOrder[tech.id]=[...routeOrd.map(x=>x.iv),..._otherDates]
+    if(!depRouteOrder[tech.id]) depRouteOrder[tech.id]={}
+    depRouteOrder[tech.id][date]=routeOrd.map(x=>x.iv.id)
     saveRouteOrder(selDate)
     totalWorkMin+=routeOrd.reduce((a,{iv})=>a+dur(iv.type,iv.form),0)
     // ── Marqueurs ──
@@ -3196,7 +3289,7 @@ async function initDepMap(){
     try{
       const allP=[dc,...routeOrd.map(x=>x.coords),dc]
       const depHH=`${String(_effSH).padStart(2,'0')}:${String(_effSM).padStart(2,'0')}`
-      const res=await fetch('/api/route-traffic',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({waypoints:allP,departureHHMM:depHH})})
+      const res=await fetch('/api/route-traffic',{method:'POST',headers:{'Content-Type':'application/json', ...(await _apiAuthHeaders())},body:JSON.stringify({waypoints:allP,departureHHMM:depHH})})
       if(res.ok){
         const data=await res.json()
         totalKm+=Math.round(data.totalDistanceKm||0)
@@ -3208,11 +3301,14 @@ async function initDepMap(){
         // Calculer les ETAs par arrêt depuis les durées de leg réelles (trafic)
         if(data.legs?.length){
           let curMin=_effStartMin
+          let delayAccum=0 // retard cumulé vs circulation fluide (somme des trafficDurationMin - durationMin)
           routeOrd.forEach(({iv},idx)=>{
-            curMin+=data.legs[idx]?.trafficDurationMin||0
+            const leg=data.legs[idx]
+            curMin+=leg?.trafficDurationMin||0
+            delayAccum+=Math.max(0,(leg?.trafficDurationMin||0)-(leg?.durationMin??(leg?.trafficDurationMin||0)))
             if(iv.timeStart){const[th,tm]=iv.timeStart.split(':').map(Number);if(curMin<th*60+tm)curMin=th*60+tm}
             const wm=dur(iv.type,iv.form)
-            depETAs[iv.id]={eta:toHM(curMin),leave:toHM(curMin+wm),travelMin:data.legs[idx]?.trafficDurationMin||0}
+            depETAs[iv.id]={eta:toHM(curMin),leave:toHM(curMin+wm),travelMin:leg?.trafficDurationMin||0,delayMin:Math.round(delayAccum)}
             curMin+=wm
           })
           // Retour dépôt : dernier leg de la matrice (après le dernier arrêt)
@@ -3274,12 +3370,14 @@ function openGoogleMaps(){
 
   // Pour chaque technicien, ouvrir un onglet Google Maps dans l'ordre optimisé
   // (depRouteOrder si calculé, sinon ordre de la DB)
+  const byId=Object.fromEntries(ivs.map(iv=>[iv.id,iv]))
   for(const techId of techIds){
     const tech=TB(techId)
     const startDepot=tech?.depotAddr||depot
     // Ordre optimisé si disponible, sinon ordre DB
-    const ordered=depRouteOrder[techId]?.length
-      ? depRouteOrder[techId]
+    const savedIds=depRouteOrder[techId]?.[date]
+    const ordered=savedIds?.length
+      ? savedIds.map(id=>byId[id]).filter(Boolean)
       : ivs.filter(i=>i.date===date&&i.techId===techId)
     if(!ordered.length) continue
     // Google Maps accepte max 10 waypoints intermédiaires
@@ -3306,6 +3404,7 @@ let planView = "semaine"
 function rPlan(){
   const el = document.getElementById("d-plan")
   if(!el) return
+  _saveUIState() // certains clics du calendrier changent selDate directement (hors setSelDate)
   if(planView==="jour")    rPlanDay(el)
   else if(planView==="semaine") rPlanWeek(el)
   else if(planView==="mois")   rPlanMonth(el)
@@ -3395,15 +3494,25 @@ function daySection(date){
     </div>`}).join("")
 }
 
+// Ouvre la fiche d'une intervention de l'archive : si elle vient du cache Notion (id =
+// notionId, pas encore synchronisée localement), on cherche d'abord la copie locale
+// correspondante ; sinon on prévient que la fiche n'est pas encore disponible pour édition.
+function openArchiveIv(id,fromNotion){
+  if(!fromNotion){ editIv(parseInt(id)); return }
+  const local=ivs.find(i=>i.notionId===id)
+  if(local){ editIv(local.id); return }
+  showToast("Fiche disponible uniquement dans l'historique Notion (pas encore synchronisée localement)","#E65100")
+}
 // ── Ligne d'intervention dans l'archive journée ──────
-function _ivArchiveRow(iv,idx){
+function _ivArchiveRow(iv,idx,fromNotion){
   const isDone=iv.status==='completed'
   const isFail=iv.status==='not_responded'
   const tp=TYPES[iv.type]||TYPES.maintenance_simple
   const bg=isDone?'#F1F8E9':isFail?'#FFEBEE':'#FAFAFA'
   const border=isDone?'#66BB6A':isFail?'#EF5350':tp.color
   const icon=isDone?'✅':isFail?'❌':'⏳'
-  let r='<div style="padding:8px 10px;border-radius:7px;background:'+bg+';border-left:3px solid '+border+';margin-bottom:4px">'
+  const idEsc=String(iv.id).replace(/'/g,"\\'")
+  let r='<div style="padding:8px 10px;border-radius:7px;background:'+bg+';border-left:3px solid '+border+';margin-bottom:4px;cursor:pointer" onclick="openArchiveIv(\''+idEsc+'\','+(fromNotion?'true':'false')+')">'
   r+='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
   r+='<span style="font-size:11px;font-weight:700;color:var(--gray)">#'+(idx+1)+'</span>'
   r+='<span style="font-weight:600;font-size:13px">'+icon+' '+iv.client+'</span>'
@@ -3513,7 +3622,7 @@ function dayArchive(date){
       html+='</div>'
     }
     html+='<div>'
-    tivs.forEach(function(iv,idx){ html+=_ivArchiveRow(iv,idx) })
+    tivs.forEach(function(iv,idx){ html+=_ivArchiveRow(iv,idx,fromNotion) })
     html+='</div></div>'
   })
   return html
@@ -3929,6 +4038,629 @@ function rMat(){
   </div>`
 }
 
+// ═══════════════════════════════════════════════════════
+// STOCK DAE — registre sorti/stock par numéro de série scanné
+// Clé Supabase optiq_dae_stock : {serial: {serial,model,status,techId,outDate,history}}
+// ═══════════════════════════════════════════════════════
+let daeStock={}
+let _daeScannerAdmin=null
+const DAE_MODELS=['HS500P','HS360P','HS350P','HS300P','CR2','Rotaid','Autre']
+let stockFilter={status:'all',tech:0}
+
+async function loadDaeStockAdmin(){
+  try{
+    const rows=await sbGet('app_state?key=eq.optiq_dae_stock&select=value')
+    if(rows[0]?.value&&typeof rows[0].value==='object') daeStock=rows[0].value
+  }catch(e){ console.warn('Stock DAE load:',e.message) }
+}
+
+async function saveDaeStockAdmin(){
+  try{ await sbUpsert('app_state',{key:'optiq_dae_stock',value:daeStock}) }
+  catch(e){ showToast('⚠️ Sync stock : '+e.message,'#C62828') }
+}
+
+// ═══════════════════════════════════════════════════════
+// STOCK — parent avec 2 sous-onglets : Consommables (nouveau, quantités,
+// tables Supabase articles_stock/mouvements_stock) et DAE par n° série
+// (existant, JSON app_state.optiq_dae_stock — inchangé, cf. rStockDae()).
+// ═══════════════════════════════════════════════════════
+let _stockSubTab='consommables'
+function switchStockSub(tab){ _stockSubTab=tab; rStock() }
+function rStock(){
+  const el=document.getElementById('d-stock')
+  if(!el) return
+  el.innerHTML=`
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <button class="${_stockSubTab==='consommables'?'bb':'bg'}" onclick="switchStockSub('consommables')">📦 Consommables</button>
+      <button class="${_stockSubTab==='dae'?'bb':'bg'}" onclick="switchStockSub('dae')">🏷️ DAE (n° série)</button>
+    </div>
+    <div id="d-stock-body"></div>`
+  if(_stockSubTab==='dae') rStockDae()
+  else rStockConsumables()
+}
+
+async function rStockDae(){
+  await loadDaeStockAdmin()
+  const el=document.getElementById('d-stock-body')
+  if(!el) return
+
+  const all=Object.values(daeStock).sort((a,b)=>(b.outTs||0)-(a.outTs||0))
+  let rows=all
+  if(stockFilter.status!=='all') rows=rows.filter(u=>u.status===stockFilter.status)
+  if(stockFilter.tech) rows=rows.filter(u=>u.techId===stockFilter.tech)
+
+  const nbStock=all.filter(u=>u.status==='stock').length
+  const nbSorti=all.filter(u=>u.status==='sorti').length
+
+  el.innerHTML=`
+  <div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <div style="flex:1;min-width:0">
+      <div style="font-size:15px;font-weight:700;margin-bottom:4px">🏷️ Stock DAE</div>
+      <div style="font-size:12px;color:var(--gray)">Suivi des DAE par numéro de série — scanné par les techniciens au moment de préparer leur matériel (sortie de stock).</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <select onchange="stockFilter.status=this.value;rStockDae()" style="font-size:13px;padding:6px 10px">
+        <option value="all" ${stockFilter.status==='all'?'selected':''}>Tous statuts</option>
+        <option value="stock" ${stockFilter.status==='stock'?'selected':''}>En stock</option>
+        <option value="sorti" ${stockFilter.status==='sorti'?'selected':''}>Sorti</option>
+      </select>
+      <select onchange="stockFilter.tech=parseInt(this.value);rStockDae()" style="font-size:13px;padding:6px 10px">
+        <option value="0">Tous techs</option>
+        ${TECHS.map(t=>`<option value="${t.id}" ${stockFilter.tech===t.id?'selected':''}>${t.name}</option>`).join('')}
+      </select>
+      <button class="bb" onclick="openDaeScanAdmin()">📷 Scanner (réception stock)</button>
+      <button class="bg" onclick="addDaeManual()">➕ Ajouter manuellement</button>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:14px 0">
+    <div class="card" style="text-align:center;padding:16px">
+      <div style="font-size:28px;font-weight:800;color:#1B5E20">${nbStock}</div>
+      <div style="font-size:12px;color:var(--gray)">En stock (entrepôt)</div>
+    </div>
+    <div class="card" style="text-align:center;padding:16px">
+      <div style="font-size:28px;font-weight:800;color:#1565C0">${nbSorti}</div>
+      <div style="font-size:12px;color:var(--gray)">Sortis (chez les techs)</div>
+    </div>
+  </div>
+
+  <div class="card">
+    ${!rows.length?`<div style="text-align:center;color:var(--gray);padding:30px">Aucun DAE ${stockFilter.status!=='all'||stockFilter.tech?'avec ces filtres':'enregistré pour le moment — scanne un DAE pour commencer'}</div>`:`
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead><tr style="border-bottom:2px solid var(--border);text-align:left;color:var(--gray);font-size:11px">
+        <th style="padding:8px">Modèle</th><th style="padding:8px">N° série</th><th style="padding:8px">Statut</th>
+        <th style="padding:8px">Technicien</th><th style="padding:8px">Date entrée</th><th style="padding:8px">Date sortie</th><th style="padding:8px"></th>
+      </tr></thead>
+      <tbody>
+      ${rows.map(u=>{
+        const tc=u.techId?TB(u.techId):null
+        return `<tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:8px;font-weight:600">${u.model||'?'}</td>
+          <td style="padding:8px;color:var(--gray)">${u.serial}</td>
+          <td style="padding:8px">${u.status==='stock'?'<span style="color:#1B5E20;font-weight:600">🟢 En stock</span>':'<span style="color:#1565C0;font-weight:600">🔵 Sorti</span>'}</td>
+          <td style="padding:8px">${tc?tc.name:'—'}</td>
+          <td style="padding:8px;color:var(--gray)">${u.inDate?fd(u.inDate):'—'}</td>
+          <td style="padding:8px;color:var(--gray)">${u.outDate?fd(u.outDate):'—'}</td>
+          <td style="padding:8px;text-align:right">
+            ${u.status==='sorti'?`<button class="bg bsm" onclick="daeReturnAdmin('${u.serial.replace(/'/g,"\\'")}')">↩ Retour stock</button>`:''}
+            <button class="bg bsm" onclick="daeDeleteAdmin('${u.serial.replace(/'/g,"\\'")}')" style="color:var(--red)">🗑️</button>
+          </td>
+        </tr>`
+      }).join('')}
+      </tbody>
+    </table>`}
+  </div>`
+}
+
+async function daeReturnAdmin(serial){
+  const u=daeStock[serial]
+  if(!u) return
+  u.history=u.history||[]
+  u.history.push({ts:Date.now(),action:'retour',techId:null,by:'admin'})
+  u.status='stock'
+  u.techId=null
+  await saveDaeStockAdmin()
+  rStockDae()
+}
+
+async function daeDeleteAdmin(serial){
+  if(!confirm(`Supprimer ${serial} du registre de stock ?`))return
+  delete daeStock[serial]
+  await saveDaeStockAdmin()
+  rStockDae()
+}
+
+async function addDaeManual(){
+  const serial=(prompt('Numéro de série du DAE :')||'').trim()
+  if(!serial) return
+  if(daeStock[serial]){ alert('Ce numéro de série existe déjà dans le registre.'); return }
+  const model=prompt('Modèle du DAE (ex: HS500P) :', DAE_MODELS[0]) || 'Inconnu'
+  daeStock[serial]={serial, model, status:'stock', techId:null, inDate:TODAY, outDate:'', outTs:0,
+    history:[{ts:Date.now(),action:'ajout_stock',by:'admin'}]}
+  await saveDaeStockAdmin()
+  rStockDae()
+}
+
+let _daeTorchOnAdmin=false
+function openDaeScanAdmin(){
+  const ov=document.getElementById('dae-scan-overlay')
+  ov.style.display='flex'
+  _daeTorchOnAdmin=false
+  const torchBtn=document.getElementById('dae-torch-btn')
+  if(torchBtn) torchBtn.style.display='none'
+  const zoomWrap=document.getElementById('dae-zoom-wrap')
+  if(zoomWrap) zoomWrap.style.display='none'
+  if(typeof Html5Qrcode==='undefined'){
+    document.getElementById('dae-scan-reader').innerHTML='<p style="color:#fff;text-align:center;padding:20px">Scanner indisponible — utilise la saisie manuelle ci-dessous.</p>'
+    return
+  }
+  // Formats DAE : DataMatrix (étiquettes GS1) + QR. Restreindre les formats laisse
+  // plus de cycles de décodage par seconde au DataMatrix, le plus lent/fragile des deux
+  // avec le décodeur JS pur.
+  const daeFormatsAdmin=(typeof Html5QrcodeSupportedFormats!=='undefined')?[Html5QrcodeSupportedFormats.DATA_MATRIX,Html5QrcodeSupportedFormats.QR_CODE]:undefined
+  _daeScannerAdmin=new Html5Qrcode('dae-scan-reader', daeFormatsAdmin?{formatsToSupport:daeFormatsAdmin,verbose:false}:undefined)
+  _daeScannerAdmin.start(
+    { facingMode:{ideal:'environment'} },
+    {
+      fps:10, qrbox:{width:280,height:200}, aspectRatio:1.5,
+      // Mise au point continue + résolution plus élevée : évite le flou de près qui
+      // empêche la caméra de faire correctement la mise au point sur l'étiquette
+      videoConstraints:{
+        facingMode:{ideal:'environment'},
+        width:{ideal:1920}, height:{ideal:1080},
+        advanced:[{focusMode:'continuous'}]
+      },
+      // Détecteur de codes-barres natif du navigateur si disponible (ML Kit sous
+      // Android Chrome) plutôt que le décodeur JS pur — bien plus fiable sur DataMatrix.
+      experimentalFeatures:{ useBarCodeDetectorIfSupported:true }
+    },
+    decodedText=>{ onDaeCodeDetectedAdmin(decodedText) },
+    ()=>{}
+  ).then(()=>{
+    document.getElementById('dae-scan-input').value=''
+    document.getElementById('dae-scan-raw-hint').style.display='none'
+    try{
+      const caps=_daeScannerAdmin.getRunningTrackCapabilities?.()
+      if(caps && 'torch' in caps && torchBtn) torchBtn.style.display='inline-block'
+      if(caps && caps.zoom && zoomWrap){
+        const sl=document.getElementById('dae-zoom-slider')
+        sl.min=caps.zoom.min; sl.max=caps.zoom.max; sl.step=caps.zoom.step||0.1
+        sl.value=caps.zoom.min
+        zoomWrap.style.display='flex'
+      }
+    }catch(e){}
+  }).catch(()=>{
+    document.getElementById('dae-scan-reader').innerHTML='<p style="color:#fff;text-align:center;padding:20px">Impossible d\'accéder à la caméra — utilise la saisie manuelle ci-dessous.</p>'
+  })
+}
+async function onDaeZoomChangeAdmin(val){
+  if(!_daeScannerAdmin) return
+  try{ await _daeScannerAdmin.applyVideoConstraints({advanced:[{zoom:parseFloat(val)}]}) }catch(e){}
+}
+async function toggleDaeTorchAdmin(){
+  if(!_daeScannerAdmin) return
+  try{
+    _daeTorchOnAdmin=!_daeTorchOnAdmin
+    await _daeScannerAdmin.applyVideoConstraints({advanced:[{torch:_daeTorchOnAdmin}]})
+  }catch(e){ _daeTorchOnAdmin=!_daeTorchOnAdmin }
+}
+
+function closeDaeScanAdmin(){
+  document.getElementById('dae-scan-overlay').style.display='none'
+  document.getElementById('dae-scan-input').value=''
+  if(_daeScannerAdmin){
+    _daeScannerAdmin.stop().then(()=>_daeScannerAdmin.clear()).catch(()=>{})
+    _daeScannerAdmin=null
+  }
+}
+
+// Beaucoup d'étiquettes DAE (dispositifs médicaux) utilisent un code GS1 DataMatrix qui
+// encode plusieurs infos (GTIN, lot, péremption, série) dans une seule chaîne — sans
+// extraction, le numéro "scanné" est un texte illisible/faux. On tente d'en extraire le
+// numéro de série (AI 21) ; sinon on retombe sur le texte brut.
+function parseGS1(raw){
+  const FNC1='\x1D'
+  const s=String(raw||'')
+  const out={}
+  let i=0
+  while(i<s.length-1){
+    const ai=s.substr(i,2)
+    if(ai==='01'&&/^\d{14}/.test(s.substr(i+2))){ out.gtin=s.substr(i+2,14); i+=16; continue }
+    if((ai==='17'||ai==='11')&&/^\d{6}/.test(s.substr(i+2))){ i+=8; continue }
+    if(ai==='10'||ai==='21'){
+      const rest=s.slice(i+2)
+      const end=rest.indexOf(FNC1)
+      const val=end>=0?rest.slice(0,end):rest
+      if(ai==='21') out.serial=val
+      i+=2+val.length+(end>=0?1:0)
+      continue
+    }
+    i++
+  }
+  return out
+}
+
+// Callback caméra : affiche le code détecté (avec extraction GS1 si applicable) pour
+// vérification/correction avant validation manuelle — plutôt que d'enregistrer directement
+// le texte brut du code-barres, parfois un identifiant composite illisible tel quel.
+function onDaeCodeDetectedAdmin(decodedText){
+  if(_daeScannerAdmin){ try{ _daeScannerAdmin.pause(true) }catch(e){} }
+  const parsed=parseGS1(decodedText)
+  const guess=parsed.serial||decodedText
+  const input=document.getElementById('dae-scan-input')
+  if(input){ input.value=guess; input.focus() }
+  const hint=document.getElementById('dae-scan-raw-hint')
+  if(hint){
+    hint.style.display='block'
+    hint.textContent=parsed.serial
+      ? `Numéro de série extrait automatiquement (code GS1). Texte brut : ${decodedText}`
+      : `Code détecté — vérifie que c'est bien le numéro de série avant de valider.`
+  }
+}
+
+function daeScanRescanAdmin(){
+  document.getElementById('dae-scan-input').value=''
+  document.getElementById('dae-scan-raw-hint').style.display='none'
+  if(_daeScannerAdmin){ try{ _daeScannerAdmin.resume() }catch(e){} }
+}
+
+// Scan admin = réception en stock (contrairement au scan technicien qui sort du stock)
+async function onDaeScanSuccessAdmin(serial){
+  serial=(serial||'').trim()
+  if(!serial) return
+  if(_daeScannerAdmin){ try{ await _daeScannerAdmin.pause(true) }catch(e){} }
+
+  const existing=daeStock[serial]
+  let model=existing?.model
+  if(!model) model=prompt('Modèle du DAE (ex: HS500P) :', DAE_MODELS[0]) || 'Inconnu'
+
+  const hist=existing?.history||[]
+  hist.push({ts:Date.now(),action:'reception_stock',by:'admin'})
+  daeStock[serial]={...existing, serial, model, status:'stock', techId:null,
+    inDate:existing?.inDate||TODAY, outDate:'', history:hist}
+  await saveDaeStockAdmin()
+  showToast(`✅ ${model} (${serial}) ajouté au stock`,'#1B5E20')
+  closeDaeScanAdmin()
+  rStockDae()
+}
+
+// ═══════════════════════════════════════════════════════
+// STOCK CONSOMMABLES (Pad-Pak, électrodes, batteries...) — vraies tables
+// Supabase (articles_stock, mouvements_stock) via stock-module.js, pas le
+// pattern app_state en JSON utilisé pour le reste de l'appli.
+// ═══════════════════════════════════════════════════════
+let _stkInited=false
+function stkInitModuleAdmin(){
+  if(_stkInited||typeof StockModule==='undefined') return
+  _stkInited=true
+  StockModule.init({
+    baseUrl: SB_URL+'/rest/v1',
+    getHeaders: async()=>await sbAuthHeaders(),
+    getActor: ()=>({techId:null, label:'Admin'})
+  })
+}
+let stkAdminHistOpen=false
+
+async function rStockConsumables(){
+  stkInitModuleAdmin()
+  const el=document.getElementById('d-stock-body')
+  if(!el) return
+  el.innerHTML=`<div style="text-align:center;color:var(--gray);padding:30px">Chargement...</div>`
+  let articles=[]
+  try{ articles=await StockModule.listArticles() }
+  catch(e){ el.innerHTML=`<div class="card" style="color:#C62828;padding:16px">❌ ${e.message}</div>`; return }
+
+  const low=articles.filter(a=>a.quantite_stock<=a.stock_minimum)
+  const rupture=low.filter(a=>a.quantite_stock<=0)
+
+  el.innerHTML=`
+  ${low.length?`<div class="card" style="background:#FFF3E0;border-left:4px solid #E65100;margin-bottom:14px">
+    <div style="font-size:13px;color:#E65100;font-weight:600">
+      ${rupture.length?`🔴 ${rupture.length} en rupture · `:''}🟠 ${low.length} article${low.length>1?'s':''} sous le seuil minimum
+    </div>
+  </div>`:''}
+  <div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+    <div style="flex:1;min-width:0">
+      <div style="font-size:15px;font-weight:700;margin-bottom:4px">📦 Articles en stock</div>
+      <div style="font-size:12px;color:var(--gray)">${articles.length} article${articles.length>1?'s':''} référencé${articles.length>1?'s':''}</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="bb" onclick="openStkScanAdmin()">📷 Scanner</button>
+      <button class="bg" onclick="stkOpenCreateAdmin()">➕ Nouvel article</button>
+      <button class="bg" onclick="stkToggleHistAdmin()">📋 ${stkAdminHistOpen?'Masquer':'Voir'} l'historique</button>
+    </div>
+  </div>
+  <div class="card">
+    ${!articles.length?`<div style="text-align:center;color:var(--gray);padding:30px">Aucun article — scanne un code-barres ou ajoute-en un manuellement</div>`:`
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead><tr style="border-bottom:2px solid var(--border);text-align:left;color:var(--gray);font-size:11px">
+        <th style="padding:8px">Article</th><th style="padding:8px">Catégorie</th><th style="padding:8px">Emplacement</th>
+        <th style="padding:8px">Stock</th><th style="padding:8px">Seuil mini</th><th style="padding:8px"></th>
+      </tr></thead>
+      <tbody>
+      ${articles.map(a=>{
+        const isLow=a.quantite_stock<=a.stock_minimum, isRupture=a.quantite_stock<=0
+        return `<tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:8px">
+            <div style="font-weight:600">${a.nom}</div>
+            <div style="font-size:11px;color:var(--gray)">${a.reference||''}${a.code_barres?' · '+a.code_barres:''}</div>
+          </td>
+          <td style="padding:8px;color:var(--gray)">${a.categorie||'—'}</td>
+          <td style="padding:8px;color:var(--gray)">${a.emplacement||'—'}</td>
+          <td style="padding:8px;font-weight:800;color:${isRupture?'#C62828':isLow?'#E65100':'#1B5E20'}">${a.quantite_stock}${isRupture?' 🔴':isLow?' 🟠':''}</td>
+          <td style="padding:8px;color:var(--gray)">${a.stock_minimum}</td>
+          <td style="padding:8px;text-align:right;white-space:nowrap">
+            <button class="bg bsm" onclick="stkQuickMove('${a.id}','entree','${a.nom.replace(/'/g,"\\'")}')">📥</button>
+            <button class="bg bsm" onclick="stkQuickMove('${a.id}','sortie','${a.nom.replace(/'/g,"\\'")}')">📤</button>
+            <button class="bg bsm" onclick="stkOpenEditAdmin('${a.id}')">✏️</button>
+          </td>
+        </tr>`
+      }).join('')}
+      </tbody>
+    </table>`}
+  </div>
+  <div id="stk-admin-hist" style="display:${stkAdminHistOpen?'block':'none'};margin-top:14px"></div>`
+  window._stkAdminArticles=articles
+  if(stkAdminHistOpen) stkRenderHistAdmin()
+}
+
+function stkToggleHistAdmin(){
+  stkAdminHistOpen=!stkAdminHistOpen
+  rStockConsumables()
+}
+
+async function stkQuickMove(articleId,type,nom){
+  const qtyStr=prompt(`${type==='entree'?'Entrée':'Sortie'} de "${nom}" — quantité :`,'1')
+  if(qtyStr===null) return
+  const qty=parseInt(qtyStr)
+  if(!qty||qty<=0){ alert('Quantité invalide'); return }
+  if(type==='sortie'&&qty>=10&&!confirm(`Confirmer la sortie de ${qty} × ${nom} ?`)) return
+  try{
+    const mv=await StockModule.recordMovement({articleId,type,quantite:qty})
+    showToast(`✅ Stock mis à jour — ${nom} : ${type==='entree'?'+':'-'}${qty} (nouveau stock : ${mv.stock_apres})`,'#1B5E20')
+    rStockConsumables()
+  }catch(e){
+    showToast('❌ Impossible de mettre à jour le stock : '+e.message,'#C62828')
+  }
+}
+
+function stkOpenCreateAdmin(prefilledCode){
+  const fs='width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-family:inherit'
+  const html=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div><label class="lbl">Nom *</label><input id="stk-a-nom" style="${fs}" placeholder="Ex: Pad-Pak adulte"/></div>
+      <div><label class="lbl">Code-barres</label><input id="stk-a-code" style="${fs}" value="${(prefilledCode||'').replace(/"/g,'&quot;')}"/></div>
+      <div><label class="lbl">Référence</label><input id="stk-a-ref" style="${fs}"/></div>
+      <div><label class="lbl">Catégorie</label>
+        <select id="stk-a-cat" style="${fs}">
+          <option>Pad-Pak</option><option>Électrodes</option><option>Batterie</option>
+          <option>Accessoires DAE</option><option>Autre</option>
+        </select>
+      </div>
+      <div><label class="lbl">Emplacement</label><input id="stk-a-emp" style="${fs}"/></div>
+      <div><label class="lbl">Fournisseur</label><input id="stk-a-four" style="${fs}"/></div>
+      <div><label class="lbl">Prix (€)</label><input id="stk-a-prix" type="number" step="0.01" style="${fs}"/></div>
+      <div><label class="lbl">Stock minimum (alerte)</label><input id="stk-a-min" type="number" value="0" style="${fs}"/></div>
+    </div>`
+  showConfirmModal('➕ Nouvel article', html, async ()=>{
+    const nom=document.getElementById('stk-a-nom').value.trim()
+    if(!nom){ alert('Le nom est obligatoire'); return false }
+    try{
+      await StockModule.createArticle({
+        nom, code_barres:document.getElementById('stk-a-code').value.trim()||null,
+        reference:document.getElementById('stk-a-ref').value.trim()||null,
+        categorie:document.getElementById('stk-a-cat').value,
+        emplacement:document.getElementById('stk-a-emp').value.trim()||null,
+        fournisseur:document.getElementById('stk-a-four').value.trim()||null,
+        prix:parseFloat(document.getElementById('stk-a-prix').value)||null,
+        stock_minimum:parseInt(document.getElementById('stk-a-min').value)||0
+      })
+      showToast('✅ Article créé','#1B5E20')
+      rStockConsumables()
+      return true
+    }catch(e){ alert('❌ '+e.message); return false }
+  })
+}
+
+function stkOpenEditAdmin(articleId,articleObj){
+  const a=articleObj||(window._stkAdminArticles||[]).find(x=>x.id===articleId)
+  if(!a) return
+  const fs='width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-family:inherit'
+  const html=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div><label class="lbl">Nom *</label><input id="stk-a-nom" style="${fs}" value="${(a.nom||'').replace(/"/g,'&quot;')}"/></div>
+      <div><label class="lbl">Code-barres</label><input id="stk-a-code" style="${fs}" value="${(a.code_barres||'').replace(/"/g,'&quot;')}"/></div>
+      <div><label class="lbl">Référence</label><input id="stk-a-ref" style="${fs}" value="${(a.reference||'').replace(/"/g,'&quot;')}"/></div>
+      <div><label class="lbl">Catégorie</label>
+        <select id="stk-a-cat" style="${fs}">
+          ${['Pad-Pak','Électrodes','Batterie','Accessoires DAE','Autre'].map(c=>`<option ${a.categorie===c?'selected':''}>${c}</option>`).join('')}
+        </select>
+      </div>
+      <div><label class="lbl">Emplacement</label><input id="stk-a-emp" style="${fs}" value="${(a.emplacement||'').replace(/"/g,'&quot;')}"/></div>
+      <div><label class="lbl">Fournisseur</label><input id="stk-a-four" style="${fs}" value="${(a.fournisseur||'').replace(/"/g,'&quot;')}"/></div>
+      <div><label class="lbl">Prix (€)</label><input id="stk-a-prix" type="number" step="0.01" style="${fs}" value="${a.prix||''}"/></div>
+      <div><label class="lbl">Stock minimum (alerte)</label><input id="stk-a-min" type="number" style="${fs}" value="${a.stock_minimum||0}"/></div>
+    </div>
+    <label style="display:flex;align-items:center;gap:6px;margin-top:10px;font-size:13px;cursor:pointer">
+      <input type="checkbox" id="stk-a-actif" ${a.actif?'checked':''}/> Article actif
+    </label>`
+  showConfirmModal('✏️ Modifier l\'article', html, async ()=>{
+    const nom=document.getElementById('stk-a-nom').value.trim()
+    if(!nom){ alert('Le nom est obligatoire'); return false }
+    try{
+      await StockModule.updateArticle(articleId,{
+        nom, code_barres:document.getElementById('stk-a-code').value.trim()||null,
+        reference:document.getElementById('stk-a-ref').value.trim()||null,
+        categorie:document.getElementById('stk-a-cat').value,
+        emplacement:document.getElementById('stk-a-emp').value.trim()||null,
+        fournisseur:document.getElementById('stk-a-four').value.trim()||null,
+        prix:parseFloat(document.getElementById('stk-a-prix').value)||null,
+        stock_minimum:parseInt(document.getElementById('stk-a-min').value)||0,
+        actif:document.getElementById('stk-a-actif').checked
+      })
+      showToast('✅ Article modifié','#1B5E20')
+      rStockConsumables()
+      return true
+    }catch(e){ alert('❌ '+e.message); return false }
+  })
+}
+
+// Petite modale générique réutilisable (titre + corps HTML + callback de validation
+// async qui renvoie false pour garder la modale ouverte en cas d'erreur de saisie)
+function showConfirmModal(title, bodyHtml, onConfirm){
+  const old=document.getElementById('stk-generic-modal'); if(old) old.remove()
+  const div=document.createElement('div')
+  div.id='stk-generic-modal'
+  div.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:900;display:flex;align-items:center;justify-content:center;padding:20px'
+  div.innerHTML=`<div class="md" style="max-width:520px;width:100%">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <h3 style="font-size:15px;font-weight:700">${title}</h3>
+      <button class="bicon" onclick="document.getElementById('stk-generic-modal').remove()">✕</button>
+    </div>
+    <div id="stk-generic-modal-body">${bodyHtml}</div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button class="bg" onclick="document.getElementById('stk-generic-modal').remove()">Annuler</button>
+      <button class="bb" id="stk-generic-modal-ok">Valider</button>
+    </div>
+  </div>`
+  div.onclick=(e)=>{ if(e.target===div) div.remove() }
+  document.body.appendChild(div)
+  document.getElementById('stk-generic-modal-ok').onclick=async()=>{
+    const ok=await onConfirm()
+    if(ok!==false){ const m=document.getElementById('stk-generic-modal'); if(m) m.remove() }
+  }
+}
+
+// ── Historique (admin) ──────────────────────────────────────────
+function stkRenderHistAdmin(){
+  const el=document.getElementById('stk-admin-hist')
+  if(!el) return
+  el.innerHTML=`<div class="card">
+    <div style="font-size:14px;font-weight:700;margin-bottom:10px">📋 Historique des mouvements</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <select id="stk-h-type" onchange="stkFetchHistAdmin()" style="font-size:13px;padding:6px 10px">
+        <option value="">Tous types</option><option value="entree">Entrées</option><option value="sortie">Sorties</option>
+      </select>
+      <select id="stk-h-article" onchange="stkFetchHistAdmin()" style="font-size:13px;padding:6px 10px">
+        <option value="">Tous articles</option>
+        ${(window._stkAdminArticles||[]).map(a=>`<option value="${a.id}">${a.nom}</option>`).join('')}
+      </select>
+      <select id="stk-h-tech" onchange="stkFetchHistAdmin()" style="font-size:13px;padding:6px 10px">
+        <option value="">Tous techniciens</option>
+        ${TECHS.map(t=>`<option value="${t.id}">${t.name}</option>`).join('')}
+        <option value="admin">Admin</option>
+      </select>
+      <input id="stk-h-search" placeholder="🔍 Recherche (intervention, technicien...)" oninput="stkFetchHistAdmin()" style="font-size:13px;padding:6px 10px;flex:1;min-width:180px"/>
+    </div>
+    <div id="stk-h-list"><div style="text-align:center;color:var(--gray);padding:16px">Chargement...</div></div>
+  </div>`
+  stkFetchHistAdmin()
+}
+async function stkFetchHistAdmin(){
+  const list=document.getElementById('stk-h-list')
+  if(!list) return
+  try{
+    const type=document.getElementById('stk-h-type')?.value||undefined
+    const articleId=document.getElementById('stk-h-article')?.value||undefined
+    const techVal=document.getElementById('stk-h-tech')?.value||''
+    const search=document.getElementById('stk-h-search')?.value||undefined
+    const techId=(techVal&&techVal!=='admin')?parseInt(techVal):undefined
+    let rows=await StockModule.listMovements({type,articleId,techId,search,limit:300})
+    if(techVal==='admin') rows=rows.filter(r=>!r.tech_id)
+    list.innerHTML=!rows.length?`<div style="text-align:center;color:var(--gray);padding:16px">Aucun mouvement</div>`:`
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="border-bottom:2px solid var(--border);text-align:left;color:var(--gray);font-size:11px">
+          <th style="padding:6px">Date</th><th style="padding:6px">Article</th><th style="padding:6px">Type</th>
+          <th style="padding:6px">Qté</th><th style="padding:6px">Avant→Après</th><th style="padding:6px">Utilisateur</th><th style="padding:6px">Intervention</th>
+        </tr></thead>
+        <tbody>
+        ${rows.map(m=>{
+          const dt=new Date(m.date)
+          const isEntree=m.type==='entree'
+          return `<tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:6px;color:var(--gray)">${dt.toLocaleDateString('fr-FR')} ${dt.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</td>
+            <td style="padding:6px;font-weight:600">${m.articles_stock?.nom||'?'}</td>
+            <td style="padding:6px">${isEntree?'<span style="color:#1B5E20">📥 Entrée</span>':'<span style="color:#E65100">📤 Sortie</span>'}</td>
+            <td style="padding:6px;font-weight:700;color:${isEntree?'#1B5E20':'#E65100'}">${isEntree?'+':'-'}${m.quantite}</td>
+            <td style="padding:6px;color:var(--gray)">${m.stock_avant} → ${m.stock_apres}</td>
+            <td style="padding:6px">${m.utilisateur||'—'}</td>
+            <td style="padding:6px;color:var(--gray)">${m.intervention_label||'—'}</td>
+          </tr>`
+        }).join('')}
+        </tbody>
+      </table>`
+  }catch(e){
+    list.innerHTML=`<div style="text-align:center;color:#C62828;padding:16px">❌ ${e.message}</div>`
+  }
+}
+
+// ── Scanner caméra (réception/consultation, admin) ──────────────
+let stkScannerAdmin=null, stkTorchOnAdmin2=false
+function openStkScanAdmin(){
+  const ov=document.getElementById('stk-scan-overlay')
+  ov.style.display='flex'
+  stkTorchOnAdmin2=false
+  const torchBtn=document.getElementById('stk-torch-btn'); if(torchBtn) torchBtn.style.display='none'
+  const zoomWrap=document.getElementById('stk-zoom-wrap'); if(zoomWrap) zoomWrap.style.display='none'
+  if(typeof Html5Qrcode==='undefined'){
+    document.getElementById('stk-scan-reader').innerHTML='<p style="color:#fff;text-align:center;padding:20px">Scanner indisponible — utilise la saisie manuelle ci-dessous.</p>'
+    return
+  }
+  const formats=(typeof Html5QrcodeSupportedFormats!=='undefined')?[
+    Html5QrcodeSupportedFormats.EAN_13,Html5QrcodeSupportedFormats.EAN_8,
+    Html5QrcodeSupportedFormats.UPC_A,Html5QrcodeSupportedFormats.UPC_E,
+    Html5QrcodeSupportedFormats.CODE_128,Html5QrcodeSupportedFormats.QR_CODE
+  ]:undefined
+  stkScannerAdmin=new Html5Qrcode('stk-scan-reader',formats?{formatsToSupport:formats,verbose:false}:undefined)
+  stkScannerAdmin.start(
+    { facingMode:{ideal:'environment'} },
+    {
+      fps:10, qrbox:{width:280,height:180}, aspectRatio:1.5,
+      videoConstraints:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080},advanced:[{focusMode:'continuous'}]},
+      // Détecteur de codes-barres natif du navigateur si disponible (ML Kit sous
+      // Android Chrome) plutôt que le décodeur JS pur — voir openDaeScanAdmin().
+      experimentalFeatures:{ useBarCodeDetectorIfSupported:true }
+    },
+    decodedText=>{ stkHandleScanAdmin(decodedText) },
+    ()=>{}
+  ).then(()=>{
+    try{
+      const caps=stkScannerAdmin.getRunningTrackCapabilities?.()
+      if(caps && 'torch' in caps && torchBtn) torchBtn.style.display='inline-block'
+      if(caps && caps.zoom && zoomWrap){
+        const sl=document.getElementById('stk-zoom-slider')
+        sl.min=caps.zoom.min; sl.max=caps.zoom.max; sl.step=caps.zoom.step||0.1; sl.value=caps.zoom.min
+        zoomWrap.style.display='flex'
+      }
+    }catch(e){}
+  }).catch(()=>{
+    document.getElementById('stk-scan-reader').innerHTML='<p style="color:#fff;text-align:center;padding:20px">Impossible d\'accéder à la caméra — utilise la saisie manuelle ci-dessous.</p>'
+  })
+}
+async function stkToggleTorchAdmin(){
+  if(!stkScannerAdmin) return
+  try{ stkTorchOnAdmin2=!stkTorchOnAdmin2; await stkScannerAdmin.applyVideoConstraints({advanced:[{torch:stkTorchOnAdmin2}]}) }catch(e){ stkTorchOnAdmin2=!stkTorchOnAdmin2 }
+}
+async function stkOnZoomChangeAdmin(val){
+  if(!stkScannerAdmin) return
+  try{ await stkScannerAdmin.applyVideoConstraints({advanced:[{zoom:parseFloat(val)}]}) }catch(e){}
+}
+function closeStkScanAdmin(){
+  document.getElementById('stk-scan-overlay').style.display='none'
+  const inp=document.getElementById('stk-scan-manual-input'); if(inp) inp.value=''
+  if(stkScannerAdmin){ const s=stkScannerAdmin; stkScannerAdmin=null; s.stop().then(()=>s.clear()).catch(()=>{}) }
+}
+async function stkHandleScanAdmin(code){
+  code=(code||'').trim()
+  if(!code) return
+  closeStkScanAdmin()
+  try{
+    const art=await StockModule.findByBarcode(code)
+    if(art) stkOpenEditAdmin(art.id, art)
+    else stkOpenCreateAdmin(code)
+  }catch(e){ showToast('❌ '+e.message,'#C62828') }
+}
+
 function updMat(id,field,val){
   ivs=ivs.map(i=>i.id===id?{...i,[field]:(field==='padPak'||field==='batChange')?!!val:(parseInt(val)||0)}:i)
   cloudSave()
@@ -4037,6 +4769,12 @@ function applyPrevYearMonth(){
 function _normKey(s){ return (s||'').toUpperCase().replace(/\s+/g,' ').trim() }
 
 function rPrev(){
+  // Enrichissement Kizeo au premier affichage si aucune urgence n'est encore chargée
+  // (modèle DAE, n° série, dates de péremption viennent de cet enrichissement)
+  if(isDeployedApp && !ivs.some(i=>i.urgencePadPak)){
+    enrichIvsWithKizeo(ivs).then(enriched=>{ ivs=enriched; cloudSave(); rPrev() })
+    return
+  }
   const sqFocused=document.activeElement?.id==="prev-sq"
   // Dernière maintenance connue par client+addr
   const lastMaint={}
@@ -4237,13 +4975,22 @@ function prevCard(f){
         </div>
         <div class="ca">📍 ${f.addr}</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;align-items:center">
-          <span style="font-size:12px;color:var(--gray)">Dernière : <strong>${fd(f.date)}</strong></span>
-          <span style="font-size:12px">→ Prochaine : <strong>${fd(f.nextDate)}</strong></span>
+          <span style="font-size:12px;color:var(--gray)">Dernière : <strong>${fdy(f.date)}</strong></span>
+          <span style="font-size:12px">→ Prochaine : <strong>${fdy(f.nextDate)}</strong></span>
           ${daysTxt}
           ${ava(tc.init,20)} <span style="font-size:11px;color:var(--gray)">${tc.name}</span>
         </div>
+        <!-- Matériel : modèle DAE, n° série, support — souvent absents si le site n'a pas
+        encore été enrichi depuis Kizeo (visible uniquement après un premier passage) -->
+        ${(f.dea||f.nSerie||f.arm)?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:5px">
+          ${f.dea?`<span class="bdg" style="background:#F3E5F5;color:#6A1B9A">⚡ ${f.dea}</span>`:""}
+          ${f.nSerie?`<span class="bdg" style="background:#ECEFF1;color:#37474F">🔢 N° série ${f.nSerie}</span>`:""}
+          ${f.arm?`<span class="bdg" style="background:#E3F2FD;color:#1565C0">🗄️ ${f.arm}</span>`:""}
+        </div>`:""}
+        ${f.padPakDate?`<div style="font-size:11px;color:#E65100;margin-top:4px">🔌 Pad Pak — péremption : <strong>${fdy(f.padPakDate)}</strong></div>`:""}
         ${f.notes?`<div style="font-size:11px;color:var(--orange);background:#FFF3E0;padding:4px 8px;border-radius:5px;margin-top:5px">📝 ${f.notes}</div>`:""}
-        ${f.contact?`<div style="font-size:11px;color:#6A1B9A;background:#F3E5F5;padding:4px 8px;border-radius:5px;margin-top:4px">👤 ${f.contact}${f.cphone?" · "+f.cphone:""}</div>`:""}
+        ${f.contact?`<div style="font-size:11px;color:#6A1B9A;background:#F3E5F5;padding:4px 8px;border-radius:5px;margin-top:4px">👤 Contact site : ${f.contact}${f.cphone?" · "+f.cphone:""}</div>`:""}
+        ${f.contact_siege?`<div style="font-size:11px;color:#1565C0;background:#E3F2FD;padding:4px 8px;border-radius:5px;margin-top:4px">🏢 Contact siège : ${f.contact_siege}${f.phone_siege?" · "+f.phone_siege:""}</div>`:""}
       </div>
       <!-- Actions -->
       <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;flex-shrink:0">
@@ -4707,7 +5454,7 @@ async function buildAIPlan() {
   for (const { tech, interventions } of perTech) {
     try {
       const r = await fetch('/api/agent-planning', {
-        method: 'POST', headers: {'Content-Type':'application/json'},
+        method: 'POST', headers: {'Content-Type':'application/json', ...(await _apiAuthHeaders())},
         body: JSON.stringify({ techName: tech.name, interventions, dates, writeToNotion: false })
       })
       _aiPlanResults.push({ tech, data: await r.json(), dates, interventions })
@@ -4791,7 +5538,7 @@ async function applyAIPlan() {
   for (const { tech, interventions, dates } of _aiPlanResults) {
     try {
       const r = await fetch('/api/agent-planning', {
-        method: 'POST', headers: {'Content-Type':'application/json'},
+        method: 'POST', headers: {'Content-Type':'application/json', ...(await _apiAuthHeaders())},
         body: JSON.stringify({ techName: tech.name, interventions, dates, writeToNotion: true })
       })
       const d = await r.json()
@@ -5153,6 +5900,7 @@ function openAdd(){
   document.getElementById("m-form").checked=false
   document.getElementById("m-arm").value=""
   document.getElementById("m-dea").value=""
+  document.getElementById("m-nserie").value=""
   const _bc=document.getElementById("m-batchg");if(_bc)_bc.checked=false
   const _bd0=document.getElementById("m-batdate");if(_bd0)_bd0.value=""
   onDeaChange()
@@ -5183,6 +5931,7 @@ function editIv(id){
   document.getElementById("m-form").checked=iv.form
   document.getElementById("m-arm").value=iv.arm||""
   document.getElementById("m-dea").value=iv.dea||""
+  document.getElementById("m-nserie").value=iv.nSerie||""
   const _bc2=document.getElementById("m-batchg");if(_bc2)_bc2.checked=iv.batChange||false
   const _bd=document.getElementById("m-batdate");if(_bd)_bd.value=iv.batDate||""
   onDeaChange()
@@ -5206,6 +5955,23 @@ function editIv(id){
   const mce=document.getElementById("m-csemail");if(mce)mce.value=iv.email_siege||""
   const mcp=document.getElementById("m-csphone");if(mcp)mcp.value=iv.phone_siege||""
   const mc=document.getElementById("m-commercial"); if(mc) mc.value=iv.commercial||""
+  // Prochaine intervention déjà planifiée pour ce même site (hors celle-ci) — pour repérer
+  // en un coup d'œil le prochain passage sans quitter la fiche
+  const nextInfo=document.getElementById("m-next-iv-info")
+  if(nextInfo){
+    const normAddr=_normKey(iv.addr)
+    const upcoming=ivs.filter(i=>i.id!==id && i.status!=="completed" && _normKey(i.addr)===normAddr)
+      .sort((a,b)=>a.date.localeCompare(b.date))
+    if(upcoming.length){
+      const n=upcoming[0]
+      const techName=TB(n.techId)?.name||"technicien non assigné"
+      nextInfo.innerHTML=`📅 Prochaine intervention prévue le <strong>${fd(n.date)}</strong> avec ${techName}`+
+        (upcoming.length>1?` (+${upcoming.length-1} autre${upcoming.length>2?"s":""})`:"")
+      nextInfo.style.display="block"
+    } else {
+      nextInfo.style.display="none"
+    }
+  }
   document.getElementById("m-edit").classList.add("open")
 }
 function closeEdit(){document.getElementById("m-edit").classList.remove("open")}
@@ -5226,6 +5992,7 @@ function saveEdit(){
     form:document.getElementById("m-form").checked,
     arm:document.getElementById("m-arm").value,
     dea:document.getElementById("m-dea").value,
+    nSerie:document.getElementById("m-nserie")?.value.trim()||"",
     bat:document.getElementById("m-padpak").checked?1:0,
     batChange:document.getElementById("m-batchg")?.checked||false,
     batDate:document.getElementById("m-batdate")?.value||"",
@@ -5273,6 +6040,7 @@ function saveEdit(){
     pushIvToNotion(newIv)
   }
   closeEdit()
+  _zoneMaybeRefresh()
   if(curView==="dashboard")rDash()
   else if(curView==="depart")rDepart()
   else if(curView==="planning")rPlan()
@@ -5296,6 +6064,7 @@ function autoSaveField(){
     form:document.getElementById("m-form").checked,
     arm:document.getElementById("m-arm").value,
     dea:document.getElementById("m-dea").value,
+    nSerie:document.getElementById("m-nserie")?.value.trim()||"",
     bat:document.getElementById("m-padpak").checked?1:0,
     batChange:document.getElementById("m-batchg")?.checked||false,
     batDate:document.getElementById("m-batdate")?.value||"",
@@ -5325,6 +6094,7 @@ function autoSaveField(){
   const ind=document.getElementById("np-saved")
   if(ind){ind.classList.add("show");clearTimeout(ind._t);ind._t=setTimeout(()=>ind.classList.remove("show"),1800)}
   cloudSave()
+  _zoneMaybeRefresh()
   // Debounce Notion — 3s pour les champs texte (évite de spammer à chaque frappe)
   clearTimeout(autoSaveField._notionT)
   autoSaveField._notionT=setTimeout(()=>{
@@ -5357,8 +6127,17 @@ function deleteIv(){
   ivs=ivs.filter(i=>i.id!==id)
   closeEdit()
   SV(curView)
+  // La suppression locale doit être poussée vers Supabase immédiatement, sinon elle n'est
+  // jamais persistée : au prochain rechargement/pull, la fiche réapparaît car Supabase
+  // garde encore l'ancienne copie complète.
+  cloudSave()
   if(iv?.notionId && isDeployedApp){
-    notionCall('archive_page',{pageId:iv.notionId}).catch(e=>console.warn('Notion archive error:',e.message))
+    notionCall('archive_page',{pageId:iv.notionId})
+      .then(()=>showToast('☁️ Supprimé dans Notion','#1B5E20'))
+      .catch(e=>{
+        console.warn('Notion archive error:',e.message)
+        showToast('⚠️ Échec suppression Notion : '+e.message,'#C62828')
+      })
   }
 }
 function updSt(id,s){
@@ -5368,6 +6147,7 @@ function updSt(id,s){
   if(prev&&prev.type==="installation"&&s==="completed"){
     autoMaintFromInstall(prev)
   }
+  _zoneMaybeRefresh()
   if(curView==="dashboard")rDash()
   else if(curView==="interventions")rIv()
   else if(curView==="depart")rDepart()
@@ -5618,7 +6398,7 @@ function rParam(){
   </div>
   <div class="ss">
     <h2>ℹ️ À propos</h2>
-    <p style="font-size:13px;color:var(--gray);line-height:1.8"><strong>OptiQ</strong> — Plateforme de gestion technicien DEA<br>Phase 1 · Développé pour <strong>OptiQ</strong></p>
+    <p style="font-size:13px;color:var(--gray);line-height:1.8"><strong>OptiTechX</strong> — Plateforme de gestion technicien DEA<br>Phase 1 · Développé pour <strong>Defiligne</strong></p>
   </div>`
 }
 function saveTech(id){
@@ -5940,19 +6720,25 @@ function rZones(){
   const today=new Date().toISOString().split("T")[0]
   const plus30=new Date();plus30.setDate(plus30.getDate()+30)
   const end=plus30.toISOString().split("T")[0]
+  // Restaurer les derniers paramètres utilisés (onglet "mémorisé" d'une visite à l'autre)
+  let saved=null
+  try{const s=localStorage.getItem("optiq_zones_params");if(s)saved=JSON.parse(s)}catch(e){}
   el.innerHTML=`
     <div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
       <div style="flex:1;min-width:0">
         <div style="font-size:15px;font-weight:700;margin-bottom:4px">🗂️ Regroupement par zone géographique</div>
-        <div style="font-size:12px;color:var(--gray)">L'algorithme regroupe les interventions par proximité. Tu choisis quel technicien fait chaque zone.</div>
+        <div style="font-size:12px;color:var(--gray)">L'algorithme regroupe les interventions de la période choisie par proximité. Tu choisis quel technicien fait chaque zone. <span id="z-live-badge" style="display:none;color:#2E7D32;font-weight:600">🔄 Mise à jour auto activée</span></div>
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <input type="date" id="z-from" value="${today}" style="font-size:13px;padding:6px 10px;width:auto"/>
-        <input type="date" id="z-to"   value="${end}"   style="font-size:13px;padding:6px 10px;width:auto"/>
+        <input type="date" id="z-from" value="${saved?.from||today}" style="font-size:13px;padding:6px 10px;width:auto"/>
+        <input type="date" id="z-to"   value="${saved?.to||end}"   style="font-size:13px;padding:6px 10px;width:auto"/>
         <div style="display:flex;align-items:center;gap:6px;font-size:13px">
           <label style="color:var(--gray)">Zones :</label>
-          <input type="number" id="z-k" value="${Math.min(TECHS.length,4)}" min="1" max="${TECHS.length}" style="width:60px;padding:6px 10px;font-size:13px"/>
+          <input type="number" id="z-k" value="${saved?.k||Math.min(TECHS.length,4)}" min="1" max="${TECHS.length}" style="width:60px;padding:6px 10px;font-size:13px"/>
         </div>
+        <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--gray);cursor:pointer">
+          <input type="checkbox" id="z-incl-completed" ${saved?.inclCompleted?"checked":""}/> Inclure les terminées (parc entier)
+        </label>
         <button class="bb" onclick="analyserZones()">🔍 Analyser</button>
       </div>
     </div>
@@ -5961,6 +6747,22 @@ function rZones(){
       <div class="prog-t" style="margin-top:6px"><div id="z-bar" class="prog-f" style="background:var(--blue);width:0%"></div></div>
     </div>
     <div id="z-result"></div>`
+  // Ré-analyser automatiquement si une analyse avait déjà été faite (mémoire de l'onglet) —
+  // évite de retomber sur un écran vide en revenant sur "Zones & Techs"
+  if(saved&&saved.from&&saved.to){
+    const badge=document.getElementById("z-live-badge");if(badge)badge.style.display="inline"
+    analyserZones()
+  }
+}
+
+// Rafraîchit automatiquement l'analyse de zones en cours quand les interventions changent
+// (nouvelle fiche, statut modifié, sync Notion/Kizeo/autre appareil...) — débounce pour
+// éviter de relancer un géocodage à chaque petit changement rapproché.
+let _zoneRefreshTimer=null
+function _zoneMaybeRefresh(){
+  if(curView!=='zones'||!window._zoneHasAnalysis) return
+  clearTimeout(_zoneRefreshTimer)
+  _zoneRefreshTimer=setTimeout(()=>{ if(curView==='zones') analyserZones() },1500)
 }
 
 async function analyserZones(){
@@ -5971,16 +6773,20 @@ async function analyserZones(){
   const bar=document.getElementById("z-bar")
   const msg=document.getElementById("z-msg")
   const res=document.getElementById("z-result")
+  const inclCompleted=document.getElementById("z-incl-completed")?.checked
   if(!from||!to){alert("Choisissez une plage de dates");return}
+  // Mémoriser les paramètres pour restaurer l'analyse en revenant sur l'onglet
+  try{localStorage.setItem("optiq_zones_params",JSON.stringify({from,to,k,inclCompleted}))}catch(e){}
   prog.style.display="block"
   res.innerHTML=""
 
-  // Filtrer les interventions dans la période
-  const pool=ivs.filter(i=>i.date>=from&&i.date<=to&&i.status!=="completed")
+  // Filtrer les interventions dans la période — terminées incluses seulement si demandé
+  // (vue "parc entier" : voir où sont tous les sites, pas juste ceux restant à faire)
+  const pool=ivs.filter(i=>i.date>=from&&i.date<=to&&(inclCompleted||i.status!=="completed"))
   if(!pool.length){res.innerHTML=`<div class="card" style="text-align:center;color:var(--gray);padding:36px">Aucune intervention sur cette période.</div>`;prog.style.display="none";return}
 
   // Géocoder
-  const pts=[]
+  const pts=[],failed=[]
   for(let i=0;i<pool.length;i++){
     msg.textContent=`Géocodage ${i+1}/${pool.length}...`
     bar.style.width=Math.round(i/pool.length*70)+"%"
@@ -5988,6 +6794,7 @@ async function analyserZones(){
     let c=gcache[iv.addr]||null
     if(!c) c=await geocodeWithFallback(iv.addr,iv.client,iv.siege||'')
     if(c) pts.push({iv,lat:c.lat,lng:c.lng})
+    else failed.push(iv)
   }
   if(!pts.length){res.innerHTML=`<div class="card" style="text-align:center;color:var(--gray);padding:36px">Impossible de géocoder les adresses.</div>`;prog.style.display="none";return}
 
@@ -5996,9 +6803,11 @@ async function analyserZones(){
   bar.style.width="80%"
   const assignments=kmeansGeo(pts,k)
 
-  // Stocker pour appliquerZones()
+  // Stocker pour appliquerZones() et pour savoir qu'une analyse est active (déclenche
+  // le rafraîchissement auto tant que l'onglet reste ouvert, cf. _zoneMaybeRefresh())
   window._zoneLastPts=pts
   window._zoneAssignments=assignments
+  window._zoneHasAnalysis=true
 
   // Grouper par cluster
   const clusters=Array.from({length:k},()=>[])
@@ -6011,41 +6820,114 @@ async function analyserZones(){
   try{const saved=localStorage.getItem("optiq_zone_assignments");if(saved)zoneAssignments=JSON.parse(saved)}catch(e){}
 
   // Rendu des clusters + carte
-  renderZoneResult(clusters,pts)
+  renderZoneResult(clusters,pts,pool.length,failed)
 }
 
-function renderZoneResult(clusters,allPts){
+// Route approx (aller-retour dépôt) par plus-proche-voisin — sert uniquement au score de
+// cohérence des zones, pas à un vrai ordre de tournée (trop léger pour ça).
+function nnRouteKm(depot,pts){
+  if(!pts.length) return 0
+  let remaining=[...pts],cur=depot,total=0
+  while(remaining.length){
+    let bi=0,bd=Infinity
+    remaining.forEach((p,i)=>{const d=haversine(cur,p);if(d<bd){bd=d;bi=i}})
+    total+=bd
+    cur=remaining[bi]
+    remaining.splice(bi,1)
+  }
+  total+=haversine(cur,depot)
+  return total
+}
+
+function renderZoneResult(clusters,allPts,poolCount,failed){
   const res=document.getElementById("z-result")
   if(!res) return
 
-  // Calculer centre et rayon de chaque cluster
+  // Bandeau récap : pourquoi le total affiché peut être < au nombre d'interventions de la
+  // période (adresses non géolocalisables, en plus des terminées déjà exclues du pool).
+  let notice=""
+  if(poolCount!==undefined && failed && failed.length){
+    const listId="z-failed-list"
+    notice=`<div class="card" style="background:#FFF3E0;border-left:4px solid #E65100;margin-bottom:12px">
+      <div style="font-size:13px;color:#E65100;font-weight:600">
+        ⚠️ ${poolCount} intervention${poolCount>1?"s":""} sur la période · ${allPts.length} placée${allPts.length>1?"s":""} sur la carte · ${failed.length} non géolocalisée${failed.length>1?"s":""} (adresse introuvable)
+      </div>
+      <div style="font-size:12px;color:var(--gray);margin-top:4px;cursor:pointer;text-decoration:underline" onclick="const e=document.getElementById('${listId}');e.style.display=e.style.display==='none'?'block':'none'">Voir la liste</div>
+      <div id="${listId}" style="display:none;margin-top:8px;max-height:160px;overflow-y:auto">
+        ${failed.map(iv=>`<div style="font-size:12px;padding:4px 0;border-top:1px solid var(--border)">
+          <strong>${iv.client}</strong> — <span style="color:var(--gray)">${iv.addr||"(adresse vide)"}</span>
+          <span style="color:var(--blue);cursor:pointer;margin-left:6px" onclick="editIv(${iv.id})">✏️ corriger</span>
+        </div>`).join("")}
+      </div>
+    </div>`
+  }
+
+  const cfg=window.dispatchCfg
+  const depotC={lat:cfg.depotLat||48.965,lng:cfg.depotLng||1.967}
+
+  // Calculer centre, dispersion et charge estimée de chaque cluster
   const clusterInfo=clusters.map((pts,ci)=>{
-    if(!pts.length) return{ci,pts,centerLat:0,centerLng:0,radiusKm:0,km:0}
+    if(!pts.length) return{ci,pts,centerLat:0,centerLng:0,radiusKm:0,distDepot:0,maxSpreadKm:0,workMin:0,travelKm:0,totalMin:0,daysNeeded:0,coherent:true}
     const clat=pts.reduce((s,p)=>s+p.lat,0)/pts.length
     const clng=pts.reduce((s,p)=>s+p.lng,0)/pts.length
-    const depotC={lat:48.965,lng:1.967}
     let maxD=0
     pts.forEach(p=>{const d=Math.hypot(p.lat-clat,p.lng-clng)*111;if(d>maxD)maxD=d})
-    const depDist=Math.round(Math.hypot(clat-depotC.lat,clng-depotC.lng)*111*1.4)
-    return{ci,pts,centerLat:clat,centerLng:clng,radiusKm:Math.round(maxD),distDepot:depDist}
+    const depDist=Math.round(haversine(depotC,{lat:clat,lng:clng}))
+    // Dispersion = distance entre les 2 points les plus éloignés de la zone (la vraie mesure
+    // de "tournée incohérente", plus fiable que le rayon autour du centroïde)
+    let maxSpread=0
+    for(let i=0;i<pts.length;i++) for(let j=i+1;j<pts.length;j++){
+      const d=haversine({lat:pts[i].lat,lng:pts[i].lng},{lat:pts[j].lat,lng:pts[j].lng})
+      if(d>maxSpread) maxSpread=d
+    }
+    const workMin=pts.reduce((s,p)=>s+dur(p.iv.type,p.iv.form),0)
+    const travelKm=nnRouteKm(depotC,pts.map(p=>({lat:p.lat,lng:p.lng})))
+    const travelMin=Math.round(travelKm/cfg.travelSpeed*60)
+    const totalMin=workMin+travelMin
+    const daysNeeded=Math.max(1,Math.ceil(totalMin/(cfg.maxDayHours*60)),Math.ceil(travelKm/cfg.maxDayKm))
+    const coherent=maxSpread<=200&&depDist<=250
+    const doneCount=pts.filter(p=>p.iv.status==="completed").length
+    return{ci,pts,centerLat:clat,centerLng:clng,radiusKm:Math.round(maxD),distDepot:depDist,
+      maxSpreadKm:Math.round(maxSpread),workMin,travelKm:Math.round(travelKm),totalMin,daysNeeded,coherent,
+      doneCount,pendingCount:pts.length-doneCount}
   }).filter(c=>c.pts.length>0)
 
   // Construire la carte Leaflet
   const mapDiv=`<div id="z-mapid" style="height:360px;border-radius:10px;border:1px solid var(--border)"></div>`
 
   // Cartes de clusters
-  const cards=clusterInfo.map(({ci,pts,radiusKm,distDepot})=>{
+  const cards=clusterInfo.map(({ci,pts,radiusKm,distDepot,coherent,doneCount,pendingCount})=>{
     const col=CLUSTER_COLORS[ci%CLUSTER_COLORS.length]
     const curTech=zoneAssignments[ci]||""
-    const clients=pts.slice(0,4).map(p=>`<div style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dark)">• ${p.iv.client}</div>`).join("")
-    const more=pts.length>4?`<div style="font-size:11px;color:var(--gray)">+ ${pts.length-4} autres</div>`:""
+    // Chaque client est cliquable → ouvre directement sa fiche (voir/modifier). Les faites
+    // et à faire sont regroupées séparément (plutôt qu'un simple ✓/• mêlé) pour qu'on
+    // repère tout de suite ce qu'il reste réellement à planifier dans la zone.
+    const MAXV=8
+    // Date de référence + badge "retard" (date passée et pas encore faite) sur chaque ligne
+    const rowHtml=(p,done)=>{
+      const late=!done&&p.iv.date<TODAY
+      const dateSpan=`<span style="color:var(--gray);font-weight:400"> · ${fd(p.iv.date)}</span>`
+      const lateBadge=late?`<span style="color:#C62828;font-weight:700;margin-left:5px">⏰ retard</span>`:""
+      return`<div style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${done?"var(--gray)":"var(--dark)"};cursor:pointer;padding:2px 4px;margin:0 -4px;border-radius:4px" onclick="editIv(${p.iv.id})" title="Cliquer pour voir / modifier ${p.iv.client}" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='transparent'">${done?"✓":`<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${col};margin-right:5px"></span>`}${p.iv.client}${dateSpan}${lateBadge}</div>`
+    }
+    const pending=pts.filter(p=>p.iv.status!=="completed")
+    const done=pts.filter(p=>p.iv.status==="completed")
+    const block=(list,label,isDone)=>{
+      if(!list.length) return ""
+      const shown=list.slice(0,MAXV).map(p=>rowHtml(p,isDone)).join("")
+      const more=list.length>MAXV?`<div style="font-size:11px;color:var(--gray);padding:2px 4px">+ ${list.length-MAXV} autres</div>`:""
+      return`<div style="font-size:10px;font-weight:700;color:${isDone?"var(--gray)":col};text-transform:uppercase;letter-spacing:.3px;margin:${isDone?"8px":"0"} 0 2px">${label} (${list.length})</div>${shown}${more}`
+    }
+    const clientsHtml=block(pending,"🔧 À faire",false)+block(done,"✓ Terminées",true)
     return`<div class="card" style="border-left:4px solid ${col};padding:14px 16px">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:2px">
         <div style="width:14px;height:14px;border-radius:50%;background:${col};flex-shrink:0"></div>
         <div style="font-size:15px;font-weight:700;flex:1">Zone ${ci+1} — ${pts.length} intervention${pts.length>1?"s":""}</div>
+        ${coherent?"":'<span title="Zone géographiquement étalée" style="font-size:13px">⚠️</span>'}
         <div style="font-size:11px;color:var(--gray)">${distDepot}km du dépôt</div>
       </div>
-      <div style="margin-bottom:10px">${clients}${more}</div>
+      <div style="font-size:11px;color:var(--gray);margin:0 0 8px 24px">${pendingCount} à faire · ${doneCount} terminée${doneCount>1?"s":""}</div>
+      <div style="margin-bottom:10px;max-height:230px;overflow-y:auto">${clientsHtml}</div>
       <div style="display:flex;align-items:center;gap:8px">
         <label style="font-size:12px;color:var(--gray);font-weight:600;flex-shrink:0">Technicien :</label>
         <select style="flex:1;font-size:13px;padding:6px 10px" onchange="zoneAssignments[${ci}]=parseInt(this.value);saveZoneAssignments()" data-ci="${ci}">
@@ -6056,9 +6938,40 @@ function renderZoneResult(clusters,allPts){
     </div>`
   }).join("")
 
+  // Score de cohérence par zone — remplit l'espace sous la carte (souvent plus court que
+  // la colonne de cartes à droite) avec des métriques concrètes pour ajuster le nb de zones.
+  const scoreRows=clusterInfo.map(({ci,pts,maxSpreadKm,distDepot,totalMin,daysNeeded,coherent})=>{
+    const col=CLUSTER_COLORS[ci%CLUSTER_COLORS.length]
+    return`<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:7px 8px;white-space:nowrap"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${col};margin-right:6px"></span>Zone ${ci+1}</td>
+      <td style="padding:7px 8px;text-align:center">${pts.length}</td>
+      <td style="padding:7px 8px;text-align:center">${maxSpreadKm} km</td>
+      <td style="padding:7px 8px;text-align:center">${distDepot} km</td>
+      <td style="padding:7px 8px;text-align:center">${fmtMin(totalMin)}</td>
+      <td style="padding:7px 8px;text-align:center">${daysNeeded} j</td>
+      <td style="padding:7px 8px;text-align:center">${coherent?'<span style="color:#2E7D32;font-weight:600">✓ Cohérente</span>':'<span style="color:#C62828;font-weight:600">⚠ Trop étalée</span>'}</td>
+    </tr>`
+  }).join("")
+  const scorePanel=`<div class="card" style="margin-top:14px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:2px">📊 Score de cohérence par zone</div>
+    <div style="font-size:11px;color:var(--gray);margin-bottom:10px">Dispersion = distance entre les 2 arrêts les plus éloignés de la zone · jours nécessaires = temps total ÷ ${window.dispatchCfg.maxDayHours}h/jour</div>
+    <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:480px">
+      <thead><tr style="color:var(--gray);text-align:center;border-bottom:2px solid var(--border)">
+        <th style="padding:6px 8px;text-align:left">Zone</th><th style="padding:6px 8px">Interv.</th>
+        <th style="padding:6px 8px">Dispersion</th><th style="padding:6px 8px">Dist. dépôt</th>
+        <th style="padding:6px 8px">Temps total</th><th style="padding:6px 8px">Jours néc.</th>
+        <th style="padding:6px 8px">Statut</th>
+      </tr></thead>
+      <tbody>${scoreRows}</tbody>
+    </table>
+    </div>
+  </div>`
+
   res.innerHTML=`
+    ${notice}
     <div style="display:grid;grid-template-columns:1fr 340px;gap:14px;align-items:start">
-      <div>${mapDiv}</div>
+      <div>${mapDiv}${scorePanel}</div>
       <div style="display:flex;flex-direction:column;gap:10px">
         ${cards}
         <button class="bb" style="width:100%" onclick="appliquerZones(${JSON.stringify(clusterInfo.map(c=>c.ci))})">✅ Appliquer les attributions</button>
@@ -6074,9 +6987,12 @@ function renderZoneResult(clusters,allPts){
     clusterInfo.forEach(({ci,pts})=>{
       const col=CLUSTER_COLORS[ci%CLUSTER_COLORS.length]
       pts.forEach(p=>{
-        const icon=L.divIcon({html:`<div style="width:12px;height:12px;background:${col};border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,className:"",iconSize:[12,12],iconAnchor:[6,6]})
+        const done=p.iv.status==="completed"
+        const late=!done&&p.iv.date<TODAY
+        const icon=L.divIcon({html:`<div style="width:12px;height:12px;background:${done?col+"55":col};border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,className:"",iconSize:[12,12],iconAnchor:[6,6]})
+        const statusLine=done?`✓ Terminée · ${fd(p.iv.date)}`:late?`<span style="color:#C62828;font-weight:700">⏰ En retard</span> · ${fd(p.iv.date)}`:`🔧 À faire · ${fd(p.iv.date)}`
         L.marker([p.lat,p.lng],{icon}).addTo(zonesMapObj)
-          .bindPopup(`<strong>${p.iv.client}</strong><br><small>${p.iv.addr}</small><br><small style="color:${col}">Zone ${ci+1}</small>`)
+          .bindPopup(`<strong>${p.iv.client}</strong><br><small>${p.iv.addr}</small><br><small style="color:${col}">Zone ${ci+1}</small><br><small>${statusLine}</small><br><a href="#" onclick="editIv(${p.iv.id});return false" style="font-size:12px;color:var(--blue)">✏️ Voir / modifier</a>`)
         bounds.push([p.lat,p.lng])
       })
     })
@@ -6570,7 +7486,7 @@ async function _calcRouteInner(){
         duration:dur(x.iv.type,x.iv.form),
         timeWindow:(x.iv.timeStart||x.iv.timeEnd)?{start:x.iv.timeStart||"00:00",end:x.iv.timeEnd||"23:59"}:null
       }))}]}
-      const rr=await fetch('/api/optimize-route',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+      const rr=await fetch('/api/optimize-route',{method:'POST',headers:{'Content-Type':'application/json', ...(await _apiAuthHeaders())},body:JSON.stringify(payload)})
       if(rr.ok){
         const rd=await rr.json()
         const res=rd.results?.[selTech||0]
@@ -6644,7 +7560,7 @@ async function _calcRouteInner(){
     let routeOk=false
     try{
       const res=await fetch('/api/route-traffic',{
-        method:'POST',headers:{'Content-Type':'application/json'},
+        method:'POST',headers:{'Content-Type':'application/json', ...(await _apiAuthHeaders())},
         body:JSON.stringify({waypoints:allPts,departureHHMM:startHHMM})
       })
       if(res.ok){
@@ -6827,7 +7743,7 @@ rDash()
 let notifCfg = {
   brevoApiKey: "",
   senderEmail: "contact@defiligne.fr",
-  senderName:  "OptiQ",
+  senderName:  "Defiligne",
   emailSubject: "Rappel maintenance défibrillateur — {{client}}",
   emailBody: `Bonjour {{contact}},
 
@@ -6838,8 +7754,8 @@ Cette intervention prend environ {{duree}} minutes et ne nécessite aucune prép
 En cas d'empêchement, merci de nous contacter au 01 XX XX XX XX ou par retour de mail.
 
 Cordialement,
-L'équipe OptiQ`,
-  smsBody: "OptiQ : rappel maintenance DEA le {{date}}. Technicien : {{technicien}}. Contact : 01 XX XX XX XX"
+L'équipe Defiligne`,
+  smsBody: "Defiligne : rappel maintenance DEA le {{date}}. Technicien : {{technicien}}. Contact : 01 XX XX XX XX"
 }
 
 // Charger config depuis localStorage si disponible
@@ -6949,7 +7865,7 @@ async function sendSMS(iv, preview=false){
       method:"POST",
       headers:{"Content-Type":"application/json","api-key":notifCfg.brevoApiKey},
       body:JSON.stringify({
-        sender:"OptiQ",
+        sender:"Defiligne",
         recipient:phone,
         content:body,
         type:"transactional"
@@ -7666,6 +8582,25 @@ function suggestDates(){
   // Masquer si modification (pas nouvelle)
   if(editId){ box.style.display="none"; unplanWrap.style.display="flex"; return }
 
+  // Un passage est-il déjà prévu pour ce site ? On l'affiche en évidence pour éviter de
+  // planifier une date incohérente (trop proche, en double) sans s'en rendre compte.
+  const warnExisting = document.getElementById("date-existing-warn")
+  if(warnExisting){
+    const normAddr = _normKey(addr)
+    const already = ivs.filter(i=>i.status!=="completed" && _normKey(i.addr)===normAddr)
+      .sort((a,b)=>a.date.localeCompare(b.date))
+    if(already.length){
+      const next = already[0]
+      const techName = TB(next.techId)?.name || "technicien non assigné"
+      warnExisting.innerHTML = `📅 <strong>Passage déjà prévu le ${fd(next.date)}</strong> avec ${techName}`+
+        (already.length>1 ? ` (+${already.length-1} autre${already.length>2?"s":""} planifié${already.length>2?"s":""})` : "")+
+        ` — vérifie avant d'en ajouter un nouveau`
+      warnExisting.style.display="block"
+    } else {
+      warnExisting.style.display="none"
+    }
+  }
+
   const ivType = document.getElementById("m-type")?.value || "maintenance_simple"
   const ivMin = dur(ivType, false) + 35
   // Lire l'horaire imposé depuis le formulaire
@@ -8142,7 +9077,7 @@ function showKizeoSyncPreview(preview, rawRecords){
     </div>`).join("")}
   </div>`:"<p style='font-size:13px;color:var(--gray);margin-bottom:10px'>Aucune mise à jour nécessaire — tout est déjà à jour.</p>"}
   ${noMatch.length?`<div style="margin-bottom:10px;padding:8px 12px;background:#FFEBEE;border-radius:8px;font-size:12px;color:#C62828">
-    ⚠️ ${noMatch.length} fiche${noMatch.length>1?"s":""} Kizeo sans correspondance dans OptiQ — vérifiez le nom du client / adresse
+    ⚠️ ${noMatch.length} fiche${noMatch.length>1?"s":""} Kizeo sans correspondance dans OptiTechX — vérifiez le nom du client / adresse
   </div>`:""}
   <div style="display:flex;gap:8px">
     ${updates.length?`<button class="bb" onclick="applyKizeoSync()">✅ Appliquer ${updates.length} mise${updates.length>1?"s":""} à jour</button>`:""}
@@ -8242,8 +9177,8 @@ async function pushTodayToKizeo(){
     }else{
       const resp = await fetch("/api/kizeo",{
         method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({action:"push_batch",token:window.kizeoCfg.token,formId:window.kizeoCfg.formId,data:toSend})
+        headers:{"Content-Type":"application/json", ...(await _apiAuthHeaders())},
+        body:JSON.stringify({action:"push_batch",formId:window.kizeoCfg.formId,data:toSend})
       })
       const result = await resp.json()
       const ok = result.results?.filter(r=>r.status===200||r.status===201).length||0
@@ -8270,7 +9205,7 @@ async function autoDetectKizeoUsers(){
       // Simulation
       users=[{id:101,name:"Cindy D"},{id:102,name:"Priscillia M"},{id:103,name:"Yaniss B"}]
     }else{
-      const resp=await fetch("/api/kizeo",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"get_users",token:window.kizeoCfg.token,formId:""})})
+      const resp=await fetch("/api/kizeo",{method:"POST",headers:{"Content-Type":"application/json", ...(await _apiAuthHeaders())},body:JSON.stringify({action:"get_users",formId:""})})
       const data=await resp.json()
       users=data.users||[]
     }
@@ -8396,8 +9331,9 @@ function initCloud(){
   // Restaurer la dernière vue + date + sous-onglet
   try{
     const ui = JSON.parse(localStorage.getItem('optiq_ui_state')||'{}')
-    // Ne restaurer que si c'est aujourd'hui ou une date future (sinon → aujourd'hui)
-    if(ui.selDate && ui.selDate >= TODAY) selDate = ui.selDate
+    // Restaurer la dernière date sélectionnée, y compris dans le passé — l'utilisateur
+    // veut retrouver exactement où il en était en rouvrant l'appli
+    if(ui.selDate) selDate = ui.selDate
     if(ui.view && VT[ui.view]) curView = ui.view
     if(ui.subTab) _depSubTab = ui.subTab
   }catch(e){}
@@ -8470,6 +9406,7 @@ function initCloud(){
             syncDepVF()
             updateAllDepMarkers()
             updateSbCount()
+            _zoneMaybeRefresh()
             if(curView==='depart') rDepart()
             else if(curView==='planning') rPlan()
             else if(curView==='dashboard') rDash()
@@ -8591,6 +9528,7 @@ function initCloud(){
         ivs=p
         nextId=Math.max(0,...ivs.map(i=>i.id))+1
         updateSbCount()
+        _zoneMaybeRefresh()
         if(curView==='depart')rDepart()
         else if(curView==='planning')rPlan()
         else if(curView==='dashboard')rDash()
@@ -9020,7 +9958,7 @@ async function fetchKizeoSites(){
 
 async function syncKizeoToSupabase(){
   try{
-    const r = await fetch('/api/supabase',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'kizeo_fetch_notion'})})
+    const r = await fetch('/api/supabase',{method:'POST',headers:{'Content-Type':'application/json', ...(await _apiAuthHeaders())},body:JSON.stringify({action:'kizeo_fetch_notion'})})
     const d = await r.json()
     if(!d.sites?.length) return {error:'Aucun site Notion'}
     for(let i=0;i<d.sites.length;i+=100) await sbUpsert('kizeo_sites', d.sites.slice(i,i+100))
@@ -9100,7 +10038,7 @@ function nProp(props, ...keys){
   return ''
 }
 
-// ── Convertir une page Notion en intervention OptiQ ────────────
+// ── Convertir une page Notion en intervention OptiTechX ────────────
 function notionPageToIv(page, existingIds){
   const p = page.properties || {}
   const client  = nProp(p, 'Société')
@@ -9231,11 +10169,28 @@ function getDaeFromStr(s){
   return ''
 }
 
-// ── Appel proxy Notion ─────────────────────────────────────────
+// SÉCURITÉ : /api/notion, /api/kizeo etc. exigent désormais une identité vérifiée
+// côté serveur — on attache le token de session Supabase Auth de l'admin connecté.
+async function _apiAuthHeaders(){
+  let token=''
+  try{
+    let { data:{ session } } = await sb.auth.getSession()
+    // Le token Supabase expire (1h par défaut) — un onglet resté ouvert
+    // longtemps (arrière-plan throttled par le navigateur) peut manquer le
+    // refresh auto du SDK. Refresh proactif si expiré/bientôt expiré, pour
+    // éviter un 401 "Authentification requise" sur /api/notion, /api/kizeo...
+    if (session?.expires_at && session.expires_at * 1000 - Date.now() < 60000) {
+      const { data: refreshed } = await sb.auth.refreshSession()
+      session = refreshed?.session || session
+    }
+    token = session?.access_token || ''
+  }catch(e){}
+  return token?{'Authorization':`Bearer ${token}`}:{}
+}
 async function notionCall(action, extra={}){
   const r = await fetch(NOTION_ENDPOINT, {
     method:'POST',
-    headers:{'Content-Type':'application/json'},
+    headers:{'Content-Type':'application/json', ...(await _apiAuthHeaders())},
     body: JSON.stringify({action, ...extra})
   })
   if(!r.ok) throw new Error(`Notion ${r.status}: ${await r.text()}`)
@@ -9280,6 +10235,14 @@ async function pullFromNotion(dateFrom, dateTo, mode='merge'){
         ivs[existIdx] = {
           ...prev,
           notionId: page.id,
+          // Adresse (donc code postal) : PAS dans la même catégorie que les notes/contact
+          // ci-dessous — Notion est la source de vérité pour l'adresse du site (le bureau
+          // la corrige directement là-bas), donc Notion gagne ici. Avec un pattern
+          // "local si non-vide" comme les autres champs, une correction d'adresse dans
+          // Notion ne serait JAMAIS récupérée (l'adresse locale n'est presque jamais vide
+          // une fois l'intervention créée) — c'était le bug : le pull ignorait purement et
+          // simplement toute modification d'adresse faite dans Notion.
+          addr: iv.addr || prev.addr,
           // Local en priorité — Notion remplit uniquement les champs vides localement
           notes:         prev.notes         || iv.notes,
           contact:       prev.contact       || iv.contact,
@@ -9346,7 +10309,7 @@ async function pushStatusToNotion(ivId, newStatus){
   const iv = ivs.find(i=>i.id===ivId)
   if(!iv||!iv.notionId) return
 
-  // Mapping statut OptiQ → Notion
+  // Mapping statut OptiTechX → Notion
   const notionStatus = {
     completed:'Yes', not_responded:'Yes', pending:'No', confirmed:'No'
   }
@@ -9381,13 +10344,13 @@ async function pullNotionForDate(dateStr){
 async function pullNotionToday(){
   const today=_parisToday()
   const result=await pullFromNotion(today,today)
-  if(!result.error){ selDate=today; rDash() }
+  if(!result.error){ selDate=today; _saveUIState(); rDash() }
 }
 
 async function pullNotionTomorrow(){
   const tomorrow=_parisDatePlus(1)
   const result=await pullFromNotion(tomorrow,tomorrow)
-  if(!result.error){ selDate=tomorrow; rDash() }
+  if(!result.error){ selDate=tomorrow; _saveUIState(); rDash() }
 }
 
 async function pullNotionWeek(){
@@ -9574,7 +10537,7 @@ function showNotionPanel(){
       <button class="bb bsm" onclick="(async()=>{const f=document.getElementById('notion-date-from').value,t=document.getElementById('notion-date-to').value||f;if(f)await pullFromNotion(f,t||f)})()">↓ Pull</button>
     </div>
     <div style="border-top:1px solid #F0F0F0;padding-top:12px;font-size:12px;color:#757575">
-      ⚡ Les statuts validés/échec dans OptiQ sont <strong>automatiquement mis à jour dans Notion</strong> lors de chaque changement.
+      ⚡ Les statuts validés/échec dans OptiTechX sont <strong>automatiquement mis à jour dans Notion</strong> lors de chaque changement.
     </div>
   </div>
 </div>
@@ -9724,7 +10687,7 @@ async function sendChat() {
   try {
     const res = await fetch('/api/agent-directif', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(await _apiAuthHeaders()) },
       body: JSON.stringify({ messages: _chatHistory }),
     });
     const data = await res.json();
@@ -9758,7 +10721,7 @@ async function confirmChatPlan() {
   try {
     const res = await fetch('/api/agent-directif', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(await _apiAuthHeaders()) },
       body: JSON.stringify({ confirmPlan: true, plan: _chatPendingPlan }),
     });
     const data = await res.json();
@@ -9823,7 +10786,7 @@ async function kizeoImport(dryRun) {
   try {
     const res = await fetch('/.netlify/functions/kizeo-base-import', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(await _apiAuthHeaders()) },
       body: JSON.stringify({ csvContent: kizeoCsvContent, dryRun }),
     });
     if (!dryRun) {

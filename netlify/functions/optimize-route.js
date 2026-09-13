@@ -5,10 +5,56 @@
 // Fallback : estimation Haversine × facteur route si OSRM indisponible
 
 const CORS = {
-  'Access-Control-Allow-Origin':  '*',
+  'Cache-Control': 'no-store',
+  'Access-Control-Allow-Origin':  'https://optitechx.netlify.app',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Content-Type': 'application/json'
+}
+
+// SÉCURITÉ : appelle un service OSRM externe (coût compute) — réservé aux
+// utilisateurs identifiés (admin ou technicien), jamais accessible librement.
+const crypto = require('crypto')
+async function verifyAdmin(authHeader) {
+  const token = (authHeader || '').startsWith('Bearer ') ? authHeader.slice(7) : null
+  const SB_URL = (process.env.SUPABASE_URL || '').replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '')
+  const SB_ANON = process.env.SUPABASE_ANON_KEY
+  if (!token || !SB_URL || !SB_ANON) return false
+  try {
+    const userRes = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: SB_ANON, Authorization: `Bearer ${token}` } })
+    if (!userRes.ok) return false
+    const user = await userRes.json()
+    if (!user?.id) return false
+    const profRes = await fetch(`${SB_URL}/rest/v1/profiles?id=eq.${user.id}&select=role`, { headers: { apikey: SB_ANON, Authorization: `Bearer ${token}` } })
+    if (!profRes.ok) return false
+    const rows = await profRes.json()
+    return rows?.[0]?.role === 'admin'
+  } catch { return false }
+}
+function verifyTechToken(authHeader) {
+  const token  = (authHeader || '').startsWith('Bearer ') ? authHeader.slice(7) : null
+  const secret = process.env.AUTH_SECRET
+  if (!token || !secret) return false
+  const parts = token.split('.')
+  if (parts.length !== 2) return false
+  const [dataB64, sig] = parts
+  let data
+  try { data = Buffer.from(dataB64, 'base64url').toString() } catch { return false }
+  const expected = crypto.createHmac('sha256', secret).update(data).digest('hex')
+  let sigBuf, expBuf
+  try { sigBuf = Buffer.from(sig, 'hex'); expBuf = Buffer.from(expected, 'hex') } catch { return false }
+  if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) return false
+  let payload
+  try { payload = JSON.parse(data) } catch { return false }
+  if (payload.role !== 'tech' || !payload.nom) return false
+  if (!payload.exp || Date.now() > payload.exp) return false
+  return true
+}
+async function authenticate(event) {
+  const authHeader = event.headers?.authorization || event.headers?.Authorization || ''
+  if (await verifyAdmin(authHeader)) return true
+  if (verifyTechToken(authHeader)) return true
+  return false
 }
 
 const ROAD_FACTOR  = 1.30  // haversine → distance routière approx. (fallback uniquement)
@@ -72,6 +118,8 @@ function makeCostFns(depot, stops, matrix) {
 }
 
 // ─── Coût d'une route (indices 1..n, dépôt implicite aux extrémités) ──────────
+// Coût "brut" : somme des temps/distances de trajet uniquement — sert à l'affichage
+// (totalDurationMin, totalDistanceKm), pas à la recherche d'ordre.
 
 function routeCost(cost, route) {
   if (!route.length) return 0
@@ -86,6 +134,30 @@ function routeCostKm(cost, route) {
   for (let i = 1; i < route.length; i++) d += cost.distKm(route[i - 1], route[i])
   d += cost.distKm(route[route.length - 1], 0)
   return d
+}
+
+// Coût "pénalisé" : simule les heures d'arrivée réelles (attente si en avance sur un
+// créneau) et ajoute une forte pénalité par minute de dépassement d'heure limite
+// (timeWindow.end). C'est CE coût que 2-opt/or-opt cherchent à minimiser, pas le coût
+// brut ci-dessus — ainsi l'algorithme réorganise activement la tournée pour respecter
+// une heure limite imposée, plutôt que de se contenter de signaler le dépassement après coup.
+const LATE_PENALTY_PER_MIN = 60
+function routeCostPenalized(cost, route, stops, startMin) {
+  let curMin = startMin, prev = 0, penalty = 0
+  for (const idx of route) {
+    curMin += cost.dist(prev, idx)
+    const s = stops[idx - 1]
+    if (s.timeWindow) {
+      const fromMin = hhmm(s.timeWindow.start)
+      const toMin   = hhmm(s.timeWindow.end)
+      if (curMin < fromMin) curMin = fromMin
+      if (curMin > toMin) penalty += (curMin - toMin) * LATE_PENALTY_PER_MIN
+    }
+    curMin += (s.duration || 0)
+    prev = idx
+  }
+  curMin += cost.dist(prev, 0)
+  return (curMin - startMin) + penalty
 }
 
 // ─── Nearest Neighbor (indexé) ─────────────────────────────────────────────────
@@ -111,15 +183,15 @@ function buildNN(cost, n, seedIdx) {
 // ─── 2-opt contraint (indexé) ───────────────────────────────────────────────────
 // Ne déplace jamais les stops ancrés (RDV avec créneau horaire)
 
-function twoOptConstrained(cost, route, anchorIdx) {
-  let best = [...route], bestD = routeCost(cost, best), improved = true, iter = 0
+function twoOptConstrained(cost, route, anchorIdx, stops, startMin) {
+  let best = [...route], bestD = routeCostPenalized(cost, best, stops, startMin), improved = true, iter = 0
   while (improved && iter++ < 100) {
     improved = false
     for (let i = 0; i < best.length - 1; i++) {
       for (let j = i + 2; j < best.length; j++) {
         if (best.slice(i + 1, j + 1).some(idx => anchorIdx.has(idx))) continue
         const cand = [...best.slice(0, i + 1), ...best.slice(i + 1, j + 1).reverse(), ...best.slice(j + 1)]
-        const d = routeCost(cost, cand)
+        const d = routeCostPenalized(cost, cand, stops, startMin)
         if (d < bestD - 0.001) { best = cand; bestD = d; improved = true }
       }
     }
@@ -130,8 +202,8 @@ function twoOptConstrained(cost, route, anchorIdx) {
 // ─── Or-opt contraint (indexé) ──────────────────────────────────────────────────
 // Déplace un stop vers sa meilleure position, sans toucher aux ancrés
 
-function orOptConstrained(cost, route, anchorIdx) {
-  let best = [...route], bestD = routeCost(cost, best), improved = true
+function orOptConstrained(cost, route, anchorIdx, stops, startMin) {
+  let best = [...route], bestD = routeCostPenalized(cost, best, stops, startMin), improved = true
   while (improved) {
     improved = false
     for (let i = 0; i < best.length; i++) {
@@ -140,7 +212,7 @@ function orOptConstrained(cost, route, anchorIdx) {
       const without = best.filter((_, k) => k !== i)
       for (let j = 0; j <= without.length; j++) {
         const cand = [...without.slice(0, j), pt, ...without.slice(j)]
-        const d = routeCost(cost, cand)
+        const d = routeCostPenalized(cost, cand, stops, startMin)
         if (d < bestD - 0.001) { best = cand; bestD = d; improved = true; break }
       }
       if (improved) break
@@ -176,15 +248,18 @@ async function optimizeTech(depot, stops, startH, startMin) {
   }
 
   const anchorIdx = new Set(stops.map((s, i) => s.timeWindow ? i + 1 : null).filter(x => x !== null))
+  const startMinTotal = startH * 60 + startMin
 
   // Multi-start : essayer depuis le dépôt + depuis chaque stop
+  // Sélection sur le coût PÉNALISÉ (respect des heures limites) — pas le coût brut,
+  // sinon on choisirait le candidat le plus court en distance même s'il rate un rendez-vous.
   let best = null, bestCost = Infinity
   const starts = [0, ...Array.from({ length: n }, (_, i) => i + 1)]
   for (const seed of starts) {
     let cand = buildNN(cost, n, seed)
-    cand = twoOptConstrained(cost, cand, anchorIdx)
-    cand = orOptConstrained(cost, cand, anchorIdx)
-    const d = routeCost(cost, cand)
+    cand = twoOptConstrained(cost, cand, anchorIdx, stops, startMinTotal)
+    cand = orOptConstrained(cost, cand, anchorIdx, stops, startMinTotal)
+    const d = routeCostPenalized(cost, cand, stops, startMinTotal)
     if (d < bestCost) { bestCost = d; best = cand }
   }
 
@@ -243,6 +318,7 @@ function minsToHHMM(m) {
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: CORS, body: '' }
   if (event.httpMethod !== 'POST')    return { statusCode: 405, headers: CORS, body: JSON.stringify({ error: 'Method Not Allowed' }) }
+  if (!(await authenticate(event))) return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'Authentification requise' }) }
 
   let body
   try { body = JSON.parse(event.body) }

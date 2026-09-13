@@ -1,7 +1,7 @@
 // netlify/functions/config.js  (Netlify Functions v2 — ESM)
 import { getStore } from '@netlify/blobs'
 
-const CORS = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' }
+const CORS = { 'Access-Control-Allow-Origin': 'https://optitechx.netlify.app', 'Content-Type': 'application/json' }
 
 export default async (request) => {
   if (request.method === 'OPTIONS')
@@ -15,7 +15,7 @@ export default async (request) => {
     if (settings?.techs?.length) {
       techniciens = settings.techs
         .filter(t => t.avail !== false)
-        .map(t => ({ nom: t.name, color: t.color || '#1565C0' }))
+        .map(t => ({ id: t.id, nom: t.name, color: t.color || '#1565C0' }))
     }
   } catch {}
 
@@ -33,14 +33,19 @@ export default async (request) => {
     { nom: 'Nathan',     color: '#B71C1C' },
   ]
 
+  // SÉCURITÉ : kizeoToken et brevoKey ont été retirés de cette réponse publique — ce
+  // sont de vrais secrets serveur (accès API Kizeo / envoi SMS-email au nom de
+  // l'entreprise) qui n'ont jamais été consommés par le frontend (vérifié) et ne
+  // doivent jamais transiter par un endpoint non authentifié. tomtomKey reste exposé
+  // volontairement : c'est l'usage normal prévu par TomTom pour les tuiles de carte
+  // côté navigateur (comme une clé Google Maps JS) — à restreindre par domaine/référent
+  // sur le tableau de bord TomTom, pas côté code.
   return new Response(JSON.stringify({
     companyName:  process.env.OPTIQ_COMPANY_NAME  || 'Defiligne',
     depotAddress: process.env.OPTIQ_DEPOT_ADDRESS || '7 rue des entrepreneurs, 78540 Vernouillet',
     depotLat:     process.env.OPTIQ_DEPOT_LAT     || '48.965',
     depotLng:     process.env.OPTIQ_DEPOT_LNG     || '1.967',
-    kizeoToken:   process.env.OPTIQ_KIZEO_TOKEN   || '',
     kizeoFormId:  process.env.OPTIQ_KIZEO_FORM_ID || '',
-    brevoKey:     process.env.OPTIQ_BREVO_KEY      || '',
     tomtomKey:    process.env.TOMTOM_KEY           || '',
     techniciens,
   }), { status: 200, headers: CORS })

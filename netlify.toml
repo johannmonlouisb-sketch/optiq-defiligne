@@ -52,18 +52,8 @@
   status = 200
 
 [[redirects]]
-  from   = "/api/agent"
-  to     = "/.netlify/functions/agent"
-  status = 200
-
-[[redirects]]
   from   = "/api/route-chat"
   to     = "/.netlify/functions/route-chat"
-  status = 200
-
-[[redirects]]
-  from   = "/api/agent-master"
-  to     = "/.netlify/functions/agent-master"
   status = 200
 
 [[redirects]]
@@ -139,6 +129,11 @@
 [[redirects]]
   from   = "/api/kizeo-import"
   to     = "/.netlify/functions/kizeo-import"
+  status = 200
+
+[[redirects]]
+  from   = "/api/kizeo-webhook"
+  to     = "/.netlify/functions/kizeo-webhook"
   status = 200
 
 [[redirects]]

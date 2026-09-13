@@ -1,9 +1,9 @@
 {
   "appId": "fr.defiligne.optiq.tech",
-  "appName": "OptiQ Tech",
+  "appName": "OptiTechX Tech",
   "webDir": "www",
   "server": {
-    "url": "https://friendly-jelly-a45a1d.netlify.app/tech",
+    "url": "https://optitechx.netlify.app/tech",
     "cleartext": false
   },
   "android": {

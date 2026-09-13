@@ -10,9 +10,10 @@ const FR_GEO       = 'https://api-adresse.data.gouv.fr/search'
 const NOMINATIM    = 'https://nominatim.openstreetmap.org/search'
 
 const CORS = {
-  'Access-Control-Allow-Origin':  '*',
+  'Cache-Control': 'no-store',
+  'Access-Control-Allow-Origin':  'https://optitechx.netlify.app',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Content-Type': 'application/json'
 }
 
@@ -179,15 +180,33 @@ async function geocodeInterventions(interventions) {
   return { found, notFound }
 }
 
-// ── Exports pour les autres fonctions Netlify ─────────────────
-module.exports = { geocodeAddress, batchGeocode, geocodeInterventions }
-
 // ── Handler HTTP ──────────────────────────────────────────────
+
+// SÉCURITÉ : réservé aux administrateurs (session Supabase Auth + profiles.role='admin').
+async function verifyAdmin(authHeader) {
+  const token = (authHeader || '').startsWith('Bearer ') ? authHeader.slice(7) : null
+  const SB_URL = (process.env.SUPABASE_URL || '').replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '')
+  const SB_ANON = process.env.SUPABASE_ANON_KEY
+  if (!token || !SB_URL || !SB_ANON) return false
+  try {
+    const userRes = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: SB_ANON, Authorization: `Bearer ${token}` } })
+    if (!userRes.ok) return false
+    const user = await userRes.json()
+    if (!user?.id) return false
+    const profRes = await fetch(`${SB_URL}/rest/v1/profiles?id=eq.${user.id}&select=role`, { headers: { apikey: SB_ANON, Authorization: `Bearer ${token}` } })
+    if (!profRes.ok) return false
+    const rows = await profRes.json()
+    return rows?.[0]?.role === 'admin'
+  } catch { return false }
+}
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: CORS, body: '' }
   if (event.httpMethod !== 'POST')
     return { statusCode: 405, headers: CORS, body: JSON.stringify({ error: 'POST only' }) }
+
+  const _authHeader = event.headers?.authorization || event.headers?.Authorization || ''
+  if (!(await verifyAdmin(_authHeader))) return { statusCode: 403, headers: CORS, body: JSON.stringify({ error: 'Réservé aux administrateurs' }) }
 
   let body
   try { body = JSON.parse(event.body || '{}') }
@@ -213,3 +232,14 @@ exports.handler = async (event) => {
 
   return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: '"address" ou "addresses" requis' }) }
 }
+
+// BUGFIX (pré-existant, sans rapport avec le durcissement sécurité) : ces exports
+// étaient déclarés en `module.exports = {...}` AVANT `exports.handler = ...` plus
+// haut dans le fichier, ce qui réassignait module.exports et rendait le handler
+// invisible pour Netlify (erreur "geocode.handler is undefined or not exported").
+// Découvert en testant /api/geocode pendant l'audit — cluster.js dépend de
+// geocodeInterventions via require('./geocode'), donc on garde ces exports mais
+// après la définition du handler, sans réassigner module.exports.
+module.exports.geocodeAddress = geocodeAddress
+module.exports.batchGeocode = batchGeocode
+module.exports.geocodeInterventions = geocodeInterventions

@@ -9,9 +9,10 @@ const { analyzeBatch }      = require('./agent-logistique')
 const { optimizeWithVroom } = require('./agent-optimiseur-vroom')
 
 const CORS = {
-  'Access-Control-Allow-Origin':  '*',
+  'Cache-Control': 'no-store',
+  'Access-Control-Allow-Origin':  'https://optitechx.netlify.app',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Content-Type': 'application/json'
 }
 
@@ -316,16 +317,22 @@ async function runPipeline({ dateFrom, dateTo, tech, updateNotion = false }) {
     log.add('info', `Groq : ${groqDecision.decisions.length} décision(s) de découcher générée(s)`)
 
   // ── 8. Mise à jour Notion (optionnel) ─────────────────────
+  // Par lots de 8 en parallèle plutôt qu'une requête à la fois : un update séquentiel sur
+  // une plage de plusieurs semaines dépassait facilement le délai d'exécution de la fonction.
   if (updateNotion) {
     log.add('info', 'Mise à jour des statuts Notion...')
+    const toUpdate = interventions.filter(iv => iv.notionId)
+    const CONCURRENCY = 8
     let updated = 0
-    for (const iv of interventions) {
-      if (!iv.notionId) continue
-      const isUnassigned = vroomUnassigned.some(u => (u.notionId || u.id) === iv.notionId)
-      await updateNotionIntervention(iv.notionId, {
-        'Statut planning': { select: { name: isUnassigned ? 'Non assignable' : 'Planifié' } }
-      })
-      updated++
+    for (let i = 0; i < toUpdate.length; i += CONCURRENCY) {
+      const batch = toUpdate.slice(i, i + CONCURRENCY)
+      await Promise.all(batch.map(iv => {
+        const isUnassigned = vroomUnassigned.some(u => (u.notionId || u.id) === iv.notionId)
+        return updateNotionIntervention(iv.notionId, {
+          'Statut planning': { select: { name: isUnassigned ? 'Non assignable' : 'Planifié' } }
+        })
+      }))
+      updated += batch.length
     }
     log.add('info', `${updated} intervention(s) mises à jour dans Notion`)
   }
@@ -420,14 +427,34 @@ async function saveReport(report) {
   } catch {}
 }
 
-module.exports = { runPipeline, buildReport }
 
 // ── Handler HTTP ──────────────────────────────────────────────
+
+// SÉCURITÉ : réservé aux administrateurs (session Supabase Auth + profiles.role='admin').
+async function verifyAdmin(authHeader) {
+  const token = (authHeader || '').startsWith('Bearer ') ? authHeader.slice(7) : null
+  const SB_URL = (process.env.SUPABASE_URL || '').replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '')
+  const SB_ANON = process.env.SUPABASE_ANON_KEY
+  if (!token || !SB_URL || !SB_ANON) return false
+  try {
+    const userRes = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: SB_ANON, Authorization: `Bearer ${token}` } })
+    if (!userRes.ok) return false
+    const user = await userRes.json()
+    if (!user?.id) return false
+    const profRes = await fetch(`${SB_URL}/rest/v1/profiles?id=eq.${user.id}&select=role`, { headers: { apikey: SB_ANON, Authorization: `Bearer ${token}` } })
+    if (!profRes.ok) return false
+    const rows = await profRes.json()
+    return rows?.[0]?.role === 'admin'
+  } catch { return false }
+}
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: CORS, body: '' }
   if (event.httpMethod !== 'POST')
     return { statusCode: 405, headers: CORS, body: JSON.stringify({ error: 'POST only' }) }
+
+  const _authHeader = event.headers?.authorization || event.headers?.Authorization || ''
+  if (!(await verifyAdmin(_authHeader))) return { statusCode: 403, headers: CORS, body: JSON.stringify({ error: 'Réservé aux administrateurs' }) }
 
   let body
   try { body = JSON.parse(event.body || '{}') }
@@ -445,3 +472,6 @@ exports.handler = async (event) => {
     return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: err.message }) }
   }
 }
+
+// (exports déplacés en fin de fichier — cf. commentaire dans geocode.js)
+Object.assign(module.exports, { runPipeline, buildReport })
