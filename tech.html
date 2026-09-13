@@ -271,6 +271,11 @@ button:disabled{opacity:.45;cursor:not-allowed}
 
   /* Topbar compact */
   #topbar{padding:0 10px;gap:7px}
+  /* Sans max-width, le logo (ratio ~5.7:1) rendait à 182px sur un topbar de
+     320px — il ne restait plus de place pour le titre ni les boutons, qui
+     débordaient hors écran (trouvé au test visuel). object-fit:contain gère
+     la mise à l'échelle proportionnelle dans cette largeur réduite. */
+  #top-logo{max-width:90px}
   #top-title{font-size:15px}
   #top-sub{font-size:10px}
   #btn-tech{padding:5px 10px;font-size:12px}
