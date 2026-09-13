@@ -33,6 +33,11 @@
   --shadow-lg:0 8px 24px rgba(16,24,40,.12);
   --tab:68px;--top:58px;--sidebar:0px;
 
+  /* ── Espacements ── nommage des incréments déjà utilisés partout dans l'app
+     (padding .card=16, margin .card=8/12, gaps hero=8...) — aucune nouvelle
+     valeur, juste une échelle nommée pour les futurs composants ── */
+  --space-xs:4px;--space-sm:8px;--space-md:12px;--space-lg:16px;--space-xl:24px;
+
   /* ── Alias legacy : tout le CSS/JS existant continue de fonctionner tel quel ── */
   --blue:var(--primary);--blueDk:var(--primary-dark);--blueLt:var(--primary-light);
   --green:var(--success);--greenLt:var(--success-light);
@@ -49,6 +54,19 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 .ux-stat{font-size:26px;font-weight:800;color:var(--text);letter-spacing:-.02em;line-height:1}
 .ux-sub{font-size:12.5px;color:var(--text-secondary)}
 .ux-micro{font-size:10.5px;color:var(--text-tertiary)}
+
+/* ── Compléments hiérarchie (Design System V2) ── alias purs, mêmes valeurs
+   que ci-dessus + tailles déjà utilisées ailleurs dans l'app (14px/700 pour
+   les titres de card type "Kizeo Forms"/"Notion" en Profil, 13px pour le
+   texte courant type .dc-client) — formalise des tailles existantes, n'en
+   invente aucune. Objectif : donner un nom unique à chaque niveau pour que
+   les prochaines passes (boutons, cards, badges) s'appuient dessus. ── */
+.ux-display{font-size:26px;font-weight:800;letter-spacing:-.02em;color:var(--text);line-height:1.2}
+.ux-h3{font-size:14px;font-weight:700;color:var(--text)}
+.ux-body{font-size:13px;color:var(--text);line-height:1.4}
+.ux-small{font-size:12.5px;color:var(--text-secondary)}
+.ux-caption{font-size:10.5px;color:var(--text-tertiary)}
+.ux-kpi{font-size:26px;font-weight:800;color:var(--text);letter-spacing:-.02em;line-height:1}
 
 /* ── Accessibilité ── zone tactile mini 44px sur les actions principales
    (pas en blanket sur tous les boutons : casserait les icônes rondes 32px
@@ -96,45 +114,54 @@ button:disabled{opacity:.45;cursor:not-allowed}
 /* Stats bandeau */
 #dep-stats-bar{display:none;flex-shrink:0;background:var(--dark);color:#fff;padding:6px 14px;display:none;gap:16px;align-items:center;font-size:12px}
 
-/* ── CARTES CLIENT DÉPART ── */
-.dc{border-left:5px solid var(--border);background:#fff;margin:0;border-bottom:1px solid var(--bg);cursor:pointer;transition:background .1s}
+/* ── CARTES CLIENT DÉPART ── Design System V2 (pass 3) : même grammaire que
+   .card (radius-lg, bordure + ombre token, espacement 12/8) tout en gardant
+   la bande de couleur à gauche qui porte le statut (pending/vdone/vfail). ── */
+.dc{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--border-strong);border-radius:var(--radius-lg);margin:0 12px 8px;box-shadow:var(--shadow-sm);cursor:pointer;transition:box-shadow .15s,border-color .15s,background .1s}
 .dc:active,.dc.sel{background:var(--blueLt)}
 .dc.vdone{border-left-color:var(--green);opacity:.7}
 .dc.vfail{border-left-color:var(--red);opacity:.7}
-.dc.drag-over{background:#E3F2FD;border-left-color:var(--blue)}
+.dc.drag-over{background:var(--primary-light);border-left-color:var(--blue)}
+/* Historique compact (interventions déjà traitées) : rangées resserrées façon
+   liste — pas de radius/ombre/marge individuels, pour ne pas transformer
+   l'historique de la journée en mur de grandes cards. Préserve aussi la
+   timeline (.dc-num::after, plus bas) qui relie les points entre rangées
+   adjacentes : elle reste scoped à .dc.mini pour la même raison. */
+.dc.mini{margin:0;border-radius:0;box-shadow:none;border-bottom:1px solid var(--bg)}
 .dc-drag{color:#bbb;font-size:16px;cursor:grab;flex-shrink:0;user-select:none;-webkit-user-select:none;padding:0 2px;line-height:1}
-.dc-top{padding:10px 10px 6px;display:flex;align-items:center;gap:8px}
+.dc-top{padding:10px 12px 6px;display:flex;align-items:center;gap:8px}
 .dc-num{width:30px;height:30px;border-radius:50%;background:var(--blue);color:#fff;font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .dc-info{flex:1;min-width:0}
-.dc-client{font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.dc-addr{font-size:11px;color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.dc-tags{display:flex;gap:4px;padding:0 10px 4px;flex-wrap:wrap}
-.dc-detail{display:none;padding:6px 10px 8px;border-top:1px solid var(--bg)}
+.dc-client{font-size:15px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dc-addr{font-size:12.5px;color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:4px}
+.dc-tags{display:flex;gap:4px;padding:0 12px 8px;flex-wrap:wrap}
+.dc-detail{display:none;padding:8px 12px 10px;border-top:1px solid var(--border)}
 .dc.open .dc-detail{display:block}
 /* Boutons val/echec TOUJOURS visibles */
-.dc-btns{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:4px 10px 8px}
+.dc-btns{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:4px 12px 10px}
 /* Carte minimisée après validation */
 .dc.mini .dc-tags,.dc.mini .dc-btns,.dc.mini .dc-detail,.dc.mini .dc-extra{display:none!important}
 .vbtn{border:none;border-radius:9px;padding:9px 6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:4px;transition:all .15s}
 .vbtn:active{transform:scale(.95)}
 .vbtn-v{background:var(--greenLt);color:var(--green)}
 .vbtn-v.active{background:var(--green);color:#fff}
-.vbtn-f{background:#FFEBEE;color:var(--red)}
+.vbtn-f{background:var(--danger-light);color:var(--red)}
 .vbtn-f.active{background:var(--red);color:#fff}
 
 /* ── CARTES GENERIQUES ── */
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin:8px 12px;box-shadow:var(--shadow-sm);transition:box-shadow .15s,border-color .15s}
 @media (hover:hover){.card:hover{box-shadow:var(--shadow-md);border-color:var(--border-strong)}}
 .tag{display:inline-block;font-size:11px;font-weight:600;padding:3px 9px;border-radius:100px;white-space:nowrap}
-.tag-warn{background:#FFF3E0;color:var(--orange)}
+.tag-warn{background:var(--warning-light);color:var(--orange)}
 .tag-ok{background:var(--greenLt);color:var(--green)}
 .tag-info{background:var(--blueLt);color:var(--blue)}
-.tag-err{background:#FFEBEE;color:var(--red)}
+.tag-err{background:var(--danger-light);color:var(--red)}
+.tag-muted{background:var(--surface-secondary);color:var(--text-tertiary)}
 
 /* ── PLANNING ── */
 .wstrip{display:flex;gap:5px;padding:10px 12px;background:#fff;border-bottom:1px solid var(--border);overflow-x:auto;flex-shrink:0}
 .wstrip::-webkit-scrollbar{display:none}
-.wpill{min-width:52px;height:64px;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;background:var(--bg);border:2px solid transparent;flex-shrink:0}
+.wpill{min-width:52px;height:64px;border-radius:var(--radius-md);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;background:var(--bg);border:2px solid transparent;flex-shrink:0}
 .wpill.on{background:var(--blue);color:#fff;border-color:var(--blue)}
 .wpill.today{border-color:var(--blue)}
 .wpill .pn{font-size:20px;font-weight:800;line-height:1}
@@ -143,7 +170,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .wpill.on .pc{background:rgba(255,255,255,.3)}
 
 /* ── MATERIEL ── */
-.mat-row{display:flex;align-items:center;gap:14px;padding:14px;background:#fff;border-radius:12px;margin:6px 12px;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.mat-row{display:flex;align-items:center;gap:14px;padding:14px;background:#fff;border-radius:12px;margin:6px 12px;box-shadow:var(--shadow-sm)}
 .mat-ico{font-size:32px}
 .mat-n{font-size:28px;font-weight:800;color:var(--blue)}
 
@@ -152,9 +179,65 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .btn:active{transform:scale(.96)}
 .btn-sm{padding:8px 16px;font-size:13px}
 .btn-md{padding:11px 20px;font-size:14px}
-.btn-blue{background:var(--blue);color:#fff}
-.btn-gray{background:var(--bg);color:var(--dark);border:1.5px solid var(--border)}
+/* Hiérarchie Design System V2 (Primary/Secondary/Ghost/Danger) — les anciens
+   noms .btn-blue/.btn-gray/.btn-green restent des ALIAS de ces règles pour
+   que tout le HTML/JS existant continue de fonctionner sans modification. */
+.btn-primary,.btn-blue{background:var(--primary);color:#fff}
+.btn-secondary,.btn-gray{background:var(--bg);color:var(--dark);border:1.5px solid var(--border)}
+.btn-ghost{background:transparent;color:var(--primary)}
+.btn-ghost:active{background:var(--primary-light)}
+.btn-danger{background:var(--danger-light);color:var(--danger)}
+.btn-danger:active{background:var(--danger);color:#fff}
 .btn-green{background:var(--green);color:#fff}
+/* Variantes sémantiques Stock — même grammaire (radius/typo/padding/hover),
+   seule la couleur change : Entrée=succès, Sortie=warning. Convention
+   fonctionnelle du module Stock, pas un doublon à fusionner avec Primary/Danger. */
+.btn-stock-in,.btn-stock-out{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:2px solid transparent;border-radius:var(--radius-md);font-family:inherit;font-weight:800;cursor:pointer;transition:all .12s;min-height:44px}
+.btn-stock-in:active,.btn-stock-out:active{transform:scale(.96)}
+.btn-stock-in{background:var(--success-light);color:var(--success);border-color:var(--success)}
+.btn-stock-out{background:var(--warning-light);color:var(--warning);border-color:var(--warning)}
+
+/* ── SCANNER (DAE + Stock) — chrome commun, Design System V2 pass 8 ──
+   Fond volontairement sombre (lisibilité caméra) : les tokens de texte clair
+   de l'app (--text, --text-secondary...) sont calibrés pour un fond clair et
+   seraient illisibles ici. On garde des neutres dédiés au chrome sombre, et on
+   réserve les tokens sémantiques (success/warning/danger/primary) aux éléments
+   qui portent un vrai statut (torche active, erreur, validation). */
+/* Overlays plein écran (position:fixed;inset:0 en inline) : padding pour les
+   safe areas iOS (notch/home indicator) — sans quoi header/zone de saisie
+   peuvent se retrouver sous l'encoche ou la barre gestuelle. */
+#dae-scan-overlay,#stk-scan-overlay{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+.scan-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px}
+.scan-title{color:#fff;font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px}
+.scan-icon-btn{display:flex;align-items:center;justify-content:center;border:none;background:rgba(255,255,255,.15);color:#fff;border-radius:50%;width:44px;height:44px;cursor:pointer;flex-shrink:0}
+.scan-icon-btn .ico{width:18px;height:18px}
+/* Feedback visuel torche — reflète l'état existant (_daeTorchOn/stkTorchOn),
+   ne modifie ni la capture vidéo ni applyVideoConstraints(). */
+.scan-icon-btn.active{background:var(--warning);color:#3a2200}
+.scan-viewport{position:relative;width:100%;max-width:480px;margin:0 auto}
+/* Cadre de visée — purement décoratif (pointer-events:none), positionné par-dessus
+   la vidéo injectée par html5-qrcode sans jamais toucher à son DOM ni à qrbox. */
+.scan-frame{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:280px;height:180px;max-width:80%;max-height:70%;pointer-events:none}
+.scan-frame i{position:absolute;width:22px;height:22px;border:3px solid rgba(255,255,255,.85);font-style:normal}
+.scan-frame i:nth-child(1){top:0;left:0;border-right:none;border-bottom:none;border-radius:8px 0 0 0}
+.scan-frame i:nth-child(2){top:0;right:0;border-left:none;border-bottom:none;border-radius:0 8px 0 0}
+.scan-frame i:nth-child(3){bottom:0;left:0;border-right:none;border-top:none;border-radius:0 0 0 8px}
+.scan-frame i:nth-child(4){bottom:0;right:0;border-left:none;border-top:none;border-radius:0 0 8px 0}
+.scan-hint{color:rgba(255,255,255,.65);font-size:11px;text-align:center;margin:8px 16px 0}
+.scan-manual{padding:16px;text-align:center}
+.scan-manual>p{color:rgba(255,255,255,.75);font-size:12px;margin-bottom:8px}
+.scan-manual input{width:100%;max-width:320px;padding:12px;border-radius:8px;border:none;font-size:14px;min-height:44px}
+.scan-actions{margin-top:8px;display:flex;gap:8px;justify-content:center}
+.scan-btn{min-height:44px;padding:10px 18px;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-family:inherit}
+.scan-btn-ghost{background:rgba(255,255,255,.15);color:#fff}
+.scan-btn-primary{background:var(--primary);color:#fff}
+/* Panneau "code détecté" (DAE) — le libellé vient d'un ::before CSS statique :
+   le JS (onDaeCodeDetected) continue à faire un simple textContent sur
+   #dae-scan-raw-hint sans qu'on touche à ce mécanisme. */
+#dae-scan-raw-hint{background:rgba(255,255,255,.08);border-left:3px solid var(--success);border-radius:0 8px 8px 0;padding:10px 12px;margin:8px 16px 0;text-align:left;color:rgba(255,255,255,.85)}
+#dae-scan-raw-hint::before{content:"Code détecté";display:block;color:var(--success);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}
+.scan-error{display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--danger);text-align:center;padding:20px}
+.scan-continuous-badge{display:flex;align-items:center;justify-content:center;gap:6px;color:#fff;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
 
 /* ── TECH SELECTOR ── */
 #tech-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:600;align-items:center;justify-content:center;padding:20px}
@@ -172,13 +255,13 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .inp:focus{outline:none;border-color:var(--blue)}
 
 /* ── TOAST ── */
-#toast{position:fixed;bottom:calc(var(--tab) + env(safe-area-inset-bottom) + 16px);left:50%;transform:translateX(-50%);background:var(--dark);color:#fff;padding:11px 22px;border-radius:100px;font-size:13px;font-weight:600;z-index:999;box-shadow:0 4px 20px rgba(0,0,0,.25);white-space:nowrap;opacity:0;transition:opacity .3s;pointer-events:none}
+#toast{position:fixed;bottom:calc(var(--tab) + env(safe-area-inset-bottom) + 16px);left:50%;transform:translateX(-50%);background:var(--dark);color:#fff;padding:11px 22px;border-radius:100px;font-size:13px;font-weight:600;z-index:999;box-shadow:0 4px 20px rgba(0,0,0,.25);max-width:calc(100vw - 48px);white-space:normal;text-align:center;opacity:0;transition:opacity .3s;pointer-events:none}
 #toast.show{opacity:1}
 
 /* ── KIZEO SYNC STATUS ── */
 .sync-tag{font-size:11px;padding:3px 8px;border-radius:6px;font-weight:600}
 .sync-ok{background:#E8F5E9;color:#2E7D32}
-.sync-demo{background:#FFF3E0;color:#E65100}
+.sync-demo{background:var(--warning-light);color:var(--warning)}
 
 /* ═══════════════════════════════════════════
    RESPONSIVE — Téléphone (< 640px)
@@ -308,10 +391,14 @@ button:disabled{opacity:.45;cursor:not-allowed}
 #dep-bar-wrap[open] summary::before{content:'▾ '}
 #dep-bar{padding:8px 4px;background:transparent;border-bottom:none;flex-shrink:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 
-/* Timeline verticale — statut visuel par arrêt (terminé / actuel / à venir) */
+/* Timeline verticale — statut visuel par arrêt (terminé / actuel / à venir).
+   Scopée à .dc.mini (rangées resserrées de l'historique) : avec le nouvel
+   espacement type "card" des arrêts actifs (pass 3), un connecteur de 14px
+   ne relierait plus rien visuellement — pas de perte fonctionnelle, seule
+   la ligne entre points est retirée pour ces cartes-là. */
 .dc{position:relative}
 .dc-num{position:relative}
-.dc:not(:last-child) .dc-num::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);width:2px;height:14px;background:var(--border-strong)}
+.dc.mini:not(:last-child) .dc-num::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);width:2px;height:14px;background:var(--border-strong)}
 .dc.vdone .dc-num{background:var(--success)}
 .dc.vfail .dc-num{background:var(--danger)}
 /* Intervention "en cours" (premier arrêt encore en attente) légèrement mise en avant */
@@ -348,6 +435,12 @@ button:disabled{opacity:.45;cursor:not-allowed}
   #dep-ndc{grid-column:2/3;grid-row:1/3;margin:0;align-self:start}
   #dep-split{grid-column:1/2;grid-row:2/3;border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow-sm)}
   #dep-hero{border-radius:var(--radius-lg)}
+
+  /* Planning/Matériel/Stock/Profil : listes de cards à colonne unique — sur
+     grand écran on garde une largeur de lecture raisonnable au lieu de les
+     étirer bord à bord (design inchangé, juste recentré). L'Accueil garde sa
+     grille dédiée ci-dessus, non concernée par cette règle. */
+  #v-planning.on,#v-materiel.on,#v-stock.on,#v-profil.on{max-width:820px;margin:0 auto;width:100%}
 }
 </style>
 </head>
@@ -422,10 +515,11 @@ button:disabled{opacity:.45;cursor:not-allowed}
 </style>
 
 <!-- ═══ Système d'icônes — sprite SVG inline, style ligne unique, aucune
-     dépendance externe (pas de librairie/police/requête réseau). Utilisé
-     uniquement sur les composants de la refonte (nav, hero, actions rapides,
-     prochaine destination, stats) — le reste de l'app garde ses emojis
-     d'origine, changement volontairement borné pour limiter le risque sur
+     dépendance externe (pas de librairie/police/requête réseau). Utilisé sur
+     les composants de la refonte initiale (nav, hero, actions rapides,
+     prochaine destination, stats) + progressivement sur le détail client
+     (Design System V2, pass 3) — le reste de l'app garde ses emojis
+     d'origine pour l'instant, remplacement borné pour limiter le risque sur
      un fichier de cette taille sans pouvoir le tester visuellement. ═══ -->
 <svg style="display:none" aria-hidden="true">
   <symbol id="ico-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></symbol>
@@ -444,6 +538,20 @@ button:disabled{opacity:.45;cursor:not-allowed}
   <symbol id="ico-play" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6 3 20 12 6 21 6 3"/></symbol>
   <symbol id="ico-chevron-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></symbol>
   <symbol id="ico-sliders" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="10"/><circle cx="4" cy="14" r="2"/><line x1="12" y1="21" x2="12" y2="15"/><circle cx="12" cy="11" r="2"/><line x1="20" y1="21" x2="20" y2="17"/><circle cx="20" cy="13" r="2"/></symbol>
+  <!-- Ajouts Design System V2 (pass 3) — mêmes conventions (24x24, stroke 2, round) -->
+  <symbol id="ico-map" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></symbol>
+  <symbol id="ico-phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1 19.5 19.5 0 01-6-6A19.8 19.8 0 012.1 4.2 2 2 0 014.1 2h3a2 2 0 012 1.7c.1 1 .3 2 .7 3a2 2 0 01-.4 2.1L8 10.1a16 16 0 006 6l1.3-1.4a2 2 0 012.1-.4c1 .4 2 .6 3 .7a2 2 0 011.6 2z"/></symbol>
+  <symbol id="ico-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></symbol>
+  <symbol id="ico-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></symbol>
+  <symbol id="ico-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></symbol>
+  <symbol id="ico-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></symbol>
+  <symbol id="ico-unlock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 019.5-2.5"/></symbol>
+  <symbol id="ico-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></symbol>
+  <symbol id="ico-in" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><path d="M5 21h14"/></symbol>
+  <symbol id="ico-out" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V9"/><polyline points="7 14 12 9 17 14"/><path d="M5 3h14"/></symbol>
+  <symbol id="ico-flash" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="13 2 3 14 11 14 10 22 21 10 13 10 13 2"/></symbol>
+  <symbol id="ico-link" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 007.07 0l2.83-2.83a5 5 0 00-7.07-7.07L11.5 4.5"/><path d="M14 11a5 5 0 00-7.07 0L4.1 13.83a5 5 0 007.07 7.07L12.5 19.5"/></symbol>
+  <symbol id="ico-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></symbol>
 </svg>
 <style>.ico{width:1.1em;height:1.1em;vertical-align:-.18em;flex-shrink:0}</style>
 
@@ -458,9 +566,9 @@ button:disabled{opacity:.45;cursor:not-allowed}
       <div id="top-title">OptiTechX Tech</div>
       <div id="top-sub"></div>
     </div>
-    <button id="btn-gps-all" onclick="openGPSAll()">🗺️ Ouvrir Maps</button>
+    <button id="btn-gps-all" onclick="openGPSAll()"><svg class="ico"><use href="#ico-nav"/></svg> Ouvrir Maps</button>
     <div id="sb-status" title="Statut Supabase" style="width:8px;height:8px;border-radius:50%;background:#666;flex-shrink:0;cursor:pointer" onclick="showSbStatus()"></div>
-    <button id="btn-tech" onclick="openTechSelect()">👤 —</button>
+    <button id="btn-tech" onclick="openTechSelect()"><svg class="ico"><use href="#ico-user"/></svg> —</button>
   </div>
 
   <!-- CONTENT -->
@@ -508,7 +616,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
       </div>
 
       <!-- Avertissement créneau impossible -->
-      <div id="dep-conflict-warn" style="display:none;background:#FFF3E0;color:#E65100;padding:6px 14px;font-size:12px;font-weight:600;border-bottom:1px solid #FFCC80"></div>
+      <div id="dep-conflict-warn" style="display:none;background:var(--warning-light);color:var(--warning);padding:6px 14px;font-size:12px;font-weight:600;border-bottom:1px solid #FFCC80"></div>
 
       <!-- ═══ PRIORITÉ 3 : statistiques rapides ═══ -->
       <div id="dep-rte-stats" style="display:none">
@@ -550,11 +658,11 @@ button:disabled{opacity:.45;cursor:not-allowed}
         <div id="dep-bar">
           <input type="date" id="dep-date" style="font-size:14px;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit" onchange="onDepDateChange()"/>
           <input type="time" id="dep-time" value="08:00" title="Heure de départ du dépôt" style="font-size:14px;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit" onchange="techCfg.startTime=this.value;saveCfg();techETAs={};_routeOrderedPts=[];techRouteLegDurations=[];renderDepart();if(mapObj&&!building)calcMap();else _calcETAsHeadless()"/>
-          <button class="btn btn-blue btn-sm" onclick="calcMap()">🗺️ Itinéraire</button>
-          <button id="dep-traffic-btn" class="btn btn-gray btn-sm" onclick="toggleDepTrafficLayer()" title="Afficher/masquer le trafic temps réel">🚦</button>
-          <button id="btn-map-toggle" class="btn btn-gray btn-sm" style="display:none" onclick="toggleDepMap()">📋 Liste</button>
-          <button id="btn-reoptimize" class="btn btn-green btn-sm" style="display:none" onclick="reoptimizeFromDepot()" title="Recalculer depuis votre position GPS (ou dépôt si GPS indisponible)">📍 Recalculer</button>
-          <button id="btn-notion-pull" class="btn btn-sm" style="background:#F3E5F5;color:#6A1B9A;border:1.5px solid #CE93D8" onclick="showNotionPanelTech()">🔄 Notion</button>
+          <button class="btn btn-blue btn-sm" style="min-height:44px" onclick="calcMap()"><svg class="ico"><use href="#ico-nav"/></svg> Itinéraire</button>
+          <button id="dep-traffic-btn" class="btn btn-gray btn-sm" style="min-height:44px" onclick="toggleDepTrafficLayer()" title="Afficher/masquer le trafic temps réel">🚦</button>
+          <button id="btn-map-toggle" class="btn btn-gray btn-sm" style="display:none;min-height:44px" onclick="toggleDepMap()">📋 Liste</button>
+          <button id="btn-reoptimize" class="btn btn-green btn-sm" style="display:none;min-height:44px" onclick="reoptimizeFromDepot()" title="Recalculer depuis votre position GPS (ou dépôt si GPS indisponible)">📍 Recalculer</button>
+          <button id="btn-notion-pull" class="btn btn-sm" style="background:#F3E5F5;color:#6A1B9A;border:1.5px solid #CE93D8;min-height:44px" onclick="showNotionPanelTech()">🔄 Notion</button>
           <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:var(--gray)">
             <input type="checkbox" id="tech-opt-return" checked style="width:auto" onchange="techRoundTrip=this.checked;calcMap()"/> Retour dépôt
           </label>
@@ -585,7 +693,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
           <div id="dep-focus-tag" style="display:none;position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:var(--blue);color:#fff;padding:7px 18px;border-radius:20px;font-size:13px;font-weight:700;box-shadow:0 2px 12px rgba(0,0,0,.3);z-index:400;pointer-events:none;max-width:85%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
           <!-- Message initial -->
           <div id="dep-init-msg" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#f0f4f8;flex-direction:column;gap:12px">
-            <div style="font-size:40px">🗺️</div>
+            <div style="color:var(--text-tertiary)"><svg class="ico" style="width:40px;height:40px"><use href="#ico-map"/></svg></div>
             <div style="font-size:15px;color:var(--gray);text-align:center;padding:0 20px">Choisissez une date et appuyez<br>sur <strong>Calculer itinéraire</strong></div>
           </div>
         </div>
@@ -610,35 +718,35 @@ button:disabled{opacity:.45;cursor:not-allowed}
     <!-- ═══ PLANNING SEMAINE ═══ -->
     <div id="v-planning" class="view">
       <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#fff;border-bottom:1px solid var(--border);flex-shrink:0">
-        <button class="btn btn-gray btn-sm" style="padding:7px 12px" onclick="shiftPlanWeek(-7)">◀</button>
-        <input type="date" id="plan-date-pick" style="flex:1;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit" onchange="planSel=this.value;renderPlanning()"/>
-        <button class="btn btn-gray btn-sm" style="padding:7px 12px" onclick="shiftPlanWeek(7)">▶</button>
-        <button class="btn btn-blue btn-sm" onclick="planSel=TODAY();renderPlanning()">Auj.</button>
-        <button id="btn-notion-plan" class="btn btn-sm" style="background:#F3E5F5;color:#6A1B9A;border:1.5px solid #CE93D8;padding:7px 12px" onclick="showNotionPanelTech()">🔄</button>
+        <button class="btn btn-gray btn-sm" style="padding:7px 12px;min-height:44px" onclick="shiftPlanWeek(-7)">◀</button>
+        <input type="date" id="plan-date-pick" style="flex:1;min-width:0;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit" onchange="planSel=this.value;renderPlanning()"/>
+        <button class="btn btn-gray btn-sm" style="padding:7px 12px;min-height:44px" onclick="shiftPlanWeek(7)">▶</button>
+        <button class="btn btn-blue btn-sm" style="min-height:44px" onclick="planSel=TODAY();renderPlanning()">Auj.</button>
+        <button id="btn-notion-plan" class="btn btn-sm" style="background:var(--purple-light);color:var(--purple);border:1.5px solid #CE93D8;padding:7px 12px;min-height:44px" onclick="showNotionPanelTech()"><svg class="ico"><use href="#ico-refresh"/></svg></button>
       </div>
       <div class="wstrip" id="wstrip"></div>
-      <div style="padding:10px 14px 4px;font-size:13px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px" id="plan-title"></div>
+      <div class="ux-label" style="padding:10px 14px 4px" id="plan-title"></div>
       <div style="flex:1;overflow-y:auto" id="plan-list"></div>
     </div>
 
     <!-- ═══ MATÉRIEL ═══ -->
     <div id="v-materiel" class="view">
-      <div style="padding:12px 14px 4px;font-size:13px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px" id="mat-title"></div>
+      <div class="ux-label" style="padding:12px 14px 4px" id="mat-title"></div>
       <div style="padding:6px 12px 2px" id="mat-prep-btn"></div>
-      <div id="mat-alert" style="display:none;margin:6px 12px;padding:10px 14px;background:#FFF3E0;border-left:4px solid var(--orange);border-radius:10px;font-size:14px;color:var(--orange);font-weight:600"></div>
+      <div id="mat-alert" style="display:none;margin:6px 12px;padding:10px 14px;background:var(--warning-light);border-left:4px solid var(--orange);border-radius:10px;font-size:14px;color:var(--orange);font-weight:600"></div>
 
       <!-- ═══ SORTIE DE STOCK DAE (scan série) ═══ -->
       <div style="margin:10px 12px;padding:12px 14px;background:#fff;border:2px solid var(--blue);border-radius:12px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <span style="font-size:13px;font-weight:700;color:var(--blue)">📦 Matériel sorti du stock</span>
-          <button onclick="openDaeScan()" style="padding:8px 14px;background:var(--blue);color:#fff;border:none;border-radius:20px;font-size:13px;font-weight:700;cursor:pointer">📷 Scanner un DAE</button>
+          <span style="font-size:13px;font-weight:700;color:var(--blue);display:flex;align-items:center;gap:6px"><svg class="ico"><use href="#ico-box"/></svg> Matériel sorti du stock</span>
+          <button onclick="openDaeScan()" style="padding:8px 14px;background:var(--blue);color:#fff;border:none;border-radius:20px;font-size:13px;font-weight:700;cursor:pointer"><svg class="ico"><use href="#ico-camera"/></svg> Scanner un DAE</button>
         </div>
         <div id="dae-stock-list" style="font-size:12px;color:var(--gray)">Aucun matériel scanné</div>
       </div>
 
       <!-- ═══ Accès Stock consommables (ex-onglet séparé) ═══ -->
       <button onclick="goTab('stock')" style="display:flex;align-items:center;gap:12px;width:calc(100% - 24px);margin:0 12px 10px;padding:14px;background:var(--purple-light);border:1.5px solid var(--purple);border-radius:12px;cursor:pointer;font-family:inherit;text-align:left">
-        <span style="font-size:22px">🏷️</span>
+        <span style="color:var(--purple)"><svg class="ico" style="width:1.4em;height:1.4em"><use href="#ico-tag"/></svg></span>
         <span style="flex:1">
           <span style="display:block;font-size:13px;font-weight:700;color:var(--purple)">Stock consommables</span>
           <span style="display:block;font-size:11.5px;color:var(--text-secondary)">Pad-Pak, électrodes, batteries — scanner, entrée, sortie</span>
@@ -657,15 +765,15 @@ button:disabled{opacity:.45;cursor:not-allowed}
     <!-- ═══ STOCK CONSOMMABLES (Pad-Pak, électrodes, batteries...) ═══ -->
     <div id="v-stock" class="view">
       <div style="display:flex;align-items:center;gap:8px;padding:10px 10px 4px">
-        <button onclick="goTab('materiel')" title="Retour à Matériel" style="border:none;background:var(--surface-secondary);border-radius:50%;width:34px;height:34px;font-size:18px;cursor:pointer;flex-shrink:0">←</button>
-        <div style="font-size:13px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px">📦 Stock consommables</div>
+        <button onclick="goTab('materiel')" title="Retour à Matériel" style="border:none;background:var(--surface-secondary);border-radius:50%;width:44px;height:44px;font-size:18px;cursor:pointer;flex-shrink:0">←</button>
+        <div class="ux-label"><svg class="ico"><use href="#ico-tag"/></svg> Stock consommables</div>
       </div>
       <div id="stk-alert-banner"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px 14px">
-        <button onclick="stkOpenScan('lookup')" style="grid-column:1/3;padding:18px;background:var(--blue);color:#fff;border:none;border-radius:14px;font-size:17px;font-weight:800;cursor:pointer;box-shadow:0 3px 10px rgba(21,101,192,.3)">📷 SCANNER</button>
-        <button onclick="stkOpenManualPicker('entree')" style="padding:16px 10px;background:#E8F5E9;color:#1B5E20;border:2px solid #1B5E20;border-radius:14px;font-size:14px;font-weight:800;cursor:pointer">📥 ENTRÉE</button>
-        <button onclick="stkOpenManualPicker('sortie')" style="padding:16px 10px;background:#FFF3E0;color:#E65100;border:2px solid #E65100;border-radius:14px;font-size:14px;font-weight:800;cursor:pointer">📤 SORTIE</button>
-        <button onclick="stkStartContinuous()" style="padding:16px 10px;background:#F3E5F5;color:#6A1B9A;border:2px solid #6A1B9A;border-radius:14px;font-size:14px;font-weight:800;cursor:pointer">🔄 SCAN CONTINU</button>
+        <button onclick="stkOpenScan('lookup')" style="grid-column:1/3;padding:18px;background:var(--blue);color:#fff;border:none;border-radius:14px;font-size:17px;font-weight:800;cursor:pointer;box-shadow:0 3px 10px rgba(21,101,192,.3)"><svg class="ico" style="width:1.2em;height:1.2em"><use href="#ico-camera"/></svg> SCANNER</button>
+        <button class="btn-stock-in" onclick="stkOpenManualPicker('entree')" style="padding:16px 10px;font-size:14px"><svg class="ico"><use href="#ico-in"/></svg> ENTRÉE</button>
+        <button class="btn-stock-out" onclick="stkOpenManualPicker('sortie')" style="padding:16px 10px;font-size:14px"><svg class="ico"><use href="#ico-out"/></svg> SORTIE</button>
+        <button onclick="stkStartContinuous()" style="padding:16px 10px;background:var(--purple-light);color:var(--purple);border:2px solid var(--purple);border-radius:14px;font-size:14px;font-weight:800;cursor:pointer"><svg class="ico"><use href="#ico-refresh"/></svg> SCAN CONTINU</button>
         <button onclick="stkOpenHistorique()" style="padding:16px 10px;background:#ECEFF1;color:#37474F;border:2px solid #37474F;border-radius:14px;font-size:14px;font-weight:800;cursor:pointer">📋 HISTORIQUE</button>
       </div>
       <div id="stk-content" style="padding:4px 14px 20px"></div>
@@ -677,7 +785,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
       <div style="background:#fff;margin:16px auto 32px;max-width:480px;border-radius:16px;overflow:hidden;position:relative">
         <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #F0F0F0;background:#FAFAFA">
           <span style="font-size:13px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px">📋 Fiche matériel</span>
-          <button onclick="closeMatFiche()" style="border:none;background:#EBEBEB;border-radius:50%;width:30px;height:30px;font-size:18px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center">×</button>
+          <button onclick="closeMatFiche()" style="border:none;background:#EBEBEB;border-radius:50%;width:44px;height:44px;font-size:18px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center">×</button>
         </div>
         <div id="mat-fiche-content" style="padding:16px"></div>
       </div>
@@ -685,62 +793,71 @@ button:disabled{opacity:.45;cursor:not-allowed}
 
     <!-- ═══ SCAN DAE (overlay caméra) ═══ -->
     <div id="dae-scan-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1000;flex-direction:column">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px">
-        <span style="color:#fff;font-size:14px;font-weight:700">📷 Scanner l'étiquette du DAE</span>
+      <div class="scan-header">
+        <span class="scan-title"><svg class="ico"><use href="#ico-camera"/></svg> Scanner l'étiquette du DAE</span>
         <div style="display:flex;align-items:center;gap:8px">
-          <button id="dae-torch-btn" onclick="toggleDaeTorch()" style="display:none;border:none;background:rgba(255,255,255,.15);color:#fff;border-radius:50%;width:32px;height:32px;font-size:16px;cursor:pointer">🔦</button>
-          <button onclick="closeDaeScan()" style="border:none;background:rgba(255,255,255,.15);color:#fff;border-radius:50%;width:32px;height:32px;font-size:18px;cursor:pointer">×</button>
+          <button id="dae-torch-btn" class="scan-icon-btn" onclick="toggleDaeTorch()" style="display:none"><svg class="ico"><use href="#ico-flash"/></svg></button>
+          <button class="scan-icon-btn" onclick="closeDaeScan()"><svg class="ico"><use href="#ico-x"/></svg></button>
         </div>
       </div>
-      <div id="dae-scan-reader" style="width:100%;max-width:480px;margin:0 auto"></div>
-      <p style="color:#aaa;font-size:11px;text-align:center;margin:8px 16px 0">Recule à ~20-25 cm (distance où le téléphone arrive à faire le point), et utilise le zoom ci-dessous pour agrandir l'étiquette si besoin</p>
+      <div class="scan-viewport">
+        <div id="dae-scan-reader" style="width:100%"></div>
+        <div class="scan-frame" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+      </div>
+      <p class="scan-hint">Placez le code dans la zone. Recule à ~20-25 cm et zoome si besoin pour agrandir l'étiquette.</p>
       <div id="dae-zoom-wrap" style="display:none;padding:6px 24px;align-items:center;gap:8px">
-        <span style="color:#fff;font-size:14px">🔍</span>
+        <span style="color:#fff"><svg class="ico"><use href="#ico-search"/></svg></span>
         <input type="range" id="dae-zoom-slider" style="flex:1" oninput="onDaeZoomChange(this.value)"/>
       </div>
-      <p id="dae-scan-raw-hint" style="display:none;color:#FFD54F;font-size:11px;text-align:center;margin:6px 16px 0;word-break:break-all"></p>
-      <div id="dae-scan-manual" style="padding:16px;text-align:center">
-        <p style="color:#ccc;font-size:12px;margin-bottom:8px">Vérifie/corrige le numéro de série avant de valider :</p>
-        <input id="dae-scan-input" placeholder="Saisir le numéro de série" style="width:100%;max-width:320px;padding:10px 12px;border-radius:8px;border:none;font-size:14px"/>
-        <div style="margin-top:8px;display:flex;gap:8px;justify-content:center">
-          <button onclick="daeScanRescan()" style="padding:10px 16px;background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">🔄 Rescanner</button>
-          <button onclick="onDaeScanSuccess(document.getElementById('dae-scan-input').value.trim())" style="padding:10px 20px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">✅ Valider</button>
+      <p id="dae-scan-raw-hint" style="display:none"></p>
+      <div id="dae-scan-manual" class="scan-manual">
+        <p>Vérifie/corrige le numéro de série avant de valider :</p>
+        <input id="dae-scan-input" placeholder="Saisir le numéro de série"/>
+        <div class="scan-actions">
+          <button class="scan-btn scan-btn-ghost" onclick="daeScanRescan()"><svg class="ico"><use href="#ico-refresh"/></svg> Rescanner</button>
+          <button class="scan-btn scan-btn-primary" onclick="onDaeScanSuccess(document.getElementById('dae-scan-input').value.trim())"><svg class="ico"><use href="#ico-check"/></svg> Valider</button>
         </div>
       </div>
     </div>
 
     <!-- ═══ SCAN STOCK (overlay caméra) — séparé du scan DAE ═══ -->
     <div id="stk-scan-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1000;flex-direction:column">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px">
-        <span style="color:#fff;font-size:14px;font-weight:700" id="stk-scan-title">📷 Scanner un article</span>
+      <div class="scan-header">
+        <span class="scan-title" id="stk-scan-title">📷 Scanner un article</span>
         <div style="display:flex;align-items:center;gap:8px">
-          <button id="stk-torch-btn" onclick="stkToggleTorch()" style="display:none;border:none;background:rgba(255,255,255,.15);color:#fff;border-radius:50%;width:32px;height:32px;font-size:16px;cursor:pointer">🔦</button>
-          <button onclick="stkCloseScan()" style="border:none;background:rgba(255,255,255,.15);color:#fff;border-radius:50%;width:32px;height:32px;font-size:18px;cursor:pointer">×</button>
+          <button id="stk-torch-btn" class="scan-icon-btn" onclick="stkToggleTorch()" style="display:none"><svg class="ico"><use href="#ico-flash"/></svg></button>
+          <button class="scan-icon-btn" onclick="stkCloseScan()"><svg class="ico"><use href="#ico-x"/></svg></button>
         </div>
       </div>
-      <div id="stk-scan-reader" style="width:100%;max-width:480px;margin:0 auto"></div>
-      <p style="color:#aaa;font-size:11px;text-align:center;margin:8px 16px 0">Vise le code-barres de l'article (EAN-13, EAN-8, UPC ou QR)</p>
+      <div class="scan-viewport">
+        <div id="stk-scan-reader" style="width:100%"></div>
+        <div class="scan-frame" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+      </div>
+      <p class="scan-hint">Vise le code-barres de l'article (EAN-13, EAN-8, UPC ou QR)</p>
       <div id="stk-zoom-wrap" style="display:none;padding:6px 24px;align-items:center;gap:8px">
-        <span style="color:#fff;font-size:14px">🔍</span>
+        <span style="color:#fff"><svg class="ico"><use href="#ico-search"/></svg></span>
         <input type="range" id="stk-zoom-slider" style="flex:1" oninput="stkOnZoomChange(this.value)"/>
       </div>
 
       <!-- Récap live du scan continu -->
       <div id="stk-continuous-panel" style="display:none;padding:10px 16px;background:rgba(255,255,255,.06);margin:8px 16px;border-radius:10px">
+        <div class="scan-continuous-badge"><svg class="ico"><use href="#ico-refresh"/></svg> Scan continu</div>
         <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:8px">
           <span style="color:#ccc;font-size:12px">Mode :</span>
-          <button id="stk-cont-type-sortie" onclick="stkSetContinuousType('sortie')" style="padding:6px 14px;border-radius:20px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:#E65100;color:#fff">📤 Sortie</button>
-          <button id="stk-cont-type-entree" onclick="stkSetContinuousType('entree')" style="padding:6px 14px;border-radius:20px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:rgba(255,255,255,.15);color:#fff">📥 Entrée</button>
+          <button id="stk-cont-type-sortie" onclick="stkSetContinuousType('sortie')" style="min-height:44px;padding:6px 14px;border-radius:20px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:var(--warning);color:#fff"><svg class="ico"><use href="#ico-out"/></svg> Sortie</button>
+          <button id="stk-cont-type-entree" onclick="stkSetContinuousType('entree')" style="min-height:44px;padding:6px 14px;border-radius:20px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:rgba(255,255,255,.15);color:#fff"><svg class="ico"><use href="#ico-in"/></svg> Entrée</button>
         </div>
         <div id="stk-continuous-list" style="max-height:140px;overflow-y:auto;font-size:13px;color:#fff"></div>
       </div>
       <div id="stk-continuous-actions" style="display:none;padding:0 16px 12px;text-align:center">
-        <button onclick="stkValidateContinuous()" style="width:100%;padding:14px;background:#1B5E20;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer">✅ VALIDER LES MOUVEMENTS</button>
+        <button class="scan-btn scan-btn-primary" onclick="stkValidateContinuous()" style="width:100%;background:var(--success)"><svg class="ico"><use href="#ico-check"/></svg> VALIDER LES MOUVEMENTS</button>
       </div>
 
-      <div id="stk-scan-manual-wrap" style="padding:16px;text-align:center">
-        <input id="stk-scan-manual-input" placeholder="Ou saisir le code-barres manuellement" style="width:100%;max-width:320px;padding:10px 12px;border-radius:8px;border:none;font-size:14px"/>
-        <button onclick="stkHandleScannedCode(document.getElementById('stk-scan-manual-input').value.trim())" style="margin-top:8px;padding:10px 20px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">Valider</button>
+      <div id="stk-scan-manual-wrap" class="scan-manual">
+        <input id="stk-scan-manual-input" placeholder="Ou saisir le code-barres manuellement"/>
+        <div class="scan-actions">
+          <button class="scan-btn scan-btn-primary" onclick="stkHandleScannedCode(document.getElementById('stk-scan-manual-input').value.trim())">Valider</button>
+        </div>
       </div>
     </div>
 
@@ -749,10 +866,10 @@ button:disabled{opacity:.45;cursor:not-allowed}
       <div style="padding:14px 14px 0">
         <div class="card" style="margin:0 0 12px;padding:16px">
           <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
-            <div id="prof-av" style="width:56px;height:56px;border-radius:50%;background:var(--blueLt);color:var(--blue);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800"></div>
-            <div>
-              <div id="prof-name" style="font-size:18px;font-weight:800"></div>
-              <div id="prof-veh" style="font-size:12px;color:var(--gray)"></div>
+            <div id="prof-av" style="width:56px;height:56px;border-radius:50%;background:var(--blueLt);color:var(--blue);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;flex-shrink:0"></div>
+            <div style="min-width:0;flex:1">
+              <div id="prof-name" style="font-size:18px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+              <div id="prof-veh" style="font-size:12px;color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
               <div id="prof-sync-status" style="margin-top:3px"></div>
             </div>
           </div>
@@ -765,7 +882,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 
         <!-- Lieux de départ / arrivée -->
         <div class="card" style="margin:0 0 12px">
-          <div style="font-size:14px;font-weight:700;margin-bottom:12px">🏠 Lieux de départ / arrivée</div>
+          <div style="font-size:14px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px"><svg class="ico"><use href="#ico-home"/></svg> Lieux de départ / arrivée</div>
           <div style="margin-bottom:8px">
             <div style="font-size:12px;color:var(--gray);margin-bottom:4px">Adresse de départ</div>
             <input class="inp" id="cfg-depot" placeholder="Ex: 7 rue des entrepreneurs, 78540 Vernouillet" oninput="saveTechAddresses()"/>
@@ -777,11 +894,11 @@ button:disabled{opacity:.45;cursor:not-allowed}
         </div>
 
         <!-- ═══ ADMINISTRATION / PARAMÈTRES ═══ -->
-        <div class="ux-label" style="margin:18px 4px 8px">⚙️ Administration</div>
+        <div class="ux-label" style="margin:18px 4px 8px;display:flex;align-items:center;gap:6px"><svg class="ico"><use href="#ico-settings"/></svg> Administration</div>
 
         <!-- Config Kizeo -->
         <div class="card" style="margin:0 0 12px">
-          <div style="font-size:14px;font-weight:700;margin-bottom:12px">🔗 Kizeo Forms</div>
+          <div style="font-size:14px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px"><svg class="ico"><use href="#ico-link"/></svg> Kizeo Forms</div>
           <div style="margin-bottom:8px">
             <div style="font-size:12px;color:var(--gray);margin-bottom:4px">Token API</div>
             <input class="inp" type="password" id="cfg-token" placeholder="Token Kizeo..." oninput="techCfg.token=this.value;saveCfg()"/>
@@ -794,7 +911,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
             <div style="font-size:12px;color:var(--gray);margin-bottom:4px">Mon ID utilisateur Kizeo</div>
             <input class="inp" id="cfg-uid" placeholder="Ex: 42" oninput="techCfg.userId=this.value;saveCfg()"/>
           </div>
-          <button class="btn btn-blue btn-sm" style="width:100%" onclick="syncKizeo()">🔄 Synchroniser les fiches</button>
+          <button class="btn btn-blue btn-md" style="width:100%" onclick="syncKizeo()">🔄 Synchroniser les fiches</button>
           <div id="sync-result" style="margin-top:8px;font-size:12px;color:var(--gray)"></div>
         </div>
 
@@ -804,29 +921,29 @@ button:disabled{opacity:.45;cursor:not-allowed}
             <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="14" height="14" rx="2" fill="#fff" stroke="#000"/><path d="M3 4.5C3 4.22 3.22 4 3.5 4h4.25l4.25 5.5V11.5c0 .28-.22.5-.5.5H3.5A.5.5 0 0 1 3 11.5v-7z" fill="#000"/></svg>
             <span style="font-size:14px;font-weight:700">Notion</span>
           </div>
-          <div id="notion-profil-status" style="padding:8px 12px;background:#F5F5F5;border-radius:8px;font-size:12px;color:#616161;margin-bottom:12px">Prêt à synchroniser</div>
-          <button class="btn btn-sm" style="width:100%;background:#000;color:#fff;border-radius:10px;padding:10px;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px" onclick="showNotionPanelTech()">
-            🔗 Synchroniser avec Notion
+          <div id="notion-profil-status" style="padding:8px 12px;background:var(--background);border-radius:8px;font-size:12px;color:var(--text-secondary);margin-bottom:12px">Prêt à synchroniser</div>
+          <button class="btn btn-sm" style="width:100%;min-height:44px;background:#000;color:#fff;border-radius:10px;padding:10px;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px" onclick="showNotionPanelTech()">
+            <svg class="ico"><use href="#ico-link"/></svg> Synchroniser avec Notion
           </button>
         </div>
 
         <!-- Export -->
         <div class="card" style="margin:0 0 12px">
-          <div style="font-size:14px;font-weight:700;margin-bottom:10px">📤 Exporter</div>
-          <button class="btn btn-gray btn-sm" style="width:100%" onclick="exportJournee()">Exporter ma journée (.txt)</button>
+          <div style="font-size:14px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:8px"><svg class="ico"><use href="#ico-out"/></svg> Exporter</div>
+          <button class="btn btn-gray btn-md" style="width:100%" onclick="exportJournee()">Exporter ma journée (.txt)</button>
         </div>
 
         <!-- Cache adresses -->
         <div class="card" style="margin:0 0 12px">
-          <div style="font-size:14px;font-weight:700;margin-bottom:10px">📍 Cache d'adresses</div>
+          <div style="font-size:14px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:8px"><svg class="ico"><use href="#ico-pin"/></svg> Cache d'adresses</div>
           <div style="font-size:12px;color:var(--gray);margin-bottom:10px">Si un trajet calculé semble incorrect (adresse mal localisée), vide ce cache puis recalcule l'itinéraire.</div>
-          <button class="btn btn-gray btn-sm" style="width:100%" id="btn-clear-gcache" onclick="clearTechGeoCache()">🗑️ Effacer le cache d'adresses</button>
+          <button class="btn btn-gray btn-md" style="width:100%" id="btn-clear-gcache" onclick="clearTechGeoCache()"><svg class="ico"><use href="#ico-trash"/></svg> Effacer le cache d'adresses</button>
         </div>
 
         <!-- Compte -->
         <div class="ux-label" style="margin:18px 4px 8px">Compte</div>
         <div class="card" style="margin:0 0 20px">
-          <button onclick="logout()" style="width:100%;padding:12px;background:#FFEBEE;color:#C62828;border:1px solid #FFCDD2;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer">🔒 Se déconnecter</button>
+          <button class="btn btn-danger btn-md" onclick="logout()" style="width:100%;font-size:14px"><svg class="ico"><use href="#ico-lock"/></svg> Se déconnecter</button>
         </div>
       </div>
     </div>
@@ -868,8 +985,8 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <div id="contact-modal">
   <div id="contact-sheet">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <div style="font-size:16px;font-weight:800">✏️ Modifier le contact</div>
-      <button onclick="closeContactModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--gray)">✕</button>
+      <div style="font-size:16px;font-weight:800;display:flex;align-items:center;gap:8px"><svg class="ico"><use href="#ico-edit"/></svg> Modifier le contact</div>
+      <button onclick="closeContactModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--gray);min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center;margin:-10px -10px -10px 0">✕</button>
     </div>
     <div id="contact-modal-client" style="font-size:13px;color:var(--gray);margin-bottom:14px"></div>
     <div style="font-size:12px;color:var(--gray);margin-bottom:4px">Nom du contact</div>
@@ -1848,11 +1965,14 @@ function _schedCalcMap(delay=1200){
 // ════════════════════════════════════════════
 // Couleurs selon niveau d'urgence Kizeo
 function urgCol(level){
-  if(level==="expired")  return {col:"#C62828",bg:"#FFEBEE"}
-  if(level==="critical") return {col:"#E65100",bg:"#FFF3E0"}
+  // "urgent" reste une teinte propre (#F57F17/#FFFDE7) : palier réel entre
+  // "critical" (warning) et "ok", pas un doublon d'un token existant — voir
+  // rapport Pass 4.
+  if(level==="expired")  return {col:"var(--danger)",bg:"var(--danger-light)"}
+  if(level==="critical") return {col:"var(--warning)",bg:"var(--warning-light)"}
   if(level==="urgent")   return {col:"#F57F17",bg:"#FFFDE7"}
-  if(level==="soon")     return {col:"#1565C0",bg:"#E3F2FD"}
-  return {col:"#E65100",bg:"#FFF3E0"}
+  if(level==="soon")     return {col:"var(--primary)",bg:"var(--primary-light)"}
+  return {col:"var(--warning)",bg:"var(--warning-light)"}
 }
 
 function getEquip(iv){
@@ -1864,16 +1984,16 @@ function getEquip(iv){
   // DAE
   if(inst){
     const label=dea?`DAE neuf · ${dea}`:"DAE neuf (modèle à confirmer)"
-    items.push({icon:"🫀",text:label,col:"#1B5E20",bg:"#E8F5E9"})
+    items.push({icon:"🫀",text:label,col:"var(--success)",bg:"var(--success-light)"})
   } else if(dea){
     // Maintenance : afficher le modèle en place + N° série si dispo
     const serial=iv.nSerie?` #${iv.nSerie}`:""
-    items.push({icon:"🫀",text:`DAE · ${dea}${serial}`,col:"#1B5E20",bg:"#E8F5E9"})
+    items.push({icon:"🫀",text:`DAE · ${dea}${serial}`,col:"var(--success)",bg:"var(--success-light)"})
   }
 
   // Armoire / support
-  if(arm) items.push({icon:"🗄️",text:arm,col:"#1565C0",bg:"#E3F2FD"})
-  else if(inst) items.push({icon:"🗄️",text:"Support à confirmer",col:"#1565C0",bg:"#E3F2FD"})
+  if(arm) items.push({icon:"🗄️",text:arm,col:"var(--primary)",bg:"var(--primary-light)"})
+  else if(inst) items.push({icon:"🗄️",text:"Support à confirmer",col:"var(--primary)",bg:"var(--primary-light)"})
 
   // Pad Pak adulte — explicite OU maintenance+ (toujours avec pad pak)
   if(iv.padPak||iv.type==='maintenance_complex'){
@@ -1887,14 +2007,14 @@ function getEquip(iv){
   if(iv.padPakDatePed){
     const today=new Date();const exp=new Date(iv.padPakDatePed+"T12:00:00")
     const daysLeft=Math.round((exp-today)/86400000)
-    if(daysLeft<180) items.push({icon:"⚡",text:`Pad Pak péd. exp. ${fd(iv.padPakDatePed)}`,col:daysLeft<0?"#C62828":"#E65100",bg:daysLeft<0?"#FFEBEE":"#FFF3E0"})
+    if(daysLeft<180) items.push({icon:"⚡",text:`Pad Pak péd. exp. ${fd(iv.padPakDatePed)}`,col:daysLeft<0?"var(--danger)":"var(--warning)",bg:daysLeft<0?"var(--danger-light)":"var(--warning-light)"})
   }
 
   // Électrodes
   if(iv.electrodeDate){
     const dL=Math.round((new Date(iv.electrodeDate+"T12:00:00")-new Date())/86400000)
     const lvl=iv.urgenceElectrodes||''
-    const urg=lvl==="expired"||dL<0?{col:"#C62828",bg:"#FFEBEE"}:lvl==="critical"||dL<30?{col:"#E65100",bg:"#FFF3E0"}:lvl==="urgent"||dL<90?{col:"#F57F17",bg:"#FFFDE7"}:{col:"#555",bg:"#F5F5F5"}
+    const urg=lvl==="expired"||dL<0?{col:"var(--danger)",bg:"var(--danger-light)"}:lvl==="critical"||dL<30?{col:"var(--warning)",bg:"var(--warning-light)"}:lvl==="urgent"||dL<90?{col:"#F57F17",bg:"#FFFDE7"}:{col:"#555",bg:"#F5F5F5"}
     items.push({icon:"🔌",text:`Électrodes${(lvl==="expired"||dL<0)?" PÉRIMÉES":` (exp. ${fd(iv.electrodeDate)})`}`,...urg})
   } else if(iv.urgenceElectrodes&&iv.urgenceElectrodes!=="ok"&&iv.urgenceElectrodes!=="unknown"){
     items.push({icon:"🔌",text:"Électrodes",...urgCol(iv.urgenceElectrodes)})
@@ -1903,26 +2023,27 @@ function getEquip(iv){
   // Prochaine expiration globale (Kizeo)
   if(iv.prochaineExpiration){
     const dL=Math.round((new Date(iv.prochaineExpiration+"T12:00:00")-new Date())/86400000)
-    const urg=dL<0?{col:"#C62828",bg:"#FFEBEE"}:dL<30?{col:"#E65100",bg:"#FFF3E0"}:dL<90?{col:"#F57F17",bg:"#FFFDE7"}:{col:"#1565C0",bg:"#E3F2FD"}
+    const urg=dL<0?{col:"var(--danger)",bg:"var(--danger-light)"}:dL<30?{col:"var(--warning)",bg:"var(--warning-light)"}:dL<90?{col:"#F57F17",bg:"#FFFDE7"}:{col:"var(--primary)",bg:"var(--primary-light)"}
     items.push({icon:"⏰",text:`Prochaine exp. ${fd(iv.prochaineExpiration)}`,...urg})
   }
 
   // Batterie
   if(iv.batDate){
     const dL=Math.round((new Date(iv.batDate+"T12:00:00")-new Date())/86400000)
-    const urg=dL<0?{col:"#C62828",bg:"#FFEBEE"}:dL<90?{col:"#E65100",bg:"#FFF3E0"}:{col:"#1B5E20",bg:"#F1F8E9"}
+    const urg=dL<0?{col:"var(--danger)",bg:"var(--danger-light)"}:dL<90?{col:"var(--warning)",bg:"var(--warning-light)"}:{col:"var(--success)",bg:"var(--success-light)"}
     items.push({icon:"🔋",text:`Batterie (exp. ${fd(iv.batDate)})`,...urg})
   } else if(iv.batChange){
-    items.push({icon:"🔋",text:"Batterie",col:"#1B5E20",bg:"#F1F8E9"})
+    items.push({icon:"🔋",text:"Batterie",col:"var(--success)",bg:"var(--success-light)"})
   }
 
   // Installation : mentionner batterie + pad pak inclus SEULEMENT si pas déjà signalés
-  if(inst&&!iv.padPak) items.push({icon:"⚡",text:"Pad Pak neuf (fourni)",col:"#2E7D32",bg:"#E8F5E9"})
-  if(inst&&!iv.batChange) items.push({icon:"🔋",text:"Batterie neuve (fournie)",col:"#2E7D32",bg:"#E8F5E9"})
+  if(inst&&!iv.padPak) items.push({icon:"⚡",text:"Pad Pak neuf (fourni)",col:"var(--success)",bg:"var(--success-light)"})
+  if(inst&&!iv.batChange) items.push({icon:"🔋",text:"Batterie neuve (fournie)",col:"var(--success)",bg:"var(--success-light)"})
 
-  // Extérieur / Formation
+  // Extérieur / Formation — "Site extérieur" garde une teinte propre
+  // (#0277BD/#E1F5FE), catégorie distincte d'un statut ok/warn/err.
   if(iv.exter) items.push({icon:"🌧️",text:"Site extérieur",col:"#0277BD",bg:"#E1F5FE"})
-  if(iv.form)  items.push({icon:"📚",text:"Formation",col:"#6A1B9A",bg:"#F3E5F5"})
+  if(iv.form)  items.push({icon:"📚",text:"Formation",col:"var(--purple)",bg:"var(--purple-light)"})
   return items
 }
 function equipHTML(iv){
@@ -1930,7 +2051,7 @@ function equipHTML(iv){
   if(!eq.length) return ""
   const isInstall=iv.type==="installation"
   const chips=eq.map(e=>`<span style="background:${e.bg};color:${e.col};padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap">${e.icon} ${e.text}</span>`).join("")
-  if(isInstall) return `<div style="background:#E8F5E9;border-left:3px solid #2E7D32;border-radius:0 6px 6px 0;padding:5px 8px;margin:0 6px 6px;display:flex;gap:5px;flex-wrap:wrap;align-items:center"><span style="font-size:10px;font-weight:700;color:#1B5E20;text-transform:uppercase;letter-spacing:.5px;flex-shrink:0">📦 À prendre</span>${chips}</div>`
+  if(isInstall) return `<div style="background:var(--success-light);border-left:3px solid var(--success);border-radius:0 6px 6px 0;padding:5px 8px;margin:0 6px 6px;display:flex;gap:5px;flex-wrap:wrap;align-items:center"><span style="font-size:10px;font-weight:700;color:var(--success);text-transform:uppercase;letter-spacing:.5px;flex-shrink:0">📦 À prendre</span>${chips}</div>`
   return `<div style="display:flex;gap:4px;flex-wrap:wrap;padding:0 10px 6px">${chips}</div>`
 }
 
@@ -1991,9 +2112,9 @@ function renderDepart(){
     const pending=dayIvs.filter(i=>!validated[i.id]&&!failed[i.id])
     const next3=pending.slice(0,3).filter(i=>techETAs[i.id])
     if(next3.length||window._tourEndETA){
-      const chips=next3.map(i=>`<span style="background:#E8F5E9;color:#2E7D32;border-radius:20px;padding:3px 10px;font-weight:700;font-size:13px">🕐 ${techETAs[i.id].eta}</span>`).join("")
-      const endChip=window._tourEndETA&&pending.length?`<span style="background:#FFF3E0;color:#E65100;border-radius:20px;padding:3px 10px;font-weight:700;font-size:13px">🏁 Fin ~${window._tourEndETA}</span>`:""
-      const remaining=pending.length?`<span style="color:#757575;font-size:12px">${pending.length} restante${pending.length>1?"s":""}</span>`:""
+      const chips=next3.map(i=>`<span style="background:var(--success-light);color:var(--success);border-radius:20px;padding:3px 10px;font-weight:700;font-size:13px">🕐 ${techETAs[i.id].eta}</span>`).join("")
+      const endChip=window._tourEndETA&&pending.length?`<span style="background:var(--warning-light);color:var(--warning);border-radius:20px;padding:3px 10px;font-weight:700;font-size:13px">🏁 Fin ~${window._tourEndETA}</span>`:""
+      const remaining=pending.length?`<span style="color:var(--text-tertiary);font-size:12px">${pending.length} restante${pending.length>1?"s":""}</span>`:""
       etaBanner.innerHTML=`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;background:#F8F9FA;border-bottom:1px solid #E0E0E0">${remaining}${chips}${endChip}</div>`
       etaBanner.style.display="block"
     } else {
@@ -2004,14 +2125,14 @@ function renderDepart(){
   const tToMin=hhmm=>{if(!hhmm)return null;const[h,m]=hhmm.split(':').map(Number);return h*60+m}
   const locked=isTechRouteLocked(date)
   const toolbarHtml=dayIvs.length?`<div style="display:flex;align-items:center;gap:8px;padding:6px 2px 8px;flex-shrink:0">
-    <span style="font-size:12px;color:var(--gray);flex:1">${locked?"🔒 Ordre verrouillé":"Glisser pour réordonner"}</span>
+    <span style="font-size:12px;color:var(--gray);flex:1">${locked?`<svg class="ico"><use href="#ico-lock"/></svg> Ordre verrouillé`:"Glisser pour réordonner"}</span>
     ${!tourRunning&&tourneesData[date]?`<button onclick="showLastTourStats()" title="Revoir le bilan de la tournée du jour" style="padding:5px 12px;font-size:12px;border-radius:8px;border:1.5px solid #2E7D32;background:#E8F5E9;color:#2E7D32;cursor:pointer;font-family:inherit;font-weight:700">📊 Bilan</button>`:""}
     <button onclick="reverseTechRoute()" style="padding:5px 12px;font-size:12px;border-radius:8px;border:1.5px solid var(--blue);background:#fff;color:var(--blue);cursor:pointer;font-family:inherit;font-weight:600">⇅ Inverser</button>
-    <button onclick="toggleTechRouteLock()" style="padding:5px 12px;font-size:12px;border-radius:8px;border:1.5px solid ${locked?"#16a34a":"var(--border)"};background:${locked?"#f0fdf4":"#fff"};color:${locked?"#16a34a":"var(--gray)"};cursor:pointer;font-family:inherit;font-weight:600">${locked?"🔒 Verr.":"🔓 Libre"}</button>
+    <button onclick="toggleTechRouteLock()" style="padding:5px 12px;font-size:12px;border-radius:8px;border:1.5px solid ${locked?"#16a34a":"var(--border)"};background:${locked?"#f0fdf4":"#fff"};color:${locked?"#16a34a":"var(--gray)"};cursor:pointer;font-family:inherit;font-weight:600">${locked?`<svg class="ico"><use href="#ico-lock"/></svg> Verr.`:`<svg class="ico"><use href="#ico-unlock"/></svg> Libre`}</button>
   </div>`:""
   list.innerHTML=toolbarHtml+dayIvs.map((iv,idx)=>{
     const done=validated[iv.id], fail=failed[iv.id]
-    const col=done?"#2E7D32":fail?"#C62828":(TYPES[iv.type]||TYPES.maintenance_simple).color
+    const col=done?"var(--success)":fail?"var(--danger)":(TYPES[iv.type]||TYPES.maintenance_simple).color
     const lbl=done?"✓":fail?"✗":(idx+1)
     // Temps de trajet = ETA(ce stop) - leave(stop précédent ou départ)
     let travelMin=null, waitMin=null, travelStatus=null
@@ -2045,9 +2166,9 @@ function renderDepart(){
         if(depTs){
           const elapsed=Math.round((Date.now()-depTs)/60000)
           const pct=travelMin>0?elapsed/travelMin:0
-          if(pct<=0.82)       travelStatus={bg:"#E8F5E9",col:"#2E7D32",icon:"🟢",label:"En avance"}
-          else if(pct<=1.15)  travelStatus={bg:"#FFF3E0",col:"#E65100",icon:"🟠",label:"Dans les temps"}
-          else                travelStatus={bg:"#FFEBEE",col:"#C62828",icon:"🔴",label:"En retard ("+fmin(elapsed)+" / prévu "+fmin(travelMin)+")"}
+          if(pct<=0.82)       travelStatus={bg:"var(--success-light)",col:"var(--success)",icon:"🟢",label:"En avance"}
+          else if(pct<=1.15)  travelStatus={bg:"var(--warning-light)",col:"var(--warning)",icon:"🟠",label:"Dans les temps"}
+          else                travelStatus={bg:"var(--danger-light)",col:"var(--danger)",icon:"🔴",label:"En retard ("+fmin(elapsed)+" / prévu "+fmin(travelMin)+")"}
         }
       }
     }
@@ -2075,12 +2196,12 @@ function renderDepart(){
             ${!_mini&&idx===0&&!done&&!fail?`<span style="font-size:11px;font-weight:700;color:#f59e0b">⭐</span>`
               :!_mini&&!done&&!fail?`<button onclick="event.stopPropagation();setFirstTechIv(${iv.id})" style="background:none;border:1.5px solid #f59e0b;border-radius:6px;padding:1px 6px;font-size:10px;cursor:pointer;color:#f59e0b;font-family:inherit;white-space:nowrap">☆ 1er</button>`:""}
           </div>
-          <div class="dc-addr">📍 ${iv.addr}</div>
-          ${!_mini&&iv.contact?`<div style="font-size:11px;color:var(--blue);margin-top:2px">👤 ${iv.contact}${iv.cphone?` <a href="tel:${iv.cphone}" onclick="event.stopPropagation()" style="color:var(--blue)">📞</a>`:""}</div>`:""}
+          <div class="dc-addr"><svg class="ico"><use href="#ico-pin"/></svg> ${iv.addr}</div>
+          ${!_mini&&iv.contact?`<div style="font-size:11px;color:var(--blue);margin-top:2px;display:flex;align-items:center;gap:4px"><svg class="ico"><use href="#ico-user"/></svg> ${iv.contact}${iv.cphone?` <a href="tel:${iv.cphone}" onclick="event.stopPropagation()" style="color:var(--blue);display:inline-flex"><svg class="ico"><use href="#ico-phone"/></svg></a>`:""}</div>`:""}
         </div>
         ${!_mini?`<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0" onclick="event.stopPropagation()">
           <a href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(iv.addr)}"
-             target="_blank" style="text-decoration:none;font-size:20px;line-height:1;display:block;text-align:center" title="Google Maps">🗺️</a>
+             target="_blank" style="text-decoration:none;color:var(--blue);font-size:20px;line-height:1;display:block;text-align:center" title="Google Maps"><svg class="ico" style="width:1.2em;height:1.2em"><use href="#ico-map"/></svg></a>
           <a href="https://waze.com/ul?q=${encodeURIComponent(iv.addr)}&navigate=yes"
              target="_blank" style="text-decoration:none;display:flex;align-items:center;justify-content:center;background:#05C8F7;color:#fff;border-radius:8px;padding:3px 6px;font-size:10px;font-weight:700;gap:3px" title="Waze">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M20.54 6.63C19.26 3.1 15.97 1 12.25 1 7.32 1 3.28 4.81 3.28 9.65c0 2.17.8 4.24 2.25 5.85l.12 3.55 3.36-1.49c1 .29 2.01.44 3.02.44.11 0 .22 0 .33-.01l.03.01c.67 0 1.33-.07 1.97-.2l3.62 1.61-.13-3.74c1.44-1.35 2.34-3.11 2.5-5.02.03-.35.05-.69.05-1.02 0-.67-.08-1.35-.22-2h-.02l-.64 2.5z"/></svg>
@@ -2091,26 +2212,26 @@ function renderDepart(){
       <div class="dc-tags">
         ${travelMin!==null?travelStatus
           ?`<span class="tag" style="background:${travelStatus.bg};color:${travelStatus.col};font-weight:700">${travelStatus.icon} ${travelStatus.label}</span>`
-          :`<span class="tag" style="background:#E3F2FD;color:#1565C0;font-weight:600">🚗 ${fmin(travelMin)} de trajet</span>`
+          :`<span class="tag tag-info">🚗 ${fmin(travelMin)} de trajet</span>`
         :""}
         ${iv.notionTime&&iv.timeStart?`<span class="tag" style="background:#FFFBEB;color:#92400E;font-weight:700;border:1px solid #F59E0B">🔔 ${iv.timeStart} — heure imposée</span>`:""}
-        ${waitMin?`<span class="tag" style="background:#FFF3E0;color:#E65100;font-weight:600">⏰ Attente ${fmin(waitMin)} — créneau ${iv.timeStart}</span>`:""}
-        ${etaLate?`<span class="tag" style="background:#FFEBEE;color:#C62828;font-weight:700">⚠️ Créneau serré (−30min)</span>`:""}
+        ${waitMin?`<span class="tag tag-warn">⏰ Attente ${fmin(waitMin)} — créneau ${iv.timeStart}</span>`:""}
+        ${etaLate?`<span class="tag tag-err" style="font-weight:700">⚠️ Créneau serré (−30min)</span>`:""}
         <span class="tag tag-info">🔧 ${fmin(workMin)} · ${(TYPES[iv.type]||TYPES.maintenance_simple).label}</span>
-        ${techETAs[iv.id]?`<span class="tag" style="background:#E8F5E9;color:#2E7D32;font-weight:600">🕐 Arrivée ${techETAs[iv.id].eta} · fin ${techETAs[iv.id].leave}</span>`:""}
-        ${techETAs[iv.id]?.delayMin>1?`<span class="tag" title="Retard potentiel cumulé vs circulation fluide" style="background:#FFF3E0;color:#E65100;font-weight:600">🐢 +${fmin(techETAs[iv.id].delayMin)} trafic</span>`:""}
+        ${techETAs[iv.id]?`<span class="tag tag-ok">🕐 Arrivée ${techETAs[iv.id].eta} · fin ${techETAs[iv.id].leave}</span>`:""}
+        ${techETAs[iv.id]?.delayMin>1?`<span class="tag tag-warn" title="Retard potentiel cumulé vs circulation fluide">🐢 +${fmin(techETAs[iv.id].delayMin)} trafic</span>`:""}
         ${(()=>{ // avance/retard vs l'heure initiale du RDV (iv.timeStart, Notion) — référence
           // absolue, indépendante des recalculs. _plannedETAs n'intervient plus ici (reste
           // utilisé uniquement pour le bilan de fin de tournée, ailleurs).
           const initial=iv.timeStart, ce=techETAs[iv.id]?.eta
           if(!tourRunning||!initial||!ce||done||fail) return ''
           const d=tToMin(ce)-tToMin(initial)
-          if(Math.abs(d)<2) return `<span class="tag" style="background:#E8F5E9;color:#2E7D32;font-weight:600">✅ À l'heure (prévu ${initial})</span>`
-          return d>0?`<span class="tag" style="background:#FFEBEE;color:#C62828;font-weight:700">⏱ Retard +${fmin(d)} (prévu ${initial})</span>`
-                    :`<span class="tag" style="background:#E8F5E9;color:#2E7D32;font-weight:700">⏱ Avance −${fmin(-d)} (prévu ${initial})</span>`
+          if(Math.abs(d)<2) return `<span class="tag tag-ok">✅ À l'heure (prévu ${initial})</span>`
+          return d>0?`<span class="tag tag-err" style="font-weight:700">⏱ Retard +${fmin(d)} (prévu ${initial})</span>`
+                    :`<span class="tag tag-ok" style="font-weight:700">⏱ Avance −${fmin(-d)} (prévu ${initial})</span>`
         })()}
-        ${iv.timeEnd&&!done?`<span class="tag" style="background:#F3F3F3;color:#757575;font-size:11px">⏰ Au plus tard ${iv.timeEnd}</span>`:""}
-        ${unroutedIvs.includes(iv)?`<span class="tag" style="background:#FFF3E0;color:#E65100;font-weight:700">⚠️ Adresse non géolocalisée — hors itinéraire</span>`:""}
+        ${iv.timeEnd&&!done?`<span class="tag tag-muted" style="font-size:11px">⏰ Au plus tard ${iv.timeEnd}</span>`:""}
+        ${unroutedIvs.includes(iv)?`<span class="tag tag-warn" style="font-weight:700">⚠️ Adresse non géolocalisée — hors itinéraire</span>`:""}
         ${done?`<span class="tag tag-ok">✅ Kizeo sync</span>`:""}
         ${fail?`<span class="tag tag-err">✗ Échec</span>`:""}
       </div>
@@ -2131,7 +2252,7 @@ function renderDepart(){
       <div class="dc-detail" id="dcd-${iv.id}">
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           ${iv.cemail?`<a href="mailto:${iv.cemail}" style="font-size:12px;color:var(--blue)">✉️ ${iv.cemail}</a>`:""}
-          <button onclick="openContactModal(${iv.id})" class="btn btn-gray" style="padding:5px 10px;font-size:11px">✏️ Modifier contact</button>
+          <button onclick="openContactModal(${iv.id})" class="btn btn-gray" style="padding:5px 10px;font-size:11px"><svg class="ico"><use href="#ico-edit"/></svg> Modifier contact</button>
         </div>
         ${iv.padPak&&iv.padPakDate?`<div style="margin-top:6px;font-size:12px;color:var(--orange)">⚡ Péremption Pad Pak : ${fd(iv.padPakDate)}</div>`:""}
         ${(iv.commercial||iv.nSerie||iv.kizeoVille)?`<div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;font-size:11px;color:#555;background:#F8F9FA;border-radius:6px;padding:5px 8px">
@@ -2936,19 +3057,23 @@ function renderPlanning(){
   document.getElementById("plan-title").textContent=fdl(planSel)
   const dayIvs=myIvs(planSel)
   document.getElementById("plan-list").innerHTML=!dayIvs.length
-    ?`<div style="padding:40px;text-align:center;color:var(--gray)">Aucune intervention</div>`
+    ?`<div style="display:flex;flex-direction:column;align-items:center;gap:10px;padding:48px 20px;color:var(--text-tertiary)"><svg class="ico" style="width:32px;height:32px"><use href="#ico-calendar"/></svg><span class="ux-sub">Aucune intervention</span></div>`
     :dayIvs.map((iv,idx)=>{
       const done=validated[iv.id],fail=failed[iv.id]
-      const col=done?"#2E7D32":fail?"#C62828":TYPES[iv.type].color
-      return `<div class="dc ${done?"vdone":fail?"vfail":""}" style="margin-bottom:1px">
+      const col=done?"var(--success)":fail?"var(--danger)":TYPES[iv.type].color
+      return `<div class="dc ${done?"vdone":fail?"vfail":""}">
         <div class="dc-top" onclick="focusClient(${iv.id})">
           <div class="dc-num" style="background:${col}">${done?"✓":fail?"✗":(idx+1)}</div>
           <div class="dc-info">
             <div class="dc-client">${iv.client}</div>
-            <div class="dc-addr">📍 ${iv.addr}</div>
-            ${iv.contact?`<div style="font-size:11px;color:var(--blue);margin-top:2px">👤 ${iv.contact}${iv.cphone?` — <a href="tel:${iv.cphone}" style="color:var(--blue)">${iv.cphone}</a>`:""}</div>`:""}
+            <div class="dc-addr"><svg class="ico"><use href="#ico-pin"/></svg> ${iv.addr}</div>
+            ${iv.contact?`<div style="font-size:11px;color:var(--blue);margin-top:2px;display:flex;align-items:center;gap:4px"><svg class="ico"><use href="#ico-user"/></svg> ${iv.contact}${iv.cphone?` — <a href="tel:${iv.cphone}" style="color:var(--blue)">${iv.cphone}</a>`:""}</div>`:""}
           </div>
-          <a href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(iv.addr)}" target="_blank" style="text-decoration:none;font-size:22px;padding:4px">🗺️</a>
+          <a href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(iv.addr)}" target="_blank" style="text-decoration:none;color:var(--blue);padding:4px" title="Google Maps"><svg class="ico" style="width:1.3em;height:1.3em"><use href="#ico-map"/></svg></a>
+        </div>
+        <div class="dc-tags">
+          ${iv.timeStart?`<span class="tag tag-info">${iv.timeStart}</span>`:""}
+          <span class="tag tag-info">${fmin(dur(iv.type,iv.form))} · ${(TYPES[iv.type]||TYPES.maintenance_simple).label}</span>
         </div>
         ${equipHTML(iv)}
         ${iv.notes?`<div style="padding:2px 10px 5px;font-size:11px;color:var(--orange)">📝 ${iv.notes}</div>`:""}
@@ -2997,8 +3122,8 @@ function renderMateriel(){
   const matHead=document.getElementById("mat-prep-btn")
   if(matHead){
     matHead.innerHTML=prep
-      ?`<button onclick="toggleMatPrep()" style="width:100%;padding:12px;background:#E8F5E9;color:#2E7D32;border:2px solid #2E7D32;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer">✅ Matériel prêt — appuyer pour annuler</button>`
-      :`<button onclick="toggleMatPrep()" style="width:100%;padding:12px;background:#fff;color:#1565C0;border:2px solid #1565C0;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer">📦 Confirmer matériel préparé</button>`
+      ?`<button onclick="toggleMatPrep()" style="width:100%;padding:12px;background:var(--success-light);color:var(--success);border:2px solid var(--success);border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px"><svg class="ico"><use href="#ico-check"/></svg> Matériel prêt — appuyer pour annuler</button>`
+      :`<button onclick="toggleMatPrep()" style="width:100%;padding:12px;background:#fff;color:var(--primary);border:2px solid var(--primary);border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px"><svg class="ico"><use href="#ico-box"/></svg> Confirmer matériel préparé</button>`
   }
   // Totaux à partir de getEquip()
   const allEquip=dayIvs.flatMap(i=>getEquip(i).map(e=>e.text.split(" ")[0]+" "+e.text.split(" ")[1]))
@@ -3017,18 +3142,18 @@ function renderMateriel(){
     padpaks.length?{i:"⚡",n:padpaks.length,l:"Pad Pak à changer",s:padpaks.map(i=>i.client.split(" ")[0]).join(", "),c:"var(--orange)"}:null,
     bats.length?{i:"🔋",n:bats.length,l:"Batteries à changer",s:bats.map(i=>i.client.split(" ")[0]).join(", "),c:"var(--blue)"}:null,
     installs.length?{i:"🔋",n:installs.length,l:"Batteries neuves (install.)",s:"Fournies avec le DAE",c:"var(--green)"}:null,
-    forms.length?{i:"📚",n:forms.length,l:"Formations",s:forms.map(i=>i.client.split(" ")[0]).join(", "),c:"#6A1B9A"}:null,
+    forms.length?{i:"📚",n:forms.length,l:"Formations",s:forms.map(i=>i.client.split(" ")[0]).join(", "),c:"var(--purple)"}:null,
     dayIvs.length?{i:"📋",n:dayIvs.length,l:"Fiches Kizeo",s:"À remplir après intervention",c:"var(--purple)"}:null,
   ].filter(Boolean)
   document.getElementById("mat-totaux").innerHTML=!rows.length
-    ?`<div style="padding:24px;text-align:center;color:var(--gray)">Aucun matériel spécifique</div>`
+    ?`<div style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:32px 20px;color:var(--text-tertiary)"><svg class="ico" style="width:26px;height:26px"><use href="#ico-box"/></svg><span class="ux-sub">Aucun matériel spécifique</span></div>`
     :rows.map(r=>`<div class="mat-row">
       <div class="mat-ico">${r.i}</div>
       <div style="min-width:0"><div class="mat-n" style="color:${r.c}">${r.n}</div><div style="font-size:14px;font-weight:700">${r.l}</div><div style="font-size:11px;color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.s}</div></div>
     </div>`).join("")
   document.getElementById("mat-detail").innerHTML=dayIvs.map(iv=>{
     const eq=getEquip(iv)
-    return `<div class="dc" style="margin:5px 12px;border-radius:10px;cursor:pointer" onclick="showMatFiche(${iv.id})">
+    return `<div class="dc" onclick="showMatFiche(${iv.id})">
       <div class="dc-top">
         <div style="font-size:18px">${iv.type==="installation"?"🏥":iv.padPak||iv.type==="maintenance_complex"?"⚡":"🔧"}</div>
         <div class="dc-info">
@@ -3111,11 +3236,11 @@ function openDaeScan(){
   ov.style.display='flex'
   _daeTorchOn=false
   const torchBtn=document.getElementById('dae-torch-btn')
-  if(torchBtn) torchBtn.style.display='none'
+  if(torchBtn){ torchBtn.style.display='none'; torchBtn.classList.remove('active') }
   const zoomWrap=document.getElementById('dae-zoom-wrap')
   if(zoomWrap) zoomWrap.style.display='none'
   if(typeof Html5Qrcode==='undefined'){
-    document.getElementById('dae-scan-reader').innerHTML='<p style="color:#fff;text-align:center;padding:20px">Scanner indisponible — utilise la saisie manuelle ci-dessous.</p>'
+    document.getElementById('dae-scan-reader').innerHTML='<div class="scan-error"><svg class="ico" style="width:28px;height:28px"><use href="#ico-alert"/></svg><span>Scanner indisponible — utilise la saisie manuelle ci-dessous.</span></div>'
     return
   }
   // Formats DAE : DataMatrix (étiquettes GS1 des dispositifs médicaux) + QR (certaines
@@ -3164,7 +3289,7 @@ function openDaeScan(){
       }
     }catch(e){}
   }).catch(err=>{
-    document.getElementById('dae-scan-reader').innerHTML='<p style="color:#fff;text-align:center;padding:20px">'+_cameraErrorMessage(err)+'</p>'
+    document.getElementById('dae-scan-reader').innerHTML='<div class="scan-error"><svg class="ico" style="width:28px;height:28px"><use href="#ico-alert"/></svg><span>'+_cameraErrorMessage(err)+'</span></div>'
   })
 }
 async function toggleDaeTorch(){
@@ -3173,6 +3298,8 @@ async function toggleDaeTorch(){
     _daeTorchOn=!_daeTorchOn
     await _daeScanner.applyVideoConstraints({advanced:[{torch:_daeTorchOn}]})
   }catch(e){ _daeTorchOn=!_daeTorchOn }
+  // Feedback visuel uniquement — ne change rien à applyVideoConstraints() ci-dessus.
+  document.getElementById('dae-torch-btn')?.classList.toggle('active',_daeTorchOn)
 }
 async function onDaeZoomChange(val){
   if(!_daeScanner) return
@@ -3313,7 +3440,7 @@ async function renderStock(){
   stkRenderAlertBanner()
   const el=document.getElementById('stk-content')
   if(el && !el.dataset.filled){
-    el.innerHTML='<div style="text-align:center;color:var(--gray);padding:30px;font-size:13px">Utilise les boutons ci-dessus pour scanner, faire une entrée/sortie, ou consulter l\'historique.</div>'
+    el.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:30px 20px;color:var(--text-tertiary)"><svg class="ico" style="width:26px;height:26px"><use href="#ico-tag"/></svg><span class="ux-sub">Utilise les boutons ci-dessus pour scanner, faire une entrée/sortie, ou consulter l\'historique.</span></div>'
   }
 }
 
@@ -3324,7 +3451,7 @@ async function stkRenderAlertBanner(){
     const low=await StockModule.lowStockArticles()
     if(!low.length){ banner.innerHTML=''; return }
     const rupture=low.filter(a=>a.quantite_stock<=0).length
-    banner.innerHTML=`<div style="margin:8px 14px 0;padding:10px 14px;background:#FFF3E0;border-left:4px solid #E65100;border-radius:10px;font-size:12px;color:#E65100;font-weight:600;cursor:pointer" onclick="stkOpenAlerts()">
+    banner.innerHTML=`<div style="margin:8px 14px 0;padding:10px 14px;background:var(--warning-light);border-left:4px solid var(--warning);border-radius:10px;font-size:12px;color:var(--warning);font-weight:600;cursor:pointer" onclick="stkOpenAlerts()">
       ${rupture?`🔴 ${rupture} en rupture · `:''}🟠 ${low.length} article${low.length>1?'s':''} sous le seuil mini — voir
     </div>`
   }catch(e){}
@@ -3340,10 +3467,10 @@ function stkOpenScan(){
   const ov=document.getElementById('stk-scan-overlay')
   ov.style.display='flex'
   stkTorchOn=false
-  const torchBtn=document.getElementById('stk-torch-btn'); if(torchBtn) torchBtn.style.display='none'
+  const torchBtn=document.getElementById('stk-torch-btn'); if(torchBtn){ torchBtn.style.display='none'; torchBtn.classList.remove('active') }
   const zoomWrap=document.getElementById('stk-zoom-wrap'); if(zoomWrap) zoomWrap.style.display='none'
   if(typeof Html5Qrcode==='undefined'){
-    document.getElementById('stk-scan-reader').innerHTML='<p style="color:#fff;text-align:center;padding:20px">Scanner indisponible — utilise la saisie manuelle ci-dessous.</p>'
+    document.getElementById('stk-scan-reader').innerHTML='<div class="scan-error"><svg class="ico" style="width:28px;height:28px"><use href="#ico-alert"/></svg><span>Scanner indisponible — utilise la saisie manuelle ci-dessous.</span></div>'
     return
   }
   const formats=(typeof Html5QrcodeSupportedFormats!=='undefined')?[
@@ -3378,12 +3505,14 @@ function stkOpenScan(){
       }
     }catch(e){}
   }).catch(err=>{
-    document.getElementById('stk-scan-reader').innerHTML='<p style="color:#fff;text-align:center;padding:20px">'+_cameraErrorMessage(err)+'</p>'
+    document.getElementById('stk-scan-reader').innerHTML='<div class="scan-error"><svg class="ico" style="width:28px;height:28px"><use href="#ico-alert"/></svg><span>'+_cameraErrorMessage(err)+'</span></div>'
   })
 }
 async function stkToggleTorch(){
   if(!stkScanner) return
   try{ stkTorchOn=!stkTorchOn; await stkScanner.applyVideoConstraints({advanced:[{torch:stkTorchOn}]}) }catch(e){ stkTorchOn=!stkTorchOn }
+  // Feedback visuel uniquement — ne change rien à applyVideoConstraints() ci-dessus.
+  document.getElementById('stk-torch-btn')?.classList.toggle('active',stkTorchOn)
 }
 async function stkOnZoomChange(val){
   if(!stkScanner) return
@@ -3419,7 +3548,7 @@ async function stkHandleScannedCode(code){
     if(art) stkRenderFiche(art)
     else stkRenderUnknown(code)
   }catch(e){
-    el.innerHTML=`<div style="text-align:center;color:#C62828;padding:20px">❌ Erreur : ${e.message}</div>`
+    el.innerHTML=`<div style="text-align:center;color:var(--danger);padding:20px">❌ Erreur : ${e.message}</div>`
   }
 }
 
@@ -3434,14 +3563,14 @@ function stkRenderFiche(art){
     <div class="card" style="padding:16px">
       <div style="font-size:16px;font-weight:800;margin-bottom:2px">${art.nom}</div>
       <div style="font-size:12px;color:var(--gray);margin-bottom:8px">${art.reference?'Réf. '+art.reference+' · ':''}Code : ${art.code_barres||'—'}</div>
-      <div style="font-size:28px;font-weight:800;color:${rupture?'#C62828':low?'#E65100':'#1B5E20'}">${art.quantite_stock}</div>
+      <div style="font-size:28px;font-weight:800;color:${rupture?'var(--danger)':low?'var(--warning)':'var(--success)'}">${art.quantite_stock}</div>
       <div style="font-size:11px;color:var(--gray);margin-bottom:12px">en stock${rupture?' · 🔴 rupture':low?' · 🟠 stock faible':''}</div>
       <label style="font-size:12px;color:var(--gray);display:block;margin-bottom:4px">Quantité</label>
       <input type="number" id="stk-qty-input" value="1" min="1" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:16px;margin-bottom:10px"/>
       <div id="stk-interv-picker"></div>
       <div style="display:flex;gap:10px;margin-top:10px">
-        <button onclick="stkSubmit('entree')" style="flex:1;padding:14px;background:#1B5E20;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer">📥 Ajouter au stock</button>
-        <button onclick="stkSubmit('sortie')" style="flex:1;padding:14px;background:#E65100;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer">📤 Retirer du stock</button>
+        <button class="btn-stock-in" onclick="stkSubmit('entree')" style="flex:1;padding:14px;font-size:14px"><svg class="ico"><use href="#ico-in"/></svg> Ajouter au stock</button>
+        <button class="btn-stock-out" onclick="stkSubmit('sortie')" style="flex:1;padding:14px;font-size:14px"><svg class="ico"><use href="#ico-out"/></svg> Retirer du stock</button>
       </div>
       <div id="stk-submit-result" style="margin-top:10px"></div>
       <button onclick="renderStockHome()" style="width:100%;margin-top:10px;padding:8px;background:none;border:none;color:var(--gray);font-size:12px;cursor:pointer">← Retour</button>
@@ -3495,7 +3624,7 @@ async function stkSubmit(type){
     stkRenderAlertBanner()
     setTimeout(()=>renderStockHome(),1800)
   }catch(e){
-    resEl.innerHTML=`<div style="text-align:center;padding:14px;background:#FFEBEE;border-radius:10px;color:#C62828">
+    resEl.innerHTML=`<div style="text-align:center;padding:14px;background:var(--danger-light);border-radius:10px;color:var(--danger)">
       <div style="font-size:20px">❌</div>
       <div style="font-size:13px;font-weight:700;margin-top:4px">Impossible de mettre à jour le stock</div>
       <div style="font-size:12px;margin-top:2px">${e.message}</div>
@@ -3510,7 +3639,7 @@ function stkRenderUnknown(code){
   el.innerHTML=`
     <div class="card" style="padding:16px;text-align:center">
       <div style="font-size:30px;margin-bottom:6px">⚠️</div>
-      <div style="font-size:15px;font-weight:800;color:#E65100;margin-bottom:4px">ARTICLE INCONNU</div>
+      <div style="font-size:15px;font-weight:800;color:var(--warning);margin-bottom:4px">ARTICLE INCONNU</div>
       <div style="font-size:12px;color:var(--gray);margin-bottom:14px">Code détecté : <strong>${code}</strong></div>
       <div style="display:flex;gap:10px">
         <button onclick="stkOpenCreateArticle('${code.replace(/'/g,"\\'")}')" style="flex:1;padding:12px;background:var(--blue);color:#fff;border:none;border-radius:10px;font-weight:700;cursor:pointer">Créer l'article</button>
@@ -3572,24 +3701,24 @@ async function stkOpenManualPicker(type){
     window._stkPickerArticles=list
     el.innerHTML=`
       <div class="card" style="padding:14px">
-        <div style="font-size:14px;font-weight:800;margin-bottom:8px">${type==='entree'?'📥 Entrée':'📤 Sortie'} — choisir un article</div>
+        <div style="font-size:14px;font-weight:800;margin-bottom:8px;display:flex;align-items:center;gap:6px">${type==='entree'?'<svg class="ico"><use href="#ico-in"/></svg> Entrée':'<svg class="ico"><use href="#ico-out"/></svg> Sortie'} — choisir un article</div>
         <input id="stk-picker-search" placeholder="Rechercher..." oninput="stkFilterPicker()" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;margin-bottom:10px"/>
         <div id="stk-picker-list"></div>
         <button onclick="renderStockHome()" style="width:100%;margin-top:10px;padding:8px;background:none;border:none;color:var(--gray);font-size:12px;cursor:pointer">← Retour</button>
       </div>`
     stkFilterPicker()
   }catch(e){
-    el.innerHTML=`<div style="text-align:center;color:#C62828;padding:20px">❌ ${e.message}</div>`
+    el.innerHTML=`<div style="text-align:center;color:var(--danger);padding:20px">❌ ${e.message}</div>`
   }
 }
 function stkFilterPicker(){
   const q=(document.getElementById('stk-picker-search')?.value||'').toLowerCase()
   const list=(window._stkPickerArticles||[]).filter(a=>!q||a.nom.toLowerCase().includes(q)||(a.reference||'').toLowerCase().includes(q))
   document.getElementById('stk-picker-list').innerHTML=list.slice(0,50).map(a=>`
-    <div onclick="stkPickArticle('${a.id}')" style="padding:10px;border-bottom:1px solid #F0F0F0;cursor:pointer;display:flex;justify-content:space-between;align-items:center">
-      <div><div style="font-weight:600;font-size:13px">${a.nom}</div><div style="font-size:11px;color:var(--gray)">${a.reference||''}</div></div>
-      <div style="font-weight:800;color:${a.quantite_stock<=a.stock_minimum?'#E65100':'#1B5E20'}">${a.quantite_stock}</div>
-    </div>`).join('') || '<div style="text-align:center;color:var(--gray);padding:16px;font-size:12px">Aucun article</div>'
+    <div onclick="stkPickArticle('${a.id}')" style="padding:10px;border-bottom:1px solid #F0F0F0;cursor:pointer;display:flex;gap:8px;justify-content:space-between;align-items:center">
+      <div style="min-width:0;overflow:hidden"><div style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.nom}</div><div style="font-size:11px;color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.reference||''}</div></div>
+      <div style="font-weight:800;flex-shrink:0;color:${a.quantite_stock<=a.stock_minimum?'var(--warning)':'var(--success)'}">${a.quantite_stock}</div>
+    </div>`).join('') || '<div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:20px;color:var(--text-tertiary)"><svg class="ico"><use href="#ico-search"/></svg><span class="ux-sub">Aucun article</span></div>'
 }
 function stkPickArticle(id){
   const art=(window._stkPickerArticles||[]).find(a=>a.id===id)
@@ -3605,8 +3734,8 @@ function stkStartContinuous(){
 }
 function stkSetContinuousType(t){
   stkContinuousType=t
-  document.getElementById('stk-cont-type-sortie').style.background = t==='sortie'?'#E65100':'rgba(255,255,255,.15)'
-  document.getElementById('stk-cont-type-entree').style.background = t==='entree'?'#1B5E20':'rgba(255,255,255,.15)'
+  document.getElementById('stk-cont-type-sortie').style.background = t==='sortie'?'var(--warning)':'rgba(255,255,255,.15)'
+  document.getElementById('stk-cont-type-entree').style.background = t==='entree'?'var(--success)':'rgba(255,255,255,.15)'
 }
 async function stkContinuousAdd(code){
   try{
@@ -3647,7 +3776,7 @@ async function stkValidateContinuous(){
     stkRenderAlertBanner()
     renderStockHome()
   }catch(e){
-    el.innerHTML=`<div style="text-align:center;padding:16px;background:#FFEBEE;border-radius:10px;color:#C62828">❌ ${e.message}<br><button onclick="renderStockHome()" style="margin-top:10px;padding:8px 16px;background:#fff;border:1px solid #C62828;border-radius:8px;cursor:pointer">Fermer</button></div>`
+    el.innerHTML=`<div style="text-align:center;padding:16px;background:var(--danger-light);border-radius:10px;color:var(--danger)">❌ ${e.message}<br><button onclick="renderStockHome()" style="margin-top:10px;padding:8px 16px;background:#fff;border:1px solid var(--danger);border-radius:8px;cursor:pointer">Fermer</button></div>`
   }
 }
 
@@ -3660,19 +3789,19 @@ async function stkOpenAlerts(){
     const low=await StockModule.lowStockArticles()
     el.innerHTML=`
       <div class="card" style="padding:14px">
-        <div style="font-size:14px;font-weight:800;margin-bottom:10px">⚠️ Articles à réapprovisionner</div>
+        <div style="font-size:14px;font-weight:800;margin-bottom:10px;display:flex;align-items:center;gap:6px"><svg class="ico"><use href="#ico-alert"/></svg> Articles à réapprovisionner</div>
         ${!low.length?'<div style="text-align:center;color:var(--gray);padding:16px">Aucune alerte 🎉</div>':low.map(a=>{
           const rupture=a.quantite_stock<=0
-          return `<div onclick="stkPickArticleAlert('${a.id}')" style="padding:10px;border-bottom:1px solid #F0F0F0;cursor:pointer;display:flex;justify-content:space-between;align-items:center">
-            <div><div style="font-weight:600;font-size:13px">${rupture?'🔴':'🟠'} ${a.nom}</div><div style="font-size:11px;color:var(--gray)">Seuil mini : ${a.stock_minimum}</div></div>
-            <div style="font-weight:800;color:${rupture?'#C62828':'#E65100'}">${a.quantite_stock}</div>
+          return `<div onclick="stkPickArticleAlert('${a.id}')" style="padding:10px;border-bottom:1px solid #F0F0F0;cursor:pointer;display:flex;gap:8px;justify-content:space-between;align-items:center">
+            <div style="min-width:0;overflow:hidden"><div style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${rupture?'🔴':'🟠'} ${a.nom}</div><div style="font-size:11px;color:var(--gray)">Seuil mini : ${a.stock_minimum}</div></div>
+            <div style="font-weight:800;flex-shrink:0;color:${rupture?'var(--danger)':'var(--warning)'}">${a.quantite_stock}</div>
           </div>`
         }).join('')}
         <button onclick="renderStockHome()" style="width:100%;margin-top:10px;padding:8px;background:none;border:none;color:var(--gray);font-size:12px;cursor:pointer">← Retour</button>
       </div>`
     window._stkAlertArticles=low
   }catch(e){
-    el.innerHTML=`<div style="text-align:center;color:#C62828;padding:20px">❌ ${e.message}</div>`
+    el.innerHTML=`<div style="text-align:center;color:var(--danger);padding:20px">❌ ${e.message}</div>`
   }
 }
 function stkPickArticleAlert(id){
@@ -3710,15 +3839,15 @@ async function stkRenderHistorique(){
       const dt=new Date(m.date)
       const isEntree=m.type==='entree'
       return `<div style="padding:8px 0;border-top:1px solid #F0F0F0">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <strong style="font-size:13px">${m.articles_stock?.nom||'?'}</strong>
-          <span style="font-weight:800;color:${isEntree?'#1B5E20':'#E65100'}">${isEntree?'+':'-'}${m.quantite}</span>
+        <div style="display:flex;gap:8px;justify-content:space-between;align-items:center">
+          <strong style="font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${m.articles_stock?.nom||'?'}</strong>
+          <span style="font-weight:800;flex-shrink:0;color:${isEntree?'var(--success)':'var(--warning)'}">${isEntree?'+':'-'}${m.quantite}</span>
         </div>
         <div style="font-size:11px;color:var(--gray)">${dt.toLocaleDateString('fr-FR')} ${dt.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})} · ${m.utilisateur||'?'} · ${m.stock_avant}→${m.stock_apres}${m.intervention_label?' · '+m.intervention_label:''}</div>
       </div>`
-    }).join(''):'<div style="text-align:center;color:var(--gray);padding:16px">Aucun mouvement</div>'
+    }).join(''):'<div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:20px;color:var(--text-tertiary)"><svg class="ico"><use href="#ico-box"/></svg><span class="ux-sub">Aucun mouvement</span></div>'
   }catch(e){
-    list.innerHTML=`<div style="text-align:center;color:#C62828;padding:16px">❌ ${e.message}</div>`
+    list.innerHTML=`<div style="text-align:center;color:var(--danger);padding:16px">❌ ${e.message}</div>`
   }
 }
 
@@ -3732,7 +3861,7 @@ function showMatFiche(ivId){
   const dea=iv.dea&&iv.dea!=="0"&&iv.dea!==0?iv.dea:""
   const arm=iv.arm&&iv.arm!=="0"&&iv.arm!==0?iv.arm:""
   const urgLbl={expired:"PÉRIMÉ",critical:"Critique",urgent:"Urgent",soon:"Bientôt",ok:"OK","":""}
-  const urgCol2={expired:"#C62828",critical:"#E65100",urgent:"#F57F17",soon:"#1565C0",ok:"#2E7D32","":"#555"}
+  const urgCol2={expired:"var(--danger)",critical:"var(--warning)",urgent:"#F57F17",soon:"var(--primary)",ok:"var(--success)","":"#555"}
 
   const row=(icon,label,val,col)=>val?`<div style="display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid #F5F5F5">
     <span style="font-size:19px;width:26px;flex-shrink:0;text-align:center">${icon}</span>
@@ -3744,7 +3873,7 @@ function showMatFiche(ivId){
   const exRow=(icon,label,date,urgLevel)=>{
     if(!date&&!urgLevel) return ""
     const dL=date?Math.round((new Date(date+"T12:00:00")-new Date())/86400000):null
-    const col=urgLevel?(urgCol2[urgLevel]||"#555"):(dL<0?"#C62828":dL<30?"#E65100":dL<90?"#F57F17":"#2E7D32")
+    const col=urgLevel?(urgCol2[urgLevel]||"#555"):(dL<0?"var(--danger)":dL<30?"var(--warning)":dL<90?"#F57F17":"var(--success)")
     const urgStr=urgLevel&&urgLevel!=="ok"?` · <strong>${urgLbl[urgLevel]||urgLevel}</strong>`:""
     return row(icon,label,date?`${fd(date)}${urgStr}`:(urgLbl[urgLevel]||urgLevel),col)
   }
@@ -3804,7 +3933,7 @@ function renderProfil(){
   const isDemo=location.protocol==="file:"||(!techCfg.token&&!techCfg.formId)
   document.getElementById("prof-sync-status").innerHTML=isDemo
     ?`<span class="sync-tag sync-demo">🔬 Mode démo</span>`
-    :`<span class="sync-tag sync-ok">🔗 Kizeo configuré</span>`
+    :`<span class="sync-tag sync-ok"><svg class="ico"><use href="#ico-link"/></svg> Kizeo configuré</span>`
   document.getElementById("cfg-token").value=techCfg.token||""
   document.getElementById("cfg-form").value=techCfg.formId||""
   document.getElementById("cfg-uid").value=techCfg.userId||""
@@ -3831,7 +3960,7 @@ async function syncKizeo(){
     const isLocal=location.protocol==="file:"||!techCfg.token
     if(isLocal){
       await new Promise(r=>setTimeout(r,1200))
-      res.innerHTML=`<span style="color:var(--green)">✅ Mode démo — 3 fiches simulées récupérées</span>`
+      res.innerHTML=`<span style="color:var(--success)">✅ Mode démo — 3 fiches simulées récupérées</span>`
       toast("✅ Sync OK (démo)","#2E7D32")
     }else{
       const resp=await fetch("/api/kizeo",{method:"POST",headers:{"Content-Type":"application/json", ..._techAuthHeaders()},
@@ -3852,12 +3981,12 @@ async function syncKizeo(){
         }
       })
       if(updated) saveIvs()
-      res.innerHTML=`<span style="color:var(--green)">✅ ${count} fiche${count>1?"s":""} récupérée${count>1?"s":""}, ${updated} mise${updated>1?"s":""} à jour</span>`
+      res.innerHTML=`<span style="color:var(--success)">✅ ${count} fiche${count>1?"s":""} récupérée${count>1?"s":""}, ${updated} mise${updated>1?"s":""} à jour</span>`
       toast(`✅ ${count} fiche${count>1?"s":""} Kizeo synchronisée${count>1?"s":""}`, "#2E7D32")
     }
     try{localStorage.setItem("kizeo_last_sync_tech",new Date().toLocaleString("fr-FR"))}catch(e){}
   }catch(e){
-    res.innerHTML=`<span style="color:var(--red)">❌ ${e.message}</span>`
+    res.innerHTML=`<span style="color:var(--danger)">❌ ${e.message}</span>`
     toast("Erreur sync: "+e.message,"#C62828")
   }finally{
     if(btn){btn.disabled=false;btn.textContent="🔄 Synchroniser les fiches"}
@@ -4684,7 +4813,7 @@ window.addEventListener('storage',e=>{
         <svg width="20" height="20" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="14" height="14" rx="2" fill="#fff" stroke="#000" stroke-width="1.5"/><path d="M3 4.5C3 4.22 3.22 4 3.5 4h4.25l4.25 5.5V11.5c0 .28-.22.5-.5.5H3.5A.5.5 0 0 1 3 11.5v-7z" fill="#000"/></svg>
         <span style="font-size:16px;font-weight:700">Synchronisation Notion</span>
       </div>
-      <button onclick="document.getElementById('notion-modal-tech').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;color:#757575">✕</button>
+      <button onclick="document.getElementById('notion-modal-tech').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;color:#757575;min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center;margin:-10px -10px -10px 0">✕</button>
     </div>
     <div id="notion-status-tech" style="padding:8px 12px;background:#F5F5F5;border-radius:8px;font-size:13px;margin-bottom:16px;color:#616161">Prêt à synchroniser</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
@@ -4709,12 +4838,12 @@ window.addEventListener('storage',e=>{
         <span style="font-size:10px;opacity:.8">Année passée + en cours</span>
       </button>
     </div>
-    <div style="display:flex;gap:8px;margin-bottom:14px;align-items:center">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:center">
       <label style="font-size:13px;white-space:nowrap;font-weight:500">Date précise :</label>
-      <input type="date" id="notion-date-from-tech" style="flex:1;padding:7px 10px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:inherit"/>
+      <input type="date" id="notion-date-from-tech" style="flex:1;min-width:130px;padding:7px 10px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:inherit"/>
       <span style="font-size:12px;color:#757575">→</span>
-      <input type="date" id="notion-date-to-tech" style="flex:1;padding:7px 10px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:inherit"/>
-      <button onclick="(()=>{const f=document.getElementById('notion-date-from-tech').value,t=document.getElementById('notion-date-to-tech').value||f;if(f)pullFromNotion(f,t)})()" style="border:none;cursor:pointer;background:#1565C0;color:#fff;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;font-family:inherit;white-space:nowrap">↓ Pull</button>
+      <input type="date" id="notion-date-to-tech" style="flex:1;min-width:130px;padding:7px 10px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:inherit"/>
+      <button onclick="(()=>{const f=document.getElementById('notion-date-from-tech').value,t=document.getElementById('notion-date-to-tech').value||f;if(f)pullFromNotion(f,t)})()" style="border:none;cursor:pointer;background:#1565C0;color:#fff;border-radius:8px;padding:8px 14px;min-height:44px;font-size:13px;font-weight:600;font-family:inherit;white-space:nowrap">↓ Pull</button>
     </div>
     <div style="border-top:1px solid #F0F0F0;padding-top:12px;font-size:12px;color:#757575">
       ⚡ Les statuts validés/échec sont <strong>automatiquement mis à jour dans Notion</strong> lors de chaque changement.
