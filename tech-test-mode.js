@@ -88,27 +88,48 @@
     {lat:48.860, lng:2.130, label:'🧪 Client Test C'},
     {lat:48.965, lng:1.967, label:'🧪 ARRIVÉE (test)'},
   ]
+  // Vitesse fictive PARTAGÉE entre le trajet statique initial (SIM_LEGS) et le
+  // recalcul GPS simulé (mock de /api/route-traffic ci-dessous) — c'est la cause
+  // exacte de la régression précédente : deux jeux de distances/durées codés en
+  // dur séparément, jamais mutuellement cohérents, qui divergeaient dès que le
+  // recalcul GPS écrasait le premier avec le second. Ici, une seule source
+  // (_distM + cette vitesse) alimente les deux, donc ils ne peuvent plus diverger
+  // tant que setGpsSpeed() n'est pas utilisé délibérément pour simuler un retard.
+  let simGpsEtaSpeedKmh = 40
+  function _legFromCoords(a, b, speedKmh){
+    const distanceKm = (typeof _distM === 'function' ? _distM(a, b) : 0) / 1000
+    const durationMin = Math.max(1, Math.round(distanceKm / speedKmh * 60))
+    return {distanceKm: Math.round(distanceKm * 10) / 10, durationMin, trafficDurationMin: durationMin}
+  }
   // legs[i] = trajet vers SIM_WAYPOINTS[i+1] ; legs[3] = trajet retour (C → arrivée)
+  // — calculés depuis les mêmes coordonnées que celles utilisées par le recalcul GPS.
   const SIM_LEGS = [
-    {distanceKm:8.0,  durationMin:12, trafficDurationMin:12},
-    {distanceKm:6.0,  durationMin:9,  trafficDurationMin:9},
-    {distanceKm:5.0,  durationMin:8,  trafficDurationMin:8},
-    {distanceKm:10.0, durationMin:15, trafficDurationMin:15},
+    _legFromCoords(SIM_WAYPOINTS[0], SIM_WAYPOINTS[1], simGpsEtaSpeedKmh),
+    _legFromCoords(SIM_WAYPOINTS[1], SIM_WAYPOINTS[2], simGpsEtaSpeedKmh),
+    _legFromCoords(SIM_WAYPOINTS[2], SIM_WAYPOINTS[3], simGpsEtaSpeedKmh),
+    _legFromCoords(SIM_WAYPOINTS[3], SIM_WAYPOINTS[4], simGpsEtaSpeedKmh),
   ]
   const SIM_STOP_IDS = ['__SIM_A', '__SIM_B', '__SIM_C']
 
   let simGpsIdx = 0
+  let simGpsProgress = 0 // 0..1 — avancement fictif entre SIM_WAYPOINTS[simGpsIdx] et le suivant
   let simGpsPaused = false
   let simGpsTimer = null
   let simGeoCb = null
+
+  function _simCurrentCoords(){
+    const a = SIM_WAYPOINTS[simGpsIdx], b = SIM_WAYPOINTS[Math.min(simGpsIdx + 1, SIM_WAYPOINTS.length - 1)]
+    const t = simGpsProgress
+    return {lat: a.lat + (b.lat - a.lat) * t, lng: a.lng + (b.lng - a.lng) * t}
+  }
 
   navigator.geolocation.watchPosition = function(successCb, errorCb, opts){
     if (!simActive) return realWatchPosition(successCb, errorCb, opts)
     simGeoCb = successCb
     simGpsTimer = setInterval(() => {
       if (simGpsPaused || !simGeoCb) return
-      const p = SIM_WAYPOINTS[simGpsIdx]
-      simGeoCb({coords:{latitude:p.lat, longitude:p.lng, accuracy:5}})
+      const c = _simCurrentCoords()
+      simGeoCb({coords:{latitude:c.lat, longitude:c.lng, accuracy:5}})
     }, 2000)
     return SIM_WATCH_ID
   }
@@ -118,8 +139,28 @@
   }
   navigator.geolocation.getCurrentPosition = function(successCb, errorCb, opts){
     if (!simActive) return realGetCurrentPosition(successCb, errorCb, opts)
-    const p = SIM_WAYPOINTS[simGpsIdx]
-    successCb({coords:{latitude:p.lat, longitude:p.lng, accuracy:5}})
+    const c = _simCurrentCoords()
+    successCb({coords:{latitude:c.lat, longitude:c.lng, accuracy:5}})
+  }
+
+  // ─────────────────────────── route-traffic simulé (jamais de vrai appel) ────
+  // _refreshRemainingLegFromGPS() (tech.html) appelle POST /api/route-traffic avec
+  // la position GPS courante. On intercepte UNIQUEMENT cette route pendant la
+  // simulation et on répond localement, avec la MÊME formule (_legFromCoords) que
+  // celle utilisée pour construire SIM_LEGS — jamais d'appel réseau vers la vraie
+  // API (payante) pendant un test.
+  const realFetch = window.fetch.bind(window)
+  window.fetch = function(url, opts){
+    const href = (typeof url === 'string') ? url : ((url && url.url) || '')
+    if (simActive && href.includes('/api/route-traffic')) {
+      let body = {}
+      try { body = JSON.parse((opts && opts.body) || '{}') } catch(e) {}
+      const wps = body.waypoints || []
+      const fakeLeg = (wps.length >= 2) ? _legFromCoords(wps[0], wps[1], simGpsEtaSpeedKmh) : {distanceKm:0, durationMin:1, trafficDurationMin:1}
+      const payload = JSON.stringify({legs:[fakeLeg], totalDistanceKm:fakeLeg.distanceKm, totalDurationMin:fakeLeg.durationMin, trafficDurationMin:fakeLeg.trafficDurationMin, source:'sim'})
+      return Promise.resolve(new Response(payload, {status:200, headers:{'Content-Type':'application/json'}}))
+    }
+    return realFetch(url, opts)
   }
 
   // ─────────────────────────── État simulation ─────────────────────────────
@@ -176,6 +217,7 @@
   function simNext(){
     if (!simActive) return
     if (simGpsIdx >= 1 && simGpsIdx <= 3) validated[SIM_STOP_IDS[simGpsIdx - 1]] = true
+    simGpsProgress = 0
     if (simGpsIdx < SIM_WAYPOINTS.length - 1) {
       simGpsIdx++
       simLogLine('➡ passage au point suivant : ' + SIM_WAYPOINTS[simGpsIdx].label)
@@ -183,6 +225,15 @@
       simLogLine('🏁 arrivée simulée au point final')
     }
     refreshLiveETAs()
+  }
+
+  function simSetProgress(frac){
+    simGpsProgress = Math.max(0, Math.min(1, Number(frac) || 0))
+    simLogLine('📍 position simulée : ' + Math.round(simGpsProgress * 100) + '% du trajet vers ' + (SIM_WAYPOINTS[Math.min(simGpsIdx + 1, SIM_WAYPOINTS.length - 1)] || {}).label)
+  }
+  function simSetGpsSpeed(kmh){
+    simGpsEtaSpeedKmh = Math.max(1, Number(kmh) || 40)
+    simLogLine('🚗 vitesse GPS simulée réglée à ' + simGpsEtaSpeedKmh + ' km/h')
   }
 
   function simPause(){
@@ -337,16 +388,41 @@
         '</select>' +
       '</div>' +
       '<div style="margin:6px 0"><button onclick="OptiSim.runAllScenarios()">▶ Lancer TEST 1 à 6</button></div>' +
+      _simGpsPanelBlock() +
       '<div style="margin-top:6px;border-top:1px solid #333;padding-top:6px;max-height:220px;overflow-y:auto">' +
         simLogLines.map(l => '<div>' + l.replace(/</g,'&lt;') + '</div>').join('') +
       '</div>'
+  }
+  // Valeurs RÉELLEMENT affichées par l'appli (techETAs / techRouteLegDurations),
+  // pas une réplique — pour vérifier ce que l'utilisateur voit, pas juste la logique.
+  function _simGpsPanelBlock(){
+    if (!simActive) return ''
+    const nextId = _nextPendingSimId()
+    const idx = (typeof _routeOrderedPts !== 'undefined') ? _routeOrderedPts.findIndex(p => p.iv.id === nextId) : -1
+    const leg = (idx >= 0 && typeof techRouteLegDurations !== 'undefined') ? techRouteLegDurations[idx] : null
+    const eta = simEtaOf(nextId)
+    const anchored = (typeof _gpsAnchorId !== 'undefined' && _gpsAnchorId === nextId)
+    return '<div style="margin:6px 0;border-top:1px solid #333;padding-top:6px">' +
+      '<div style="color:#80D8FF">📡 Prochain arrêt : ' + (nextId || '—') + '</div>' +
+      '<div>Distance restante : ' + (leg ? leg.distanceKm + ' km' : '—') + '</div>' +
+      '<div>Durée restante : ' + (leg ? leg.trafficDurationMin + ' min' : '—') + '</div>' +
+      '<div>ETA affichée (techETAs) : ' + (eta || '—') + '</div>' +
+      '<div>Ancrage GPS actif : ' + (anchored ? 'oui' : 'non (planning statique)') + '</div>' +
+      '<div style="margin-top:4px;display:flex;gap:6px;align-items:center">' +
+        '<label>Progression <input type="range" min="0" max="100" value="' + Math.round(simGpsProgress*100) + '" style="width:80px" oninput="OptiSim.setProgress(this.value/100)"/></label>' +
+      '</div>' +
+      '<div style="margin-top:4px;display:flex;gap:6px;align-items:center">' +
+        '<label>Vitesse simulée <input type="number" min="1" value="' + simGpsEtaSpeedKmh + '" style="width:50px" onchange="OptiSim.setGpsSpeed(this.value)"/> km/h</label>' +
+      '</div>' +
+    '</div>'
   }
   setInterval(simRenderPanel, 1000)
 
   window.OptiSim = {
     start: simStart, pause: simPause, resume: simResume, next: simNext, end: simEnd,
     setSpeed: setSimSpeed, jumpMinutes, runAllScenarios, runScenario,
-    _debug: () => ({simActive, simLog, simGpsIdx, techRouteLegDurations, _routeOrderedPts}),
+    setProgress: simSetProgress, setGpsSpeed: simSetGpsSpeed,
+    _debug: () => ({simActive, simLog, simGpsIdx, simGpsProgress, simGpsEtaSpeedKmh, techRouteLegDurations, _routeOrderedPts, _gpsAnchorIdx, _gpsAnchorId}),
   }
 
   document.addEventListener('DOMContentLoaded', simRenderPanel)

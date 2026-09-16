@@ -1232,9 +1232,21 @@ function refreshLiveETAs(){
   let delayAccum=0 // retard cumulé vs circulation fluide
   _routeOrderedPts.forEach((p,idx)=>{
     const leg=techRouteLegDurations[idx]
-    curMin+=leg?.trafficDurationMin||0
+    const isGpsAnchor=idx===_gpsAnchorIdx&&p.iv.id===_gpsAnchorId&&_gpsAnchorPtsRef===_routeOrderedPts
+    if(isGpsAnchor){
+      // Cette étape a une durée de trajet fraîche depuis la position GPS réelle :
+      // on ré-ancre sur l'instant où cette donnée a été obtenue (pas sur l'heure de
+      // départ, pas sur "maintenant" à cet appel-ci), en ajoutant uniquement la
+      // pause survenue DEPUIS cet ancrage — jamais comptée deux fois. L'heure de
+      // RDV (iv.timeStart) n'intervient volontairement PAS ici : elle ne doit
+      // jamais influencer l'ETA elle-même, seulement servir de référence pour le
+      // calcul d'avance/retard fait séparément à l'affichage.
+      curMin=_gpsAnchorAtMin+(leg?.trafficDurationMin||0)+Math.max(0,pauseMin-_gpsAnchorPauseMinAtCapture)
+    }else{
+      curMin+=leg?.trafficDurationMin||0
+      if(p.iv.timeStart){const[th,tm]=p.iv.timeStart.split(':').map(Number);if(curMin<th*60+tm)curMin=th*60+tm}
+    }
     delayAccum+=Math.max(0,(leg?.trafficDurationMin||0)-(leg?.durationMin??(leg?.trafficDurationMin||0)))
-    if(p.iv.timeStart){const[th,tm]=p.iv.timeStart.split(':').map(Number);if(curMin<th*60+tm)curMin=th*60+tm}
     if(tourRunning&&curMin<nowMin&&!validated[p.iv.id]&&!failed[p.iv.id]) curMin=nowMin
     techETAs[p.iv.id]={eta:toHHMM(curMin),leave:toHHMM(curMin+dur(p.iv.type,p.iv.form)),delayMin:Math.round(delayAccum)}
     curMin+=dur(p.iv.type,p.iv.form)
@@ -1326,6 +1338,10 @@ function _startTourInterval(){
       const pbloc=document.getElementById('dep-tour-paused')
       if(pbloc) pbloc.style.display='flex'
     }
+    // Occasion de recalculer l'ETA depuis la position GPS réelle — la fonction
+    // décide elle-même (fraîcheur GPS, distance parcourue, anti-concurrence) si
+    // un appel est réellement nécessaire à ce tick ; ne crée pas de nouvelle horloge.
+    if(tourRunning&&!_pauseStartTime) _refreshRemainingLegFromGPS()
   }
   _tick() // mise à jour immédiate
   tourTimer=setInterval(_tick, 30000) // toutes les 30s
@@ -1334,6 +1350,14 @@ function _startTourInterval(){
 // ── Position en direct, planning de référence, arrivée destination finale ──────
 let _posWatchId=null,_posMarker=null,_lastPos=null,_arrivalAlerted=false
 let _plannedETAs=null,_plannedTourEnd=null,_tourSheetCb=null
+// Ancrage GPS→ETA : identifie QUELLE étape de _routeOrderedPts a reçu une durée de
+// trajet fraîchement recalculée depuis la position GPS réelle, et À QUEL MOMENT
+// (nowMinParis() au moment du succès, pas "maintenant" à chaque refresh — sinon
+// l'ETA dérive à chaque tick même sans nouvelle donnée GPS). _gpsAnchorPtsRef est
+// une référence d'objet : si _routeOrderedPts est réaffecté en bloc (recalcul
+// complet), l'ancrage se désactive automatiquement (référence différente), sans
+// avoir à toucher les points où techRouteLegDurations est réinitialisé.
+let _gpsAnchorIdx=null,_gpsAnchorId=null,_gpsAnchorAtMin=null,_gpsAnchorPauseMinAtCapture=0,_gpsAnchorPtsRef=null
 function _distM(a,b){
   const R=6371000,dLat=(b.lat-a.lat)*Math.PI/180,dLng=(b.lng-a.lng)*Math.PI/180
   const x=Math.sin(dLat/2)**2+Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLng/2)**2
@@ -1382,6 +1406,69 @@ function _checkArrival(c){
     'Toutes les interventions sont traitées et tu es arrivé au point final de la tournée — n\'oublie pas d\'arrêter le timer.',
     '✓ Fin tournée', ()=>{closeTourSheet();endTournee()},
     {persistent:true, secondaryLabel:'Plus tard — je garde le timer', onSecondary:closeTourSheet})
+}
+// ── ETA basée sur la position GPS réelle ────────────────────────────────────
+// Ne remplace QUE le segment vers le prochain arrêt non validé (techRouteLegDurations[idx])
+// avec un trajet routé depuis la position GPS actuelle — le reste de la tournée
+// n'est jamais touché. Pose aussi l'ancrage (_gpsAnchor*) que refreshLiveETAs()
+// utilise pour calculer cette étape depuis "l'instant de cette lecture GPS", pas
+// depuis l'heure de départ de la tournée — refreshLiveETAs() elle-même n'a besoin
+// d'aucune autre modification pour en tenir compte.
+let _gpsEtaBusy=false
+// Dernier point ayant servi à un recalcul GPS→ETA réussi — sert UNIQUEMENT à limiter
+// la fréquence des appels API (distance/temps écoulé), ne remplace pas _lastPos et
+// n'introduit pas un second système de position.
+let _lastGpsEtaRecalc=null
+async function _refreshRemainingLegFromGPS(){
+  if(!tourRunning||_pauseStartTime) return // jamais pendant une pause, jamais hors tournée
+  if(_gpsEtaBusy) return // anti-concurrence : jamais deux appels en vol
+  if(!_lastPos) return // GPS indisponible → on ne touche à rien
+  if(Date.now()-_lastPos.ts>180000) return // position trop ancienne (>3min) → on ne touche à rien
+
+  const nextIdx=_routeOrderedPts.findIndex(p=>!validated[p.iv.id]&&!failed[p.iv.id])
+  if(nextIdx<0) return // plus aucun arrêt en attente
+  const dest=_routeOrderedPts[nextIdx].c
+  if(!dest) return
+
+  const now=Date.now()
+  if(_lastGpsEtaRecalc){
+    const movedM=_distM(_lastPos,_lastGpsEtaRecalc)
+    const sinceMs=now-_lastGpsEtaRecalc.ts
+    const movingEnough=movedM>=150 && sinceMs>=60000   // déplacement réel, pas plus d'1 fois/min
+    const safetyCeiling=sinceMs>=180000                 // plafond même à l'arrêt (trafic qui évolue)
+    if(!movingEnough&&!safetyCeiling) return
+  }
+
+  _gpsEtaBusy=true
+  try{
+    const r=await fetch('/api/route-traffic',{
+      method:'POST',
+      headers:{'Content-Type':'application/json',..._techAuthHeaders()},
+      body:JSON.stringify({waypoints:[{lat:_lastPos.lat,lng:_lastPos.lng},dest]}),
+      signal:AbortSignal.timeout(8000)
+    })
+    if(!r.ok) return
+    const data=await r.json()
+    const leg=data.legs?.[0]
+    const mins=leg?.trafficDurationMin??leg?.durationMin
+    if(!leg||!(mins>0)) return // durée absente/invalide → on garde l'ancienne valeur, jamais 0
+    // Le point ciblé peut avoir changé pendant l'appel réseau (validation du client,
+    // recalcul complet déclenché entre-temps) — si ce n'est plus le même arrêt, on
+    // abandonne ce résultat plutôt que de l'appliquer au mauvais endroit.
+    if(_routeOrderedPts[nextIdx]?.c!==dest) return
+    techRouteLegDurations[nextIdx]=leg
+    _lastGpsEtaRecalc={lat:_lastPos.lat,lng:_lastPos.lng,ts:now}
+    _gpsAnchorIdx=nextIdx
+    _gpsAnchorId=_routeOrderedPts[nextIdx].iv.id
+    _gpsAnchorAtMin=nowMinParis()
+    _gpsAnchorPauseMinAtCapture=Math.round(_pauseCumMs/60000) // pas de pause en cours ici (déjà garanti par le garde ci-dessus)
+    _gpsAnchorPtsRef=_routeOrderedPts
+    refreshLiveETAs() // recalcul immédiat, sans attendre le prochain tick de 30s
+  }catch(e){
+    console.warn('[GPS→ETA] recalcul échoué, dernière valeur conservée:',e.message)
+  }finally{
+    _gpsEtaBusy=false
+  }
 }
 // Planning de référence figé au démarrage : sert à mesurer avance/retard par client
 // pendant la journée, et le bilan temps gagné/perdu à la fin. Persisté pour survivre
