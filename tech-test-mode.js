@@ -204,6 +204,18 @@
     tourRunning = true
     tourStartTime = new Date() // lit l'horloge simulée patchée
     if (typeof _arrivalAlerted !== 'undefined') _arrivalAlerted = true // coupe l'alerte d'arrivée RÉELLE par sécurité — l'arrivée simulée est gérée par simNext()/ce fichier, jamais par _checkArrival()/endTournee() réels
+    // startTournee()/endTournee() (réels) réinitialisent _pauseCumMs/_pauseStartTime à
+    // chaque tournée — mais simStart()/simEnd() ne les appellent JAMAIS (pour éviter les
+    // écritures Supabase). Sans ce reset explicite, une pause testée lors d'un run
+    // précédent (manuel ou "TEST 1 à 6") reste accumulée dans _pauseCumMs d'un
+    // simStart() au suivant, sans recharger la page — jusqu'à ce que refreshLiveETAs()
+    // calcule une ETA de plusieurs dizaines de milliers de minutes, qui fait alors
+    // plusieurs tours de cadran (%24×60) et affiche une heure sans rapport avec la
+    // réalité. C'est la cause exacte du bug ETA observé.
+    if (typeof _pauseStartTime !== 'undefined') _pauseStartTime = null
+    if (typeof _pauseCumMs !== 'undefined') _pauseCumMs = 0
+    if (typeof _gpsAnchorIdx !== 'undefined') { _gpsAnchorIdx = null; _gpsAnchorId = null; _gpsAnchorAtMin = null; _gpsAnchorPauseMinAtCapture = 0; _gpsAnchorPtsRef = null }
+    if (typeof _lastGpsEtaRecalc !== 'undefined') _lastGpsEtaRecalc = null
 
     simActive = true
     simLog = {demarrage:simHHMM(), pause:null, dureePause:null, reprise:null, etaAvantPause:null, etaApresReprise:null}
@@ -263,6 +275,9 @@
     navigator.geolocation.clearWatch(SIM_WATCH_ID)
     tourRunning = false
     tourStartTime = null
+    if (typeof _pauseStartTime !== 'undefined') _pauseStartTime = null
+    if (typeof _pauseCumMs !== 'undefined') _pauseCumMs = 0
+    if (typeof _gpsAnchorIdx !== 'undefined') { _gpsAnchorIdx = null; _gpsAnchorId = null; _gpsAnchorAtMin = null; _gpsAnchorPauseMinAtCapture = 0; _gpsAnchorPtsRef = null }
     SIM_STOP_IDS.forEach(id => { delete validated[id]; delete failed[id]; delete techETAs[id] })
     if (simSavedState) {
       techRouteLegDurations = simSavedState.techRouteLegDurations
@@ -404,8 +419,8 @@
     const anchored = (typeof _gpsAnchorId !== 'undefined' && _gpsAnchorId === nextId)
     return '<div style="margin:6px 0;border-top:1px solid #333;padding-top:6px">' +
       '<div style="color:#80D8FF">📡 Prochain arrêt : ' + (nextId || '—') + '</div>' +
-      '<div>Distance restante : ' + (leg ? leg.distanceKm + ' km' : '—') + '</div>' +
-      '<div>Durée restante : ' + (leg ? leg.trafficDurationMin + ' min' : '—') + '</div>' +
+      '<div>Distance restante : ' + (leg ? Math.max(0, leg.distanceKm || 0) + ' km' : '—') + '</div>' +
+      '<div>Durée restante : ' + (leg ? Math.max(0, leg.trafficDurationMin || 0) + ' min' : '—') + '</div>' +
       '<div>ETA affichée (techETAs) : ' + (eta || '—') + '</div>' +
       '<div>Ancrage GPS actif : ' + (anchored ? 'oui' : 'non (planning statique)') + '</div>' +
       '<div style="margin-top:4px;display:flex;gap:6px;align-items:center">' +

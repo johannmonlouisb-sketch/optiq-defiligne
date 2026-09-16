@@ -1204,7 +1204,10 @@ const MS=["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","D
 const DS=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"]
 function fd(d){if(!d)return "";const dt=new Date(d+"T12:00:00");return dt.getDate()+" "+MS[dt.getMonth()]}
 function fdl(d){if(!d)return "";const dt=new Date(d+"T12:00:00");return DS[dt.getDay()]+" "+dt.getDate()+" "+MS[dt.getMonth()]}
-function fmin(m){if(m<60)return m+"min";return Math.floor(m/60)+"h"+(m%60>0?String(m%60).padStart(2,"0"):"")}
+// Toujours utilisée pour des durées (jamais pour l'écart avance/retard, qui construit
+// son propre signe "−" en texte puis appelle fmin() sur une valeur déjà positive) —
+// filet de sécurité : une durée ne doit jamais s'afficher négative.
+function fmin(m){const s=Math.max(0,m||0);if(s<60)return s+"min";return Math.floor(s/60)+"h"+(s%60>0?String(s%60).padStart(2,"0"):"")}
 function dur(t,f){return (TYPES[t]||TYPES.maintenance_simple).dur+(f?10:0)}
 function TB(id){return TECHS.find(t=>t.id===id)||TECHS[0]}
 function addMinToTime(hhmm,mins){
