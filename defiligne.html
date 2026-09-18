@@ -12,7 +12,67 @@
 <script src="/stock-module.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-:root{--blue:#1565C0;--blueDark:#0D47A1;--blueLight:#E3F2FD;--green:#1B5E20;--greenLight:#E8F5E9;--orange:#E65100;--red:#C62828;--purple:#6A1B9A;--gray:#757575;--border:#E0E0E0;--bg:#F5F5F5;--white:#fff;--dark:#1A1A1A}
+:root{
+  /* 1. Couleurs principales */
+  --primary:#1565C0;--primary-dark:#0D47A1;--primary-light:#E3F2FD;
+
+  /* 2. Couleurs sémantiques */
+  --success:#1B8A45;--success-light:#E8F5E9;
+  --warning:#B45309;--warning-light:#FFF3E0;
+  --danger:#C62828;--danger-light:#FFEBEE;
+
+  /* 3. Couleurs métier — données partagées avec tech.html, jamais des couleurs
+     sémantiques : ne pas les faire pointer vers success/warning/danger. */
+  --purple:#6A1B9A;--purple-light:#F3E5F5;
+  --type-telemaintenance:#00897B;
+  /* Note : la palette qualitative de clustering (dont #00838F) vit dans le
+     tableau JS CLUSTER_COLORS, pas ici — non modifiée, non dupliquée. */
+
+  /* 4. Surfaces */
+  --background:#F5F5F5;--surface:#FFFFFF;--surface-secondary:#F8F9FA;
+
+  /* 5. Texte */
+  --text:#17202A;--text-secondary:#5A6472;--text-tertiary:#8A94A0;
+
+  /* 6. Bordures — --border-strong est un ajout pur ; --border existant (§ légende
+     ci-dessous) garde sa valeur actuelle pour ne rien changer visuellement. */
+  --border-strong:#D0D5DD;
+
+  /* 7. Spacing */
+  --space-xs:4px;--space-sm:8px;--space-md:12px;--space-lg:16px;--space-xl:24px;--space-2xl:32px;
+
+  /* 8. Radius */
+  --radius-sm:8px;--radius-md:12px;--radius-lg:16px;--radius-xl:20px;--radius-pill:9999px;--radius-circle:50%;
+
+  /* 9. Shadows */
+  --shadow-sm:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.06);
+  --shadow-md:0 2px 8px rgba(16,24,40,.08),0 1px 2px rgba(16,24,40,.04);
+  --shadow-lg:0 8px 24px rgba(16,24,40,.12);
+  --shadow-overlay:0 20px 60px rgba(0,0,0,.2);
+
+  /* 10. Typography */
+  --text-display-size:28px;--text-display-weight:800;--text-display-line:1.2;
+  --text-h1-size:20px;--text-h1-weight:700;--text-h1-line:1.25;
+  --text-h2-size:16px;--text-h2-weight:700;--text-h2-line:1.3;
+  --text-h3-size:14px;--text-h3-weight:600;--text-h3-line:1.35;
+  --text-body-size:13px;--text-body-weight:400;--text-body-line:1.5;
+  --text-small-size:12px;--text-small-weight:400;--text-small-line:1.4;
+  --text-caption-size:11px;--text-caption-weight:500;--text-caption-line:1.3;
+  --text-label-size:11px;--text-label-weight:700;--text-label-line:1.2;
+  --text-kpi-size:28px;--text-kpi-weight:800;--text-kpi-line:1;
+  --text-button-size:14px;--text-button-weight:600;--text-button-line:1;
+  --text-button-small-size:12px;
+
+  /* 11. Legacy aliases — compatibilité obligatoire, tout le CSS/JS existant
+     continue de fonctionner à l'identique via ces noms. */
+  --blue:var(--primary);--blueDark:var(--primary-dark);--blueLight:var(--primary-light);
+  --green:var(--success);--greenLight:var(--success-light);--orange:var(--warning);
+  --bg:var(--background);--white:var(--surface);
+
+  /* Tokens historiques non réalignés dans ce pass — valeur inchangée, aucun
+     alias créé (non demandé explicitement / changerait le rendu, voir rapport) */
+  --red:#C62828;--gray:#757575;--border:#E0E0E0;--dark:#1A1A1A;
+}
 body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);display:flex;height:100vh;overflow:hidden;font-size:15px}
 /* ── SIDEBAR ── */
 #sidebar{width:220px;background:var(--blueDark);display:flex;flex-direction:column;flex-shrink:0;transition:width 0.2s;overflow-y:auto;overflow-x:hidden}
@@ -74,6 +134,17 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);display:flex;h
 .ivc .cn{font-weight:600;font-size:14px;color:var(--dark);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ivc .ca{font-size:12px;color:var(--gray);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ivc .note-preview{font-size:11px;color:var(--orange);background:#FFF3E0;padding:4px 8px;border-radius:5px;margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* PASS 10D.6 — INTERVENTIONS : correction responsive du groupe date/badges/
+   avatar/select des cartes .ivc dans rIv() uniquement (classe locale
+   .iv-card-actions, absente de ivCard()/rDash()/rMat()). Cause racine
+   mesurée : à <=480px, les 5 éléments à largeur fixe (date, badge type,
+   avatar, badge statut, select) dépassent la largeur de la carte car
+   flex-shrink:0 les empêche de rétrécir. Autoriser le retour à la ligne
+   au lieu de les laisser déborder de la carte. Aucune donnée/JS modifié. */
+.iv-card-actions{flex-shrink:0}
+@media(max-width:480px){
+  .iv-card-actions{flex-wrap:wrap;justify-content:flex-end;flex-shrink:1;min-width:0}
+}
 /* PROGRESS */
 .prog-t{height:7px;background:var(--bg);border-radius:4px;overflow:hidden}
 .prog-f{height:100%;border-radius:4px;transition:width 0.4s}
@@ -127,19 +198,20 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--blue);border-col
 .lbl{font-size:12px;color:var(--gray);font-weight:500;display:block;margin-bottom:3px}
 /* DEPART TAB */
 #dep-layout{display:grid;grid-template-columns:1fr 340px;gap:14px;padding:12px 16px 16px;min-height:0;flex:1}
-#dep-mapid{border-radius:10px;overflow:hidden;border:1px solid var(--border);background:#f0f0f0}
-#dep-right{display:flex;flex-direction:column;gap:8px;overflow-y:auto;min-height:0}
+#dep-mapid{border-radius:var(--radius-lg);overflow:hidden;border:1px solid var(--border);background:var(--surface-secondary);box-shadow:var(--shadow-sm)}
+#dep-right{display:flex;flex-direction:column;gap:var(--space-sm);overflow-y:auto;min-height:0}
 #dep-list{display:flex;flex-direction:column;gap:8px}
-.dep-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px;cursor:pointer;transition:all 0.15s;border-left:4px solid var(--blue)}
+.dep-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:14px;cursor:pointer;transition:box-shadow .15s,border-color .15s;border-left:4px solid var(--blue)}
 .dep-card.done{border-left-color:#4CAF50;opacity:0.72}
-.dep-card:hover:not(.done){box-shadow:0 2px 12px rgba(0,0,0,0.1)}
+.dep-card:hover:not(.done){box-shadow:var(--shadow-sm);border-color:var(--border-strong)}
 .dep-card.drag-over{outline:2px dashed var(--blue);background:var(--blueLight,#EFF6FF)}
 .dep-card.sel{outline:2px solid var(--blue);background:var(--blueLight,#EFF6FF)}
-.dep-num{width:32px;height:32px;background:var(--blue);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0}
+.dep-num{width:32px;height:32px;background:var(--blue);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;box-shadow:var(--shadow-sm)}
 .dep-card.done .dep-num{background:#4CAF50}
-.dep-drag{color:#ccc;font-size:18px;cursor:grab;flex-shrink:0;user-select:none;-webkit-user-select:none;padding:0 2px;line-height:1;align-self:center}
+.dep-drag{color:var(--text-tertiary);font-size:18px;cursor:grab;flex-shrink:0;user-select:none;-webkit-user-select:none;padding:0 2px;line-height:1;align-self:center}
 .dep-card.mini{padding:8px 14px}
 .dep-card.mini .dep-body{display:none}
+.dep-addr{font-size:12px;color:var(--text-tertiary)}
 .dep-card.mini .dep-addr{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* PRÉVISIONS */
 .prev-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px 15px;margin-bottom:8px;border-left:3px solid}
@@ -208,6 +280,548 @@ tr:hover td{background:var(--bg)}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 #sidebar::-webkit-scrollbar-thumb{background:rgba(255,255,255,.2)}
 #sidebar{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.2) transparent}
+
+/* ============================================================
+   PASS 5 — COMPOSANTS GÉNÉRIQUES (Design System)
+   Couche additive uniquement : aucune classe/règle existante
+   n'est modifiée ci-dessus. Ces classes ne sont pour l'instant
+   utilisées nulle part dans l'app — elles préparent les
+   migrations de vues des PASS suivants.
+   ============================================================ */
+
+/* --- Boutons génériques --- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 16px;border-radius:var(--radius-sm);border:1px solid transparent;font-family:inherit;font-size:var(--text-button-size);font-weight:var(--text-button-weight);line-height:var(--text-button-line);cursor:pointer;transition:background .12s,border-color .12s,color .12s,box-shadow .12s;white-space:nowrap}
+.btn:focus-visible{outline:2px solid var(--primary);outline-offset:1px}
+.btn:disabled,.btn.is-disabled,.btn[aria-disabled="true"]{opacity:.5;cursor:not-allowed;pointer-events:none}
+.btn-sm{padding:5px 12px;font-size:var(--text-button-small-size)}
+
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover{background:var(--primary-dark)}
+.btn-primary:active{background:var(--primary-dark);box-shadow:inset 0 1px 2px rgba(0,0,0,.15)}
+
+.btn-secondary{background:var(--surface);color:var(--text);border-color:var(--border)}
+.btn-secondary:hover{background:var(--surface-secondary)}
+.btn-secondary:active{background:var(--surface-secondary);box-shadow:inset 0 1px 2px rgba(0,0,0,.06)}
+
+.btn-tertiary{background:transparent;color:var(--primary);border-color:transparent}
+.btn-tertiary:hover{background:var(--primary-light)}
+
+.btn-danger{background:var(--danger);color:#fff}
+.btn-danger:hover{filter:brightness(.92)}
+.btn-danger:active{filter:brightness(.85)}
+
+.btn-ghost{background:transparent;color:var(--text);border-color:transparent}
+.btn-ghost:hover{background:rgba(0,0,0,.05)}
+
+.btn-icon{width:44px;height:44px;padding:0;border-radius:50%;background:transparent;border:1px solid transparent;color:var(--text-secondary)}
+.btn-icon:hover{background:rgba(0,0,0,.06)}
+
+/* --- Badges génériques (namespace distinct de .bdg existant, non touché) --- */
+.badge{display:inline-block;font-size:var(--text-caption-size);font-weight:var(--text-caption-weight);line-height:var(--text-caption-line);padding:2px 9px;border-radius:var(--radius-pill);white-space:nowrap}
+.badge-success{background:var(--success-light);color:var(--success)}
+.badge-warning{background:var(--warning-light);color:var(--warning)}
+.badge-danger{background:var(--danger-light);color:var(--danger)}
+.badge-primary{background:var(--primary-light);color:var(--primary)}
+.badge-purple{background:var(--purple-light);color:var(--purple)}
+.badge-neutral{background:var(--surface-secondary);color:var(--text-secondary)}
+
+/* --- Carte : .card existe déjà (ligne ~112) et reste inchangée.
+   Sous-structure optionnelle, additive, non utilisée pour l'instant. --- */
+.card-header{padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--border);font-size:var(--text-h3-size);font-weight:var(--text-h3-weight)}
+.card-body{padding:0}
+.card-footer{padding-top:10px;margin-top:10px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
+
+/* --- Inputs génériques (le sélecteur global input,select,textarea plus haut n'est pas touché) --- */
+.form-control,.form-select,.form-textarea{width:100%;font-family:inherit;font-size:var(--text-body-size);color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 11px;min-height:38px;transition:border-color .12s,box-shadow .12s}
+.form-textarea{min-height:80px;resize:vertical}
+.form-control:focus,.form-control:focus-visible,.form-select:focus,.form-select:focus-visible,.form-textarea:focus,.form-textarea:focus-visible{outline:none;border-color:var(--primary);box-shadow:0 0 0 2px var(--primary-light)}
+
+/* --- Recherche générique (le #gsearch existant n'est pas touché) --- */
+.search-control{width:100%;font-family:inherit;font-size:var(--text-body-size);color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-pill);padding:8px 16px;transition:border-color .12s}
+.search-control:focus,.search-control:focus-visible{outline:none;border-color:var(--primary)}
+
+/* --- Filtres génériques (.fbar existant n'est pas touché) --- */
+.filter-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.filter-item{display:flex;flex-direction:column;gap:4px}
+.filter-actions{display:flex;gap:8px;align-items:center;margin-left:auto}
+
+/* --- Alertes génériques --- */
+.alert{display:flex;gap:10px;align-items:flex-start;padding:10px 14px;border-radius:var(--radius-sm);border-left:4px solid transparent;font-size:var(--text-body-size);line-height:var(--text-body-line)}
+.alert-info{background:var(--primary-light);border-left-color:var(--primary);color:var(--text)}
+.alert-success{background:var(--success-light);border-left-color:var(--success);color:var(--text)}
+.alert-warning{background:var(--warning-light);border-left-color:var(--warning);color:var(--text)}
+.alert-danger{background:var(--danger-light);border-left-color:var(--danger);color:var(--text)}
+
+/* --- Grilles génériques (.g2/.g3/.kpig existants ne sont pas touchés) --- */
+.grid-2{display:grid;grid-template-columns:1fr 300px;gap:var(--space-lg)}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-md)}
+.grid-kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--space-md)}
+@media(max-width:900px){.grid-2{grid-template-columns:1fr}.grid-3{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.grid-3{grid-template-columns:1fr}.grid-kpi{grid-template-columns:repeat(2,1fr)}}
+
+/* --- États génériques : CSS uniquement, aucun JS n'active ces classes ici --- */
+.is-hidden{display:none!important}
+.is-disabled{opacity:.5;pointer-events:none}
+.is-active{background:var(--primary-light);color:var(--primary)}
+.is-loading{position:relative;color:transparent!important;pointer-events:none}
+.is-loading::after{content:"";position:absolute;width:14px;height:14px;top:50%;left:50%;margin:-7px 0 0 -7px;border:2px solid rgba(0,0,0,.15);border-top-color:var(--primary);border-radius:50%;animation:optx-spin .6s linear infinite}
+@keyframes optx-spin{to{transform:rotate(360deg)}}
+
+/* --- Tableaux génériques : scopés sous .table, ne touchent pas table/th/td globaux --- */
+.table{width:100%;font-size:var(--text-body-size);border-collapse:collapse}
+.table th{text-align:left;padding:6px 8px;color:var(--text-secondary);font-weight:600;font-size:var(--text-caption-size);border-bottom:2px solid var(--border)}
+.table td{padding:7px 8px;border-bottom:1px solid var(--border);color:var(--text)}
+.table-compact th,.table-compact td{padding:4px 6px}
+.table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+
+/* ============================================================
+   PASS 6 — DASHBOARD (rDash)
+   Classes de composition propres à la vue Dashboard uniquement.
+   .kpi/.kpig/.ivc/.card/.g2 restent les classes partagées
+   d'origine (utilisées ailleurs ou historiques) : non redéfinies,
+   sauf la ligne .kpi ci-dessous (voir commentaire).
+   ============================================================ */
+.dashboard-context{margin-bottom:14px}
+.dashboard-section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.dashboard-section-header h2{font-size:var(--text-h2-size);font-weight:var(--text-h2-weight);color:var(--text);margin:0}
+/* .kpi est exclusif au Dashboard (aucun autre usage dans le fichier, vérifié) :
+   harmonisation du poids de la valeur avec le token typographique KPI du DS. */
+.kpi p:last-child{font-weight:var(--text-kpi-weight)}
+
+/* ============================================================
+   PASS 7B — PLANNING (rPlan / planHdr / ivCard / vues Jour-Semaine-Mois-Année)
+   .wkg/.db/.dc sont exclusifs à Planning (vérifié Pass 7A) : étendus
+   directement. .card/.ivc restent partagés : non redéfinis, seules
+   des classes additives (.plan-*) leur sont accolées.
+   ============================================================ */
+.plan-header{display:flex;flex-direction:column;gap:10px;margin-bottom:14px}
+.plan-header-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.plan-view-switch{display:flex;gap:6px;flex-wrap:wrap}
+.plan-nav{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.plan-actions{gap:8px}
+.plan-period-label{font-size:var(--text-h2-size);font-weight:var(--text-h2-weight);color:var(--text);margin:0 0 var(--space-md)}
+.plan-period-inline{font-size:var(--text-h3-size);font-weight:var(--text-h3-weight);color:var(--text);padding:0 6px}
+.plan-period-sub{font-size:var(--text-small-size);font-weight:400;color:var(--gray)}
+.plan-day-heading{font-size:var(--text-h3-size);font-weight:var(--text-h3-weight);color:var(--text);margin:0 0 var(--space-sm)}
+
+/* Bandeau semaine (.wkg/.db) : accessibilité clavier + réponsive (gap identifié Pass 7A) */
+.db{font-family:inherit;width:100%;display:block}
+.db:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.plan-week-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+@media(max-width:768px){
+  .plan-week-scroll .wkg{grid-template-columns:repeat(7,minmax(76px,1fr));min-width:560px}
+}
+
+/* Grille mois : nouvelle classe (aucune classe n'existait auparavant, style 100% inline) */
+.plan-month-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:var(--space-lg)}
+.plan-month-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+@media(max-width:768px){
+  .plan-month-scroll .plan-month-grid{grid-template-columns:repeat(7,minmax(64px,1fr));min-width:480px}
+}
+.plan-month-cell{font-family:inherit;width:100%;display:block;text-align:left;cursor:pointer;border-radius:var(--radius-sm);padding:5px 6px;transition:box-shadow .1s}
+.plan-month-cell:hover{box-shadow:0 2px 8px rgba(0,0,0,.1)}
+.plan-month-cell:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.plan-month-weekday{text-align:center;font-size:var(--text-caption-size);font-weight:600;color:var(--gray);padding:5px 0}
+
+/* Cartes mois de la vue Année : .card non redéfini, classe additive uniquement */
+.plan-year-card{font-family:inherit;width:100%;display:block;text-align:left;cursor:pointer}
+.plan-year-card:hover{box-shadow:var(--shadow-md)}
+.plan-year-card:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+
+/* Carte intervention (ivCard()) : focus clavier additif sur .ivc, sans redéfinir sa base */
+.ivc:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+
+/* ============================================================
+   PASS 8B.1 — DÉPART & CARTE : HEADER / CONTRÔLES UNIQUEMENT
+   Classes additives pour le bandeau de contrôles uniquement.
+   .dep-grp-hdr, .dep-card, .surf, le moteur de tournée/ETA et
+   la carte Leaflet ne sont pas concernés par ce pass.
+   ============================================================ */
+.dep-header{display:flex;flex-direction:column;gap:7px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--surface)}
+.dep-tech-dropdown{position:absolute;top:calc(100% + 6px);left:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);box-shadow:var(--shadow-md);z-index:200;min-width:220px;padding:8px}
+.dep-chip-remove{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border:none;background:transparent;color:inherit;opacity:.75;cursor:pointer;padding:0;font-size:10px;margin-left:2px;border-radius:50%;font-family:inherit}
+.dep-chip-remove:hover{opacity:1;background:rgba(255,255,255,.25)}
+.dep-chip-remove:focus-visible{outline:2px solid #fff;outline-offset:1px}
+
+/* ============================================================
+   PASS 8B.2 — DÉPART & CARTE : EN-TÊTE GROUPE TECHNICIEN
+   .dep-grp-hdr exclusif à Départ (vérifié Pass 7A/8A) : première
+   règle CSS dédiée créée ici. Couleurs d'état (absent/verrouillé)
+   gardées littérales à dessein — voir rapport 8B.2 section D.
+   .dep-card/.dep-drag et le moteur de tournée ne sont pas concernés.
+   ============================================================ */
+.dep-grp-hdr{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:var(--radius-md);background:var(--surface-secondary);flex-wrap:wrap;row-gap:6px}
+.dep-grp-hdr.is-absent{opacity:.5}
+.dep-grp-name{font-weight:700;font-size:var(--text-h3-size)}
+.dep-grp-count{font-size:var(--text-caption-size);color:var(--text-secondary)}
+.dep-grp-end{font-size:var(--text-caption-size);font-weight:700;color:#E65100;background:#FFF3E0;padding:2px 8px;border-radius:var(--radius-pill);white-space:nowrap}
+.dep-grp-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-left:auto}
+
+.dep-action{border-color:var(--border);background:var(--surface);color:var(--text-secondary)}
+.dep-action:hover{background:var(--surface-secondary)}
+.dep-action:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.dep-action.is-on{border-color:#C62828;background:#FFEBEE;color:#C62828}
+.dep-action.is-on:hover{background:#FFEBEE}
+.dep-action.is-locked{border-color:#16a34a;background:#f0fdf4;color:#16a34a}
+.dep-action.is-locked:hover{background:#f0fdf4}
+
+/* ============================================================
+   PASS 8B.3 — DÉPART & CARTE : RÉSUMÉ MATÉRIEL (conteneur uniquement)
+   matSummaryCompact()/equipHTML_dep()/getEquip()/urgCol() ne sont
+   PAS modifiées — leurs chips gardent leurs styles inline et leurs
+   couleurs d'urgence/catégorie exactement comme avant. Cette classe
+   habille uniquement le conteneur ajouté par rDepart() autour du
+   résultat de matSummaryCompact(), pas la fonction elle-même.
+   ============================================================ */
+.dep-mat-summary{padding:6px 10px;margin:4px 0 6px;background:var(--surface-secondary);border-radius:var(--radius-sm)}
+
+/* ============================================================
+   PASS 8B.5 — DÉPART & CARTE : BOUTONS D'ACTION DE .dep-card
+   valDep()/failDep()/setFirstDepIv()/editIv() non modifiées — ces
+   classes n'habillent que le rendu, aucune couleur métier de
+   statut/technicien/matériel n'est touchée. La marque Waze (cyan)
+   est préservée à l'identique (identité tierce, pas une couleur
+   sémantique arbitraire).
+   ============================================================ */
+.dep-action-btn{flex:1;background:var(--bg);color:var(--text)}
+.dep-action-btn:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.dep-action-btn.is-done{background:#4CAF50;color:#fff}
+.dep-action-btn.is-failed{background:var(--danger);color:#fff}
+.dep-action-icon{width:36px;height:36px;padding:0;border-radius:var(--radius-sm);background:var(--surface);border:1px solid var(--border);color:var(--text-secondary);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.dep-action-icon:hover{background:var(--surface-secondary)}
+.dep-action-icon:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+
+/* ============================================================
+   PASS 8B.6 — DÉPART & CARTE : AFFICHAGE ETA (habillage uniquement)
+   depETAs/depTourEnd et leur calcul (refreshDepETAs/initDepMap) ne
+   sont pas modifiés — seule la présentation du bloc généré dans
+   rDepart() change. "Heure prévue" devient l'info dominante, le
+   trajet reste secondaire ; seul le retard utilise --warning (le
+   code le traite déjà comme un retard réel à surveiller, cf. son
+   title="Retard potentiel..."), pour ne jamais confondre l'ETA
+   avec un statut "done"/succès métier (cf. brief section 8).
+   ============================================================ */
+.dep-eta{display:flex;flex-direction:column;gap:3px;margin-bottom:5px}
+.dep-eta-main{font-size:12px;font-weight:700;color:var(--primary)}
+.dep-eta-meta{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+.dep-eta-duration{font-size:11px;color:var(--text-secondary)}
+.dep-eta-delay{font-size:11px;font-weight:600;padding:2px 7px;border-radius:var(--radius-pill);background:var(--warning-light);color:var(--warning)}
+
+/* ============================================================
+   PASS 8B.9 — DÉPART & CARTE : QA ACCESSIBILITÉ FINALE
+   Focus visible additif uniquement pour les éléments convertis
+   div → button de rDepTechDropdownContent(). Aucune logique
+   touchée (voir rapport 8B.9).
+   ============================================================ */
+#dep-tech-list button:focus-visible,#dep-tech-btn:focus-visible,#dep-traffic-btn:focus-visible{outline:2px solid var(--primary);outline-offset:1px}
+
+/* ============================================================
+   PASS 9B.1 — ZONES & TECHS : HEADER / CONTRÔLES D'ANALYSE UNIQUEMENT
+   analyserZones()/kmeansGeo()/renderZoneResult()/appliquerZones() ne
+   sont pas modifiées. Cartes de zone, tableau de score, carte Leaflet,
+   bouton "Appliquer" et CLUSTER_COLORS hors périmètre (voir 9B.2+).
+   ============================================================ */
+.zone-header{display:flex;align-items:center;gap:var(--space-md);flex-wrap:wrap}
+.zone-controls{display:flex;gap:var(--space-sm);align-items:flex-end;flex-wrap:wrap}
+.zone-control{display:flex;flex-direction:column;gap:4px}
+.zone-control label{font-size:var(--text-caption-size);font-weight:600;color:var(--text-secondary)}
+.zone-control-checkbox{display:flex;align-items:center;gap:6px;font-size:var(--text-body-size);color:var(--text-secondary);cursor:pointer;padding-bottom:8px}
+
+/* ============================================================
+   PASS 9B.2 — ZONES & TECHS : BANDEAU ADRESSES NON GÉOLOCALISÉES
+   renderZoneResult() n'est modifiée que sur ce fragment (bandeau +
+   bouton "Voir la liste"). Cartes de zone, carte Leaflet, tableau de
+   score, sélecteurs technicien, bouton Appliquer, CLUSTER_COLORS :
+   non touchés (voir rapport 9B.2).
+   ============================================================ */
+.zone-toggle-list{display:inline-block;background:none;border:none;padding:0;margin-top:4px;font-family:inherit;font-size:12px;color:var(--gray);cursor:pointer;text-decoration:underline}
+.zone-toggle-list:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+
+/* ============================================================
+   PASS 9B.3 — ZONES & TECHS : CARTES DE ZONES (renderZoneResult)
+   Uniquement le conteneur/header/méta/liste-wrapper des cartes de
+   zone. Sélecteur technicien, bouton Appliquer, tableau de score,
+   Leaflet, CLUSTER_COLORS et logique div onclick des interventions
+   (voir 9B.4) : non touchés (voir rapport 9B.3).
+   ============================================================ */
+.zone-card{background:var(--surface);border:1px solid var(--border);border-left-width:4px;border-left-style:solid;border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);padding:var(--space-lg) var(--space-lg) var(--space-md)}
+.zone-card-header{display:flex;align-items:center;gap:var(--space-sm);margin-bottom:2px}
+.zone-card-color{width:14px;height:14px;border-radius:var(--radius-circle);flex-shrink:0}
+.zone-card-title{font-size:var(--text-h3-size);font-weight:700;color:var(--text);flex:1}
+.zone-card-count{font-size:var(--text-caption-size);font-weight:var(--text-caption-weight);color:var(--text-secondary);background:var(--surface-secondary);border-radius:var(--radius-pill);padding:2px 9px;flex-shrink:0;white-space:nowrap}
+.zone-card-meta{font-size:var(--text-caption-size);color:var(--text-secondary);margin:0 0 var(--space-sm) 24px}
+.zone-card-body{margin-bottom:var(--space-sm);max-height:230px;overflow-y:auto}
+
+/* ============================================================
+   PASS 9B.4 — ZONES & TECHS : ACCESSIBILITÉ LIGNES D'INTERVENTION
+   Conversion div onclick -> button dans rowHtml() (renderZoneResult).
+   editIv() non modifiée. Cartes de zone/header/footer technicien/score/
+   Leaflet/bandeau non géolocalisées : non touchés (voir rapport 9B.4).
+   ============================================================ */
+.zone-intervention{display:block;width:100%;text-align:left;font-family:inherit;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;padding:2px 4px;margin:0 -4px;border-radius:4px;border:none;background:transparent}
+.zone-intervention:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+
+/* ============================================================
+   PASS 9B.5 — ZONES & TECHS : SÉLECTEUR TECHNICIEN + BOUTON APPLIQUER
+   Footer des cartes de zone uniquement (label/select/bouton). Contrat
+   DOM data-ci/value/onchange/onclick strictement inchangé — voir
+   appliquerZones()/saveZoneAssignments(), non modifiées.
+   ============================================================ */
+.zone-card-footer{display:flex;align-items:center;gap:var(--space-sm)}
+
+/* ============================================================
+   PASS 9B.7 — ZONES & TECHS : CONTENEUR CARTE LEAFLET
+   Enveloppe visuelle de #z-mapid uniquement. Aucun code Leaflet
+   (L.map/tileLayer/marker/popup/fitBounds), marqueur, coordonnée ou
+   couleur CLUSTER_COLORS modifié — voir rapport 9B.7. Hauteur
+   fonctionnelle (360px) conservée inchangée.
+   ============================================================ */
+#z-mapid{border-radius:var(--radius-lg);overflow:hidden;border:1px solid var(--border);background:var(--surface-secondary);box-shadow:var(--shadow-sm)}
+
+/* ============================================================
+   PASS 10B.2 — NOTIFICATIONS : HEADER / BANDEAU CLÉ / PREVIEW /
+   HEADER DE LISTE UNIQUEMENT. Cartes candidates, KPI, boutons
+   d'action, getNotifCandidates()/sendEmail()/sendSMS()/
+   sendAllPending()/markSent()/saveNotifCfg() : non modifiés —
+   voir rapport 10B.2. notifParamSection() reste non câblée
+   (finding fonctionnel documenté en backlog, non corrigé ici).
+   ============================================================ */
+.notif-header{margin-bottom:var(--space-md)}
+.notif-header h2{font-size:var(--text-h2-size);font-weight:var(--text-h2-weight);color:var(--text);margin:0 0 2px}
+.notif-header p{font-size:var(--text-body-size);color:var(--text-secondary);margin:0}
+.notif-key-alert{align-items:center;gap:12px;margin-bottom:var(--space-lg)}
+.notif-alert-icon{font-size:24px}
+.notif-alert-title{font-weight:600;color:var(--warning);margin:0 0 2px}
+.notif-alert-text{font-size:var(--text-body-size);color:var(--gray);margin:0}
+.notif-link-btn{background:none;border:none;color:var(--primary);cursor:pointer;font-size:var(--text-body-size);font-weight:500;text-decoration:underline;padding:0;font-family:inherit}
+.notif-preview{margin-bottom:var(--space-md)}
+.notif-list-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.notif-list-header h3{font-size:var(--text-h3-size);font-weight:var(--text-h3-weight);color:var(--text);margin:0}
+.notif-list-count{font-size:var(--text-small-size);color:var(--gray)}
+.notif-historical-alert{margin-bottom:10px}
+
+/* ============================================================
+   PASS 10B.3 — NOTIFICATIONS : 3 TUILES KPI UNIQUEMENT
+   Valeurs/calculs (emailToday/smsToday/déjà notifiés),
+   getNotifCandidates()/sendAllPending()/API Brevo : non modifiés
+   — voir rapport 10B.3. #1565C0/#6A1B9A = couleurs de CANAL
+   (email/SMS), pas des couleurs de statut — jamais interprétées
+   comme success/warning/danger.
+   ============================================================ */
+.notif-kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px}
+.notif-kpi{background:var(--surface);border:1px solid var(--border);border-left-width:3px;border-left-style:solid;border-radius:var(--radius-md);padding:14px 18px;text-align:center}
+.notif-kpi-value{font-size:var(--text-kpi-size);font-weight:var(--text-kpi-weight);line-height:var(--text-kpi-line)}
+.notif-kpi-label{font-size:var(--text-small-size);color:var(--gray);margin-top:4px}
+.notif-kpi-action{margin-top:8px}
+@media(max-width:600px){.notif-kpi-grid{grid-template-columns:1fr}}
+
+/* ============================================================
+   PASS 10B.4 — NOTIFICATIONS : CARTES CANDIDATES UNIQUEMENT
+   Contenu/données/conditions d'affichage/onclick (sendEmail,
+   sendSMS, editIv) et getNotifCandidates() : non modifiés — voir
+   rapport 10B.4. Boutons non retravaillés (réservé au 10B.5),
+   couleurs métier (canal/urgence) conservées (réservé au 10B.6).
+   ============================================================ */
+.notif-card{background:var(--surface);border:1px solid var(--border);border-left-width:3px;border-left-style:solid;border-radius:var(--radius-md);padding:14px 18px;margin-bottom:8px}
+.notif-card-row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px}
+.notif-card-main{flex:1;min-width:0}
+.notif-card-title-row{display:flex;align-items:center;gap:8px;margin-bottom:3px;flex-wrap:wrap}
+.notif-card-client{font-size:var(--text-h3-size);color:var(--text);overflow-wrap:break-word}
+.notif-card-delay{font-size:var(--text-small-size);font-weight:600}
+.notif-card-meta{font-size:var(--text-small-size);color:var(--text-secondary)}
+.notif-card-contact{font-size:var(--text-small-size);color:var(--purple);margin-top:3px}
+.notif-card-channels{display:flex;gap:12px;margin-top:3px;font-size:var(--text-small-size);flex-wrap:wrap}
+.notif-card-actions{display:flex;flex-direction:column;gap:5px;flex-shrink:0}
+.notif-card-note{font-size:var(--text-caption-size);color:var(--orange);background:var(--warning-light);padding:4px 8px;border-radius:5px;margin-top:10px}
+
+/* ============================================================
+   PASS 10B.5 — NOTIFICATIONS : BOUTONS DES CARTES CANDIDATES
+   onclick/conditions/paramètres (sendEmail/sendSMS/editIv) non
+   modifiés — voir rapport 10B.5. Renforcement visuel disabled
+   uniquement (attribut disabled natif conservé, aucun JS ajouté).
+   ============================================================ */
+.notif-card .btn:disabled{opacity:.55;cursor:not-allowed}
+
+/* ============================================================
+   PASS 10C.2 — ANALYSE : HEADER / NAVIGATION TEMPORELLE UNIQUEMENT
+   KPI, cartes techniciens, graphiques, tableaux, Live Feed, modales :
+   non modifiés — voir rapport 10C.2. calcTechStats()/renderLiveFeed()/
+   shiftAnalyseMonth()/shiftAnalyseYear()/openAnalyseCfg() non modifiées
+   (seuls leurs onclick/appels sont réutilisés tels quels).
+   ============================================================ */
+.analyse-header{display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap}
+.analyse-view-toggle{display:flex;gap:6px;flex-wrap:wrap}
+.analyse-nav{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.analyse-period{font-size:15px}
+.analyse-actions{margin-left:auto}
+
+/* ============================================================
+   PASS 10C.3 — ANALYSE : KPI (VUES MOIS + ANNÉE) UNIQUEMENT
+   Calculs (mDone/mIvs/daysActive/totalKm/totalFuel/totalHotel/
+   totalDone/evo) et calcTechStats() non modifiés — voir rapport
+   10C.3. Couleurs #1B5E20/#E65100 conservées (non exactes à un
+   token existant ; #1B5E20 fait partie des "4 verts" protégés,
+   harmonisation globale réservée au 10C.9).
+   ============================================================ */
+.analyse-kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:20px}
+.analyse-kpi{background:var(--surface);border:1px solid var(--border);border-top-width:3px;border-top-style:solid;border-radius:var(--radius-md);box-shadow:var(--shadow-sm);padding:16px;text-align:center}
+.analyse-kpi-value{font-size:22px;font-weight:700;line-height:1}
+.analyse-kpi-label{margin-top:8px;font-size:11px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.06em}
+.analyse-kpi-meta{margin-top:2px;font-size:10px;color:var(--gray)}
+@media(max-width:1024px){.analyse-kpi-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:768px){.analyse-kpi-grid{grid-template-columns:repeat(2,1fr)}}
+
+/* ============================================================
+   PASS 10C.4 — ANALYSE : CARTES TECHNICIENS (VUES MOIS + ANNÉE)
+   calcTechStats()/bar()/ava()/showUnplannedDetail() non modifiées
+   — voir rapport 10C.4. AUCUN tc.color trouvé dans ces cartes :
+   l'accent bleu/gris est piloté par s.tc.avail (disponibilité),
+   pas par une couleur d'identité technicien — conservé tel quel.
+   Mois et Année ont des contenus réellement différents (barres,
+   sous-stats, bandeaux) : non unifiés, structure d'origine gardée.
+   ============================================================ */
+.analyse-tech-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-bottom:20px}
+.analyse-tech-card{background:var(--surface);border:1px solid var(--border);border-left-width:3px;border-left-style:solid;border-radius:var(--radius-md);box-shadow:var(--shadow-sm);padding:16px}
+.analyse-tech-header{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.analyse-tech-name{font-size:15px;color:var(--text)}
+.analyse-tech-meta{font-size:11px;color:var(--gray)}
+.analyse-tech-rendement{margin-left:auto;text-align:right}
+.analyse-tech-rendement-value{font-size:22px;font-weight:700}
+.analyse-tech-rendement-label{font-size:10px;color:var(--gray)}
+.analyse-tech-evo{margin-left:auto;font-size:12px;font-weight:700}
+.analyse-tech-substats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
+.analyse-tech-substat{text-align:center}
+.analyse-tech-substat-value{font-size:16px;font-weight:700}
+.analyse-tech-substat-label{font-size:10px;color:var(--gray)}
+.analyse-tech-stats2{display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px}
+.analyse-tech-banner{margin-top:8px;padding:6px 10px;border-radius:6px;font-size:12px}
+
+/* ============================================================
+   PASS 10C.5 — ANALYSE : GRAPHIQUES (QUOTIDIEN, ANNUEL, TOP
+   CLIENTS) UNIQUEMENT. bar()/calcTechStats() non modifiées — voir
+   rapport 10C.5. Le onclick des barres quotidiennes est un no-op
+   préexistant (analyseMonth/analyseView réassignés à leur valeur
+   déjà courante, sans rAnalyse() derrière) : conservé strictement
+   tel quel, non "corrigé" (changement de comportement interdit).
+   ============================================================ */
+.analyse-chart{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);box-shadow:var(--shadow-sm);padding:16px;margin-bottom:16px}
+.analyse-chart-title{font-size:14px;font-weight:600;margin-bottom:14px}
+.analyse-chart-body{display:flex;align-items:flex-end;gap:3px;height:80px}
+.analyse-chart-bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;background:none;border:none;padding:0;margin:0;font-family:inherit;cursor:pointer}
+.analyse-chart-bar-wrap:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.analyse-chart-bar-count{font-size:8px;color:var(--primary);margin-bottom:1px}
+.analyse-chart-bar{width:100%;border-radius:3px 3px 0 0}
+.analyse-chart-bar-label{font-size:8px;color:var(--gray);margin-top:2px}
+.analyse-chart-legend{display:flex;gap:14px;margin-top:8px;font-size:11px;color:var(--gray)}
+.analyse-chart-legend-item{display:flex;align-items:center;gap:4px}
+.analyse-chart-legend-swatch{width:12px;height:12px;border-radius:2px;display:inline-block}
+.analyse-chart-bar-pair{width:100%;display:flex;gap:2px;align-items:flex-end;height:90px}
+
+/* ============================================================
+   PASS 10C.6 — ANALYSE : TABLEAU FINANCIER + HÔTELS. Calculs,
+   addHotel()/delHotel()/saveHotels()/calcTechStats() non modifiés.
+   Paddings/tailles repris à l'identique des styles inline d'origine
+   (5px/6px/7px selon le tableau : différences préexistantes entre
+   le tableau hôtels et le bilan financier, conservées telles quelles,
+   non unifiées). Alignement des colonnes inchangé (gauche partout,
+   comme dans le code d'origine).
+   ============================================================ */
+.analyse-hotel-section{margin-bottom:16px}
+.analyse-hotel-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.analyse-hotel-title{font-size:14px;font-weight:600}
+.analyse-hotel-empty{font-size:var(--text-body-size);color:var(--gray)}
+.analyse-hotel-table{width:100%;font-size:var(--text-body-size);border-collapse:collapse}
+.analyse-hotel-table thead tr{border-bottom:2px solid var(--border)}
+.analyse-hotel-table th{text-align:left;padding:5px 8px;font-size:var(--text-caption-size);color:var(--gray)}
+.analyse-hotel-table td{padding:6px 8px}
+.analyse-hotel-table tbody tr{border-bottom:1px solid var(--bg)}
+.analyse-hotel-table tfoot tr{border-top:2px solid var(--border)}
+.analyse-finance-title{font-size:14px;font-weight:600;margin-bottom:12px}
+.analyse-finance-table{width:100%;font-size:var(--text-body-size);border-collapse:collapse}
+.analyse-finance-table thead tr{border-bottom:2px solid var(--border)}
+.analyse-finance-table th{text-align:left;padding:6px 8px;font-size:var(--text-caption-size);color:var(--gray)}
+.analyse-finance-table td{padding:7px 8px}
+.analyse-finance-table tbody tr{border-bottom:1px solid var(--bg)}
+.analyse-finance-table tfoot tr{border-top:2px solid var(--border);background:var(--blueLight)}
+
+/* ============================================================
+   PASS 10C.7 — ANALYSE : ACCESSIBILITÉ DES MODALES (Config
+   tarifs, Ajouter nuit, Détours non prévus). Ne redéfinit pas
+   .md/.bicon globalement : classe complémentaire .analyse-modal
+   uniquement. addHotel()/saveHotels()/delHotel()/saveAnalyseCfg()/
+   calcTechStats() non modifiées.
+   ============================================================ */
+.analyse-modal .bicon:focus-visible{outline:2px solid var(--primary);outline-offset:1px}
+
+/* ============================================================
+   PASS 10C.8 — ANALYSE : LIVE FEED (#d-live) + LAYOUT #p-analyse.
+   Lecture seule de techTourneesData (non modifiée), _liveInterval
+   non modifié (garde if(!_liveInterval) déjà présente, aucune
+   duplication). #fafbfc conservé (aucun token n'égale exactement
+   cette valeur) ; #16a34a/#E65100 conservés (vert protégé PASS
+   10C.9 / orange non-équivalent à --warning).
+   ============================================================ */
+.analyse-split{flex-direction:row}
+.analyse-main{min-height:0}
+.analyse-live{width:320px;flex-shrink:0;border-left:1px solid var(--border);background:#fafbfc;display:flex;flex-direction:column;overflow-y:auto}
+.analyse-live-header{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;background:var(--surface)}
+.analyse-live-title{font-weight:700;font-size:13px}
+.analyse-live-ts{font-size:11px;color:var(--gray)}
+.analyse-live-section-label{padding:10px 14px 6px;font-size:12px;font-weight:600;color:var(--gray);text-transform:uppercase;letter-spacing:.5px}
+.analyse-live-section-label-bordered{border-top:1px solid var(--border)}
+.analyse-live-list{padding:0 14px 10px;display:flex;flex-direction:column;gap:6px}
+.analyse-live-item{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px}
+.analyse-live-item-header{display:flex;justify-content:space-between;align-items:center}
+.analyse-live-item-title{font-weight:600;font-size:13px}
+.analyse-live-item-meta{font-size:11px;color:var(--gray);margin-top:2px}
+.analyse-live-item-status{font-size:10px;font-weight:600}
+.analyse-live-empty{color:var(--gray);font-size:12px;text-align:center;padding:12px}
+.analyse-live-recent{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--bg)}
+.analyse-live-recent-name{font-size:12px;font-weight:500}
+.analyse-live-recent-init{font-size:10px;color:var(--gray);margin-left:4px}
+.analyse-live-recent-date{font-size:11px;color:var(--gray);flex-shrink:0}
+.analyse-live-tour{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px}
+.analyse-live-tour-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.analyse-live-tour-date{font-weight:600;font-size:12px}
+.analyse-live-tour-rate{font-size:12px;font-weight:700}
+.analyse-live-tour-meta{font-size:11px;color:var(--gray)}
+@media(max-width:1024px){
+  .analyse-live{width:240px}
+}
+@media(max-width:768px){
+  .analyse-split{flex-direction:column}
+  .analyse-live{width:100%;border-left:none;border-top:1px solid var(--border);max-height:45vh}
+}
+
+/* ============================================================
+   PASS 10C.9 — ANALYSE : HARMONISATION COULEURS (aucune classe
+   nouvelle, uniquement des littéraux inline convertis en tokens).
+   Migré : #1565C0→var(--primary) (accent disponibilité cartes
+   techniciens) ; #16a34a→var(--success) (statuts "terminé/OK" et
+   seuil ≥80% du Live Feed, hors contexte des autres verts).
+   Conservé (voir rapport 10C.9 pour le détail par occurrence) :
+   #1B5E20 (rôle mixte catégoriel "km"/performance, non scindable
+   sans introduire un nouveau contraste visuel à l'intérieur d'une
+   même carte technicien), #E65100 (non exact à --warning), #BDBDBD
+   (indisponibilité technicien, aucun token exact), #fafbfc (fond
+   Live Feed, aucun token exact — déjà documenté 10C.8),
+   rgba(21,101,192,.25) (série N-1 des graphiques, aucun token RGB
+   disponible), rgba(0,0,0,.5) (fond des 3 modales, convention
+   universelle de l'app, hors du rôle "couleur Analyse").
+   ============================================================ */
+
+/* ============================================================
+   PASS 10C.10 — ANALYSE : ACCESSIBILITÉ FINALE. Conversion des 2
+   derniers div[onclick] du module en <button type="button"> :
+   bannière "détour non prévu" (carte technicien) et lignes de la
+   modale #unplan-overlay (backlog identifié au PASS 10C.7). Aucun
+   changement de showUnplannedDetail()/editIv()/calcTechStats(),
+   uniquement l'élément conteneur et son reset visuel.
+   ============================================================ */
+.analyse-tech-banner-btn{display:block;width:100%;text-align:left;border:none;font-family:inherit;cursor:pointer}
+.analyse-tech-banner-btn:focus-visible{outline:2px solid var(--primary);outline-offset:1px}
+.analyse-unplan-row{display:block;width:100%;text-align:left;font-family:inherit;cursor:pointer;padding:8px 10px;background:var(--bg);border:none;border-left:3px solid var(--danger);border-radius:7px;margin-bottom:5px}
+.analyse-unplan-row:focus-visible{outline:2px solid var(--primary);outline-offset:1px}
 </style>
 </head>
 <body>
@@ -291,19 +905,19 @@ tr:hover td{background:var(--bg)}
   <div id="p-depart" class="vp" style="flex-direction:column">
 
     <!-- CONTRÔLES -->
-    <div style="padding:10px 16px;display:flex;flex-direction:column;gap:7px;flex-shrink:0;border-bottom:1px solid var(--border);background:#fff">
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        <input type="date" id="dep-date" style="width:auto;font-size:13px;padding:6px 10px" onchange="setSelDate(this.value)"/>
-        <input type="time" id="dep-time" value="08:00" title="Heure de départ" style="width:auto;font-size:13px;padding:6px 10px" oninput="_schedDepMap()"/>
-        <button onclick="depNow()" title="Utiliser l'heure actuelle (Paris)" style="padding:6px 10px;font-size:12px;border-radius:8px;border:1.5px solid var(--blue);background:#E3F2FD;color:#1565C0;cursor:pointer;font-family:inherit;font-weight:600;white-space:nowrap">🕐 Maintenant</button>
-        <button id="dep-refresh-btn" onclick="_schedDepMap()" title="Recalculer les ETAs et l'itinéraire" style="padding:6px 10px;font-size:12px;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:var(--dark);cursor:pointer;font-family:inherit;font-weight:600;white-space:nowrap;display:flex;align-items:center;gap:4px"><span id="dep-refresh-ic">🔄</span> Recalculer</button>
-        <button id="dep-traffic-btn" onclick="toggleDepTrafficLayer()" title="Afficher/masquer le trafic temps réel (TomTom)" style="padding:6px 10px;font-size:12px;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:var(--dark);cursor:pointer;font-family:inherit;font-weight:600;white-space:nowrap">🚦 Trafic</button>
+    <div class="dep-header" style="flex-shrink:0">
+      <div class="filter-bar">
+        <input type="date" id="dep-date" class="form-control" style="width:auto;min-height:auto;padding:6px 10px;font-size:13px" aria-label="Date de la tournée" onchange="setSelDate(this.value)"/>
+        <input type="time" id="dep-time" value="08:00" class="form-control" title="Heure de départ" aria-label="Heure de départ" style="width:auto;min-height:auto;padding:6px 10px;font-size:13px" oninput="_schedDepMap()"/>
+        <button onclick="depNow()" title="Utiliser l'heure actuelle (Paris)" class="btn btn-sm btn-secondary">🕐 Maintenant</button>
+        <button id="dep-refresh-btn" onclick="_schedDepMap()" title="Recalculer les ETAs et l'itinéraire" class="btn btn-sm btn-secondary"><span id="dep-refresh-ic">🔄</span> Recalculer</button>
+        <button id="dep-traffic-btn" onclick="toggleDepTrafficLayer()" title="Afficher/masquer le trafic temps réel (TomTom)" aria-pressed="false" class="btn btn-sm" style="border:1.5px solid var(--border);background:#fff;color:var(--dark)">🚦 Trafic</button>
         <div style="position:relative;display:inline-block">
-          <button id="dep-tech-btn" onclick="toggleDepTechDropdown(event)" style="padding:6px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;font-size:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:8px;min-width:160px;white-space:nowrap">
+          <button id="dep-tech-btn" onclick="toggleDepTechDropdown(event)" aria-haspopup="true" aria-expanded="false" class="btn btn-sm btn-secondary" style="min-width:160px;justify-content:space-between">
             <span id="dep-tech-label" style="flex:1;text-align:left">Tous les techniciens</span>
-            <span style="font-size:10px;color:var(--gray)">▾</span>
+            <span aria-hidden="true" style="font-size:10px;color:var(--gray)">▾</span>
           </button>
-          <div id="dep-tech-dropdown" style="display:none;position:absolute;top:calc(100% + 4px);left:0;background:#fff;border:1.5px solid var(--border);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.15);z-index:200;min-width:220px;padding:8px">
+          <div id="dep-tech-dropdown" class="dep-tech-dropdown" style="display:none">
             <div id="dep-tech-list"></div>
           </div>
         </div>
@@ -324,11 +938,11 @@ tr:hover td{background:var(--bg)}
     <div id="dep-layout">
       <div id="dep-mapid"></div>
       <div id="dep-right">
-        <div id="dep-map-pb" style="display:none;padding:10px 14px;background:var(--blueLight);border-radius:8px">
+        <div id="dep-map-pb" style="display:none;padding:10px 14px;background:var(--blueLight);border-radius:var(--radius-md)">
           <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span id="dep-pm">Chargement...</span><span id="dep-pp">0%</span></div>
           <div class="prog-t"><div id="dep-pf" style="height:100%;background:var(--blue);border-radius:4px;width:0%;transition:width .3s"></div></div>
         </div>
-        <div id="dep-map-msg" style="display:none"></div>
+        <div id="dep-map-msg" class="alert alert-info" style="display:none"></div>
         <div id="dep-list"></div>
       </div>
     </div>
@@ -353,9 +967,9 @@ tr:hover td{background:var(--bg)}
   <div id="p-previsions" class="vp" style="padding:18px;gap:14px"><div id="d-prev"></div></div>
 
   <!-- PARAMÈTRES -->
-  <div id="p-analyse" class="vp" style="padding:0;overflow:hidden;flex-direction:row">
-    <div id="d-analyse" style="flex:1;overflow-y:auto;padding:18px;min-width:0"></div>
-    <div id="d-live" style="width:320px;flex-shrink:0;border-left:1px solid var(--border);overflow-y:auto;display:flex;flex-direction:column;background:#fafbfc"></div>
+  <div id="p-analyse" class="vp analyse-split" style="padding:0;overflow:hidden">
+    <div id="d-analyse" class="analyse-main" style="flex:1;overflow-y:auto;padding:18px;min-width:0"></div>
+    <div id="d-live" class="analyse-live"></div>
   </div>
   <div id="p-notifications" class="vp" style="padding:18px;gap:14px;overflow-y:auto"><div id="d-notif"></div></div>
   <div id="p-parametres" class="vp" style="padding:18px;overflow-y:auto"><div id="d-param" style="max-width:700px"></div></div>
@@ -892,10 +1506,10 @@ const TYPES={
   tele_maintenance:   {label:"Télémaintenance",  dur:10,color:"#00897B"},
 }
 const STATUSES={
-  completed:    {label:"Terminé",    color:"#2E7D32",bg:"#E8F5E9"},
-  confirmed:    {label:"Confirmé",   color:"#1565C0",bg:"#E3F2FD"},
-  pending:      {label:"En attente", color:"#E65100",bg:"#FFF3E0"},
-  not_responded:{label:"Non répondu",color:"#C62828",bg:"#FFEBEE"},
+  completed:    {label:"Terminé",    color:"#2E7D32",bg:"var(--success-light)"},
+  confirmed:    {label:"Confirmé",   color:"var(--primary)",bg:"var(--primary-light)"},
+  pending:      {label:"En attente", color:"#E65100",bg:"var(--warning-light)"},
+  not_responded:{label:"Non répondu",color:"var(--danger)",bg:"var(--danger-light)"},
 }
 let ivs=[
 {id:1,client:"SPIE BATIGNOLLES VALERIAN",addr:"EOLE-Triangles de Mantes Impasse Sainte-Claire Déville 78200 Mantes-la-Jolie",siege:"nan",date:"2025-01-08",type:"maintenance_simple",status:"completed",techId:5,form:false,arm:0,dea:0,bat:0,padPak:false,padPakDate:"2025-10-01",notes:"",contact:"SPIE VALÉRIAN",cphone:"",cemail:"75 Avenue Louis Lépine",contact_siege:"",email_siege:"",phone_siege:"",unplanned:false,kizeoId:"217043868"},
@@ -2054,7 +2668,7 @@ async function toggleDepTrafficLayer(){
   if(depTrafficLayer){
     depMapObj?.removeLayer(depTrafficLayer)
     depTrafficLayer=null; depTrafficOn=false
-    if(btn){btn.style.background='#fff';btn.style.color='var(--dark)'}
+    if(btn){btn.style.background='#fff';btn.style.color='var(--dark)';btn.setAttribute('aria-pressed','false')}
     return
   }
   if(!depMapObj){ alert('Calculez d\'abord l\'itinéraire du jour.'); return }
@@ -2062,7 +2676,7 @@ async function toggleDepTrafficLayer(){
   if(!key){ alert('Clé TomTom non configurée (variable TOMTOM_KEY côté Netlify).'); return }
   await _addDepTrafficLayer()
   depTrafficOn=true
-  if(btn){btn.style.background='#FFE0B2';btn.style.color='#E65100'}
+  if(btn){btn.style.background='#FFE0B2';btn.style.color='#E65100';btn.setAttribute('aria-pressed','true')}
 }
 const WEEK=(()=>{
   const d=new Date();d.setHours(12,0,0,0)
@@ -2118,19 +2732,21 @@ function toggleDepTechDropdown(e){
   depTechDropdownOpen=!depTechDropdownOpen
   const dd=document.getElementById("dep-tech-dropdown")
   if(dd)dd.style.display=depTechDropdownOpen?"block":"none"
+  const btn=document.getElementById("dep-tech-btn")
+  if(btn)btn.setAttribute("aria-expanded",depTechDropdownOpen?"true":"false")
   if(depTechDropdownOpen)rDepTechDropdownContent()
 }
 function rDepTechDropdownContent(){
   const list=document.getElementById("dep-tech-list");if(!list)return
-  list.innerHTML=`<div onclick="clearDepTechs(event)" style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500;border-bottom:1px solid var(--border);margin-bottom:4px">
+  list.innerHTML=`<button type="button" onclick="clearDepTechs(event)" aria-pressed="${!depSelectedTechs.length}" style="width:100%;text-align:left;font-family:inherit;display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;border:none;background:transparent;cursor:pointer;font-size:13px;font-weight:500;border-bottom:1px solid var(--border);margin-bottom:4px">
     <span style="width:16px;height:16px;border-radius:4px;border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0">${!depSelectedTechs.length?"✓":""}</span>
     Tous les techniciens
-  </div>
-  ${TECHS.map(t=>{const sel=depSelectedTechs.includes(t.id);const col=t.color||"#1565C0";return`<div onclick="togDepTech2(${t.id},event)" style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:13px;background:${sel?col+"11":"transparent"};margin-bottom:2px">
+  </button>
+  ${TECHS.map(t=>{const sel=depSelectedTechs.includes(t.id);const col=t.color||"#1565C0";return`<button type="button" onclick="togDepTech2(${t.id},event)" aria-pressed="${sel}" style="width:100%;text-align:left;font-family:inherit;display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;border:none;cursor:pointer;font-size:13px;background:${sel?col+"11":"transparent"};margin-bottom:2px">
     <span style="width:16px;height:16px;border-radius:4px;border:1.5px solid ${col};background:${sel?col:"transparent"};display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;flex-shrink:0">${sel?"✓":""}</span>
     <span style="width:9px;height:9px;border-radius:50%;background:${col};flex-shrink:0"></span>
     ${t.name}
-  </div>`}).join("")}`
+  </button>`}).join("")}`
 }
 let _depMapAutoTimer=null
 function _schedDepMap(){
@@ -2186,7 +2802,7 @@ function clearDepTechs(e){
   _schedDepMap()
 }
 // Ferme dropdown sur clic externe — attaché une seule fois
-;(function(){let ready=false;function attachClose(){if(ready)return;ready=true;document.addEventListener("click",()=>{if(depTechDropdownOpen){depTechDropdownOpen=false;const dd=document.getElementById("dep-tech-dropdown");if(dd)dd.style.display="none"}})}if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",attachClose);else attachClose()})()
+;(function(){let ready=false;function attachClose(){if(ready)return;ready=true;document.addEventListener("click",()=>{if(depTechDropdownOpen){depTechDropdownOpen=false;const dd=document.getElementById("dep-tech-dropdown");if(dd)dd.style.display="none";const btn=document.getElementById("dep-tech-btn");if(btn)btn.setAttribute("aria-expanded","false")}})}if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",attachClose);else attachClose()})()
 
 // ═══════════════════════════════════════════════════════
 // NAVIGATION
@@ -2430,6 +3046,13 @@ function rDash(){
   const lc=lp>85?"#C62828":lp>65?"#E65100":"#1B5E20"
   renderTourTracker()
   document.getElementById("d-dash").innerHTML=`
+  <div class="dashboard-context filter-bar">
+    <div class="filter-item">
+      <label style="font-size:11px;font-weight:600;color:var(--gray)">Date</label>
+      <input type="date" value="${selDate}" onchange="setSelDate(this.value)" style="width:auto;padding:4px 8px;font-size:13px"/>
+    </div>
+    ${selDate!==TODAY?`<button onclick="setSelDate(TODAY)" class="btn btn-secondary btn-sm">Aujourd'hui</button>`:""}
+  </div>
   <div class="kpig" style="margin-bottom:16px">
     <div class="kpi" style="border-left-color:#1565C0" onclick="fStatus='all';SV('interventions')" title="Toutes les interventions"><p>Interventions du jour</p><p style="color:#1565C0">${day.length}</p></div>
     <div class="kpi" style="border-left-color:#2E7D32" onclick="fStatus='completed';SV('interventions')"><p>Terminées</p><p style="color:#2E7D32">${day.filter(i=>i.status=="completed").length}</p></div>
@@ -2438,11 +3061,8 @@ function rDash(){
   </div>
   <div class="g2">
     <div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <h2 style="font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap">Interventions du
-          <input type="date" value="${selDate}" onchange="setSelDate(this.value)" style="width:auto;padding:4px 8px;font-size:13px"/>
-          ${selDate!==TODAY?`<button onclick="setSelDate(TODAY)" class="bg bsm" style="font-size:11px">Aujourd'hui</button>`:""}
-        </h2>
+      <div class="dashboard-section-header">
+        <h2>Interventions</h2>
       </div>
       ${!day.length?`<div class="card" style="text-align:center;color:var(--gray);padding:36px">Aucune intervention</div>`:""}
       ${day.map(iv=>{const tc=TB(iv.techId);return `
@@ -2795,10 +3415,10 @@ function rDepart(){
   // Badge "Jour en cours" si on affiche aujourd'hui
   const dayBadgeEl=document.getElementById("dep-day-badge")
   if(dayBadgeEl) dayBadgeEl.innerHTML=date===TODAY
-    ? `<span style="padding:3px 10px;border-radius:100px;background:#E8F5E9;color:#2E7D32;font-size:11px;font-weight:700">● Aujourd'hui</span>`
+    ? `<span class="badge" style="padding:3px 10px;background:#E8F5E9;color:#2E7D32;font-size:11px;font-weight:700">● Aujourd'hui</span>`
     : date>TODAY
-      ? `<span style="padding:3px 10px;border-radius:100px;background:#E3F2FD;color:#1565C0;font-size:11px;font-weight:700">📅 Planifié</span>`
-      : `<span style="padding:3px 10px;border-radius:100px;background:#FFF3E0;color:#E65100;font-size:11px;font-weight:700">🕐 Passé</span>`
+      ? `<span class="badge badge-primary" style="padding:3px 10px;font-size:11px;font-weight:700">📅 Planifié</span>`
+      : `<span class="badge" style="padding:3px 10px;background:#FFF3E0;color:#E65100;font-size:11px;font-weight:700">🕐 Passé</span>`
   // ─── Dropdown label ──────────────────────────────────
   const lbl=document.getElementById("dep-tech-label")
   if(lbl)lbl.textContent=!depSelectedTechs.length?"Tous les techniciens":depSelectedTechs.length===1?TB(depSelectedTechs[0]).name:`${depSelectedTechs.length} techniciens`
@@ -2806,7 +3426,7 @@ function rDepart(){
   const chipsDiv=document.getElementById("dep-techs-chips")
   if(chipsDiv)chipsDiv.innerHTML=depSelectedTechs.map(id=>{
     const t=TB(id);const col=t.color||"#1565C0"
-    return `<span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:100px;background:${col};color:#fff;font-size:12px;font-weight:600">${t.init} ${t.name}<span onclick="togDepTech2(${id})" style="cursor:pointer;opacity:.75;font-size:10px;margin-left:2px">✕</span></span>`
+    return `<span class="badge" style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;background:${col};color:#fff;font-size:12px;font-weight:600">${t.init} ${t.name}<button type="button" onclick="togDepTech2(${id})" class="dep-chip-remove" aria-label="Retirer ${t.name}">✕</button></span>`
   }).join("")
   // ─── Depot address inputs ────────────────────────────
   const depotsDiv=document.getElementById("dep-depots")
@@ -2818,8 +3438,8 @@ function rDepart(){
         const t=TB(id);const col=t.color||"#1565C0";const addr=t.depotAddr||depot
         return `<div style="display:flex;align-items:center;gap:8px;background:${col}11;border:1.5px solid ${col}55;padding:6px 12px;border-radius:8px;flex:1;min-width:200px;max-width:420px">
           <span style="font-size:11px;font-weight:700;color:${col};white-space:nowrap">🏠 ${t.init}</span>
-          <input value="${addr.replace(/"/g,"&quot;")}" placeholder="Adresse de départ..."
-            style="flex:1;font-size:12px;border:none;background:transparent;outline:none;min-width:0"
+          <input value="${addr.replace(/"/g,"&quot;")}" placeholder="Adresse de départ..." aria-label="Adresse de départ — ${t.name}"
+            style="flex:1;font-size:12px;border:none;background:transparent;min-width:0"
             onchange="saveDepotAddr(${id},this.value)"/>
         </div>`
       }).join("")
@@ -2829,7 +3449,7 @@ function rDepart(){
   const doneCount=dayIvs.filter(i=>depValidated[i.id]).length
   const failCount=dayIvs.filter(i=>depFailed[i.id]).length
   document.getElementById("dep-stats").innerHTML=
-    `✅ <strong style="color:var(--green)">${doneCount}</strong> validées · ❌ <strong style="color:#C62828">${failCount}</strong> échecs · ${dayIvs.length} total`
+    `✅ <strong style="color:var(--green)">${doneCount}</strong> validées · ❌ <strong style="color:var(--danger)">${failCount}</strong> échecs · ${dayIvs.length} total`
   const el=document.getElementById("dsv")
   if(el)el.textContent=`${doneCount}/${dayIvs.length}`
 
@@ -2882,33 +3502,33 @@ function rDepart(){
       const locked=isRouteLocked(tid,date)
       // ── En-tête du groupe technicien ──
       const isAbsent=isTechAbsent(tid,date)
-      html+=`<div class="dep-grp-hdr" style="display:flex;align-items:center;gap:8px;padding:8px 4px 4px;flex-wrap:wrap;row-gap:6px;flex-shrink:0${isAbsent?';opacity:.5':''}">
+      html+=`<div class="dep-grp-hdr${isAbsent?' is-absent':''}" style="flex-shrink:0">
         ${ava(tc.init,26,techCol)}
-        <span style="font-weight:700;font-size:13px;color:${techCol}">${tc.name}</span>
-        <span style="font-size:11px;color:var(--gray)">${techIvs.length} intervention${techIvs.length>1?'s':''}</span>
-        ${depTourEnd[tid]?`<span style="font-size:11px;font-weight:700;color:#E65100;background:#FFF3E0;padding:2px 8px;border-radius:20px;white-space:nowrap">🏁 Fin ~${depTourEnd[tid]}</span>`:''}
-        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-          <button onclick="toggleTechAbsent(${tid},'${date}')"
-            style="padding:4px 10px;font-size:12px;border-radius:7px;border:1.5px solid ${isAbsent?'#C62828':'var(--border)'};background:${isAbsent?'#FFEBEE':'#fff'};color:${isAbsent?'#C62828':'var(--gray)'};cursor:pointer;font-family:inherit;font-weight:600">
+        <span class="dep-grp-name" style="color:${techCol}">${tc.name}</span>
+        <span class="dep-grp-count">${techIvs.length} intervention${techIvs.length>1?'s':''}</span>
+        ${depTourEnd[tid]?`<span class="dep-grp-end">🏁 Fin ~${depTourEnd[tid]}</span>`:''}
+        <div class="dep-grp-actions">
+          <button onclick="toggleTechAbsent(${tid},'${date}')" title="${isAbsent?'Marquer présent':'Marquer absent'}" aria-pressed="${isAbsent}"
+            class="btn btn-sm dep-action${isAbsent?' is-on':''}">
             ${isAbsent?'🚫 Absent':'Absent'}
           </button>
           <button onclick="reverseDepRoute(${tid})" title="Inverser le sens de la tournée"
-            style="padding:4px 10px;font-size:12px;border-radius:7px;border:1.5px solid ${techCol};background:#fff;color:${techCol};cursor:pointer;font-family:inherit;font-weight:600">
+            class="btn btn-sm dep-action" style="border-color:${techCol};color:${techCol}">
             ⇅ Inverser
           </button>
-          <button onclick="toggleRouteLock(${tid})" title="${locked?'Déverrouiller l\'ordre':'Verrouiller l\'ordre'}"
-            style="padding:4px 10px;font-size:12px;border-radius:7px;border:1.5px solid ${locked?"#16a34a":"var(--border)"};background:${locked?"#f0fdf4":"#fff"};color:${locked?"#16a34a":"var(--gray)"};cursor:pointer;font-family:inherit;font-weight:600">
+          <button onclick="toggleRouteLock(${tid})" title="${locked?'Déverrouiller l\'ordre':'Verrouiller l\'ordre'}" aria-pressed="${locked}"
+            class="btn btn-sm dep-action${locked?' is-locked':''}">
             ${locked?"🔒 Verrouillé":"🔓 Libre"}
           </button>
           <button onclick="resetRouteOrder(${tid},'${date}')" title="Effacer l'ordre sauvegardé et relancer une optimisation complète"
-            style="padding:4px 10px;font-size:12px;border-radius:7px;border:1.5px solid var(--border);background:#fff;color:var(--gray);cursor:pointer;font-family:inherit;font-weight:600">
+            class="btn btn-sm dep-action">
             🔄 Réoptimiser
           </button>
         </div>
       </div>`
       // ── Résumé matériel compact (catégories + comptages) ──
       const matCompact=matSummaryCompact(techIvs)
-      if(matCompact) html+=`<div style="padding:2px 4px 6px;margin-left:2px">${matCompact}</div>`
+      if(matCompact) html+=`<div class="dep-mat-summary">${matCompact}</div>`
       // ── Cartes interventions du technicien ──
       techIvs.forEach((iv,techIdx)=>{
         const done=depValidated[iv.id],fail=depFailed[iv.id]
@@ -2919,7 +3539,7 @@ function rDepart(){
         const isFirst=techIdx===0
         const _mini=(done||fail)&&!_depExpanded.has(iv.id)
         html+=`<div class="dep-card ${done||fail?"done":""} ${_mini?"mini":""}" id="dc-${iv.id}"
-          style="border-left-color:${done?"#4CAF50":fail?"#C62828":techCol}"
+          style="border-left-color:${done?"#4CAF50":fail?"var(--danger)":techCol}"
           draggable="true"
           ondragstart="_dragId=${iv.id};_dragTechId=${iv.techId};event.dataTransfer.effectAllowed='move'"
           ondragover="event.preventDefault();if(${iv.techId}===_dragTechId)this.classList.add('drag-over')"
@@ -2928,47 +3548,49 @@ function rDepart(){
           onclick="focusDepCard(${iv.id})">
           <div style="display:flex;gap:10px;align-items:${_mini?"center":"flex-start"}">
             <div class="dep-drag" onclick="event.stopPropagation()" title="Déplacer">☰</div>
-            <div class="dep-num" style="background:${done?"#4CAF50":fail?"#C62828":techCol}">${done?"✓":fail?"✗":techIdx+1}</div>
+            <div class="dep-num" style="background:${done?"#4CAF50":fail?"var(--danger)":techCol}">${done?"✓":fail?"✗":techIdx+1}</div>
             <div style="flex:1;min-width:0">
               <div style="display:flex;align-items:center;gap:6px;margin-bottom:${_mini?0:2}px">
                 <span style="font-weight:600;font-size:14px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${iv.client}</span>
-                ${!_mini&&!isFirst&&!done&&!fail?`<button onclick="event.stopPropagation();setFirstDepIv(${iv.id},${iv.techId})" title="Commencer par cette intervention"
-                  style="background:none;border:1.5px solid #f59e0b;border-radius:6px;padding:2px 7px;font-size:11px;cursor:pointer;color:#f59e0b;flex-shrink:0;font-family:inherit;white-space:nowrap">☆ 1er</button>`
+                ${!_mini&&!isFirst&&!done&&!fail?`<button onclick="event.stopPropagation();setFirstDepIv(${iv.id},${iv.techId})" type="button" title="Commencer par cette intervention"
+                  class="btn btn-sm" style="background:transparent;border-color:#f59e0b;color:#f59e0b;flex-shrink:0">☆ 1er</button>`
                   :!_mini&&isFirst&&!done&&!fail?`<span style="font-size:11px;font-weight:700;color:#f59e0b;flex-shrink:0">⭐ 1er</span>`:''}
               </div>
-              ${_mini?`<div class="dep-addr" style="font-size:11px;color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📍 ${iv.addr}</div>`:''}
+              ${_mini?`<div class="dep-addr">📍 ${iv.addr}</div>`:''}
               <div class="dep-body">
-                <div style="font-size:12px;color:var(--gray);margin-bottom:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📍 ${iv.addr}</div>
+                <div class="dep-addr" style="margin-bottom:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📍 ${iv.addr}</div>
                 <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:5px">
                   ${tBdg(iv.type)}${sBdg(iv.status)}
                   <span style="font-size:11px;color:var(--gray)">⏱ ${fmtMin(dur(iv.type,iv.form))}</span>
                 </div>
                 ${equipHTML_dep(iv)}
                 ${iv.notionTime&&iv.timeStart?`<div style="font-size:11px;font-weight:700;color:#92400E;background:#FFFBEB;padding:4px 9px;border-radius:6px;border:1px solid #F59E0B;margin-bottom:5px">🔔 Heure Notion imposée : <strong>${iv.timeStart}</strong></div>`:""}
-                ${depETAs[iv.id]?`<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:5px">
-                  ${depETAs[iv.id]?.travelMin?`<span style="font-size:11px;padding:2px 7px;border-radius:100px;background:#E3F2FD;color:#1565C0">🚗 ${fmtMin(depETAs[iv.id].travelMin)}</span>`:''}
-                  ${depETAs[iv.id]?`<span style="font-size:11px;font-weight:600;padding:2px 7px;border-radius:100px;background:#E8F5E9;color:#2E7D32">🕐 ${depETAs[iv.id].eta} → ${depETAs[iv.id].leave}</span>`:''}
-                  ${depETAs[iv.id]?.delayMin>1?`<span title="Retard potentiel cumulé vs circulation fluide" style="font-size:11px;font-weight:600;padding:2px 7px;border-radius:100px;background:#FFF3E0;color:#E65100">🐢 +${fmtMin(depETAs[iv.id].delayMin)} trafic</span>`:''}
+                ${depETAs[iv.id]?`<div class="dep-eta">
+                  <div class="dep-eta-main">🕐 ${depETAs[iv.id].eta} → ${depETAs[iv.id].leave}</div>
+                  ${(depETAs[iv.id]?.travelMin||depETAs[iv.id]?.delayMin>1)?`<div class="dep-eta-meta">
+                    ${depETAs[iv.id]?.travelMin?`<span class="dep-eta-duration">🚗 ${fmtMin(depETAs[iv.id].travelMin)}</span>`:''}
+                    ${depETAs[iv.id]?.delayMin>1?`<span class="dep-eta-delay" title="Retard potentiel cumulé vs circulation fluide">🐢 +${fmtMin(depETAs[iv.id].delayMin)} trafic</span>`:''}
+                  </div>`:''}
                 </div>`:''}
-                ${iv.notes?`<div style="font-size:12px;color:var(--orange);background:#FFF3E0;padding:5px 9px;border-radius:6px;margin-bottom:5px">📝 ${iv.notes}</div>`:""}
-                ${(iv.commercial||iv.nSerie||iv.dateFin)?`<div style="font-size:11px;background:#F8F9FA;border:1px solid #E9ECEF;padding:5px 9px;border-radius:6px;margin-bottom:5px;display:flex;gap:10px;flex-wrap:wrap">
+                ${iv.notes?`<div style="font-size:12px;color:var(--orange);background:var(--warning-light);padding:5px 9px;border-radius:6px;margin-bottom:5px">📝 ${iv.notes}</div>`:""}
+                ${(iv.commercial||iv.nSerie||iv.dateFin)?`<div style="font-size:11px;background:var(--surface-secondary);border:1px solid #E9ECEF;padding:5px 9px;border-radius:6px;margin-bottom:5px;display:flex;gap:10px;flex-wrap:wrap">
                   ${iv.commercial?`<span>💼 <strong>${iv.commercial}</strong></span>`:""}
                   ${iv.nSerie?`<span style="color:var(--gray)">🔢 S/N : <strong>${iv.nSerie}</strong></span>`:""}
                   ${iv.dateFin?`<span style="color:#1B5E20">✅ Fin : <strong>${fd(iv.dateFin)}</strong></span>`:""}
                 </div>`:""}
-                ${(iv.contact||iv.cphone||iv.cemail)?`<div style="font-size:12px;background:#F3E5F5;padding:5px 9px;border-radius:6px;margin-bottom:5px">
+                ${(iv.contact||iv.cphone||iv.cemail)?`<div style="font-size:12px;background:var(--purple-light);padding:5px 9px;border-radius:6px;margin-bottom:5px">
                   ${iv.contact?`👤 <strong>${iv.contact}</strong> `:""}${iv.cphone?`📞 <a href="tel:${iv.cphone}" style="color:var(--blue)">${iv.cphone}</a>`:""}
                   ${iv.cemail?`<br>✉️ <a href="mailto:${iv.cemail}" style="color:var(--blue)">${iv.cemail}</a>`:""}
                 </div>`:""}
                 <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap" onclick="event.stopPropagation()">
-                  <button onclick="valDep(${iv.id})" style="flex:1;min-width:90px;padding:9px;border-radius:8px;border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:500;background:${done?"#4CAF50":"var(--bg)"};color:${done?"#fff":"var(--dark)"}">
+                  <button onclick="valDep(${iv.id})" type="button" class="btn btn-sm dep-action-btn${done?" is-done":""}" style="min-width:90px">
                     ${done?"✅ Validé":"☐ Valider"}
                   </button>
-                  <button onclick="failDep(${iv.id})" style="flex:1;min-width:80px;padding:9px;border-radius:8px;border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:500;background:${fail?"#C62828":"var(--bg)"};color:${fail?"#fff":"var(--dark)"}">
+                  <button onclick="failDep(${iv.id})" type="button" class="btn btn-sm dep-action-btn${fail?" is-failed":""}" style="min-width:80px">
                     ${fail?"❌ Échec":"✕ Échec"}
                   </button>
-                  <a href="https://waze.com/ul?q=${encodeURIComponent(iv.addr)}&navigate=yes" target="_blank" class="bg" style="display:inline-flex;align-items:center;gap:4px;text-decoration:none;padding:9px 12px;font-size:13px;border-radius:8px;background:#05C8F7;color:#fff;border:none" title="Waze"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M20.54 6.63C19.26 3.1 15.97 1 12.25 1 7.32 1 3.28 4.81 3.28 9.65c0 2.17.8 4.24 2.25 5.85l.12 3.55 3.36-1.49c1 .29 2.01.44 3.02.44.11 0 .22 0 .33-.01l.03.01c.67 0 1.33-.07 1.97-.2l3.62 1.61-.13-3.74c1.44-1.35 2.34-3.11 2.5-5.02.03-.35.05-.69.05-1.02 0-.67-.08-1.35-.22-2h-.02l-.64 2.5z"/></svg> Waze</a>
-                  <button class="bicon" onclick="editIv(${iv.id})" style="padding:9px">✏️</button>
+                  <a href="https://waze.com/ul?q=${encodeURIComponent(iv.addr)}&navigate=yes" target="_blank" class="btn btn-sm" style="text-decoration:none;background:#05C8F7;color:#fff" title="Waze"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.54 6.63C19.26 3.1 15.97 1 12.25 1 7.32 1 3.28 4.81 3.28 9.65c0 2.17.8 4.24 2.25 5.85l.12 3.55 3.36-1.49c1 .29 2.01.44 3.02.44.11 0 .22 0 .33-.01l.03.01c.67 0 1.33-.07 1.97-.2l3.62 1.61-.13-3.74c1.44-1.35 2.34-3.11 2.5-5.02.03-.35.05-.69.05-1.02 0-.67-.08-1.35-.22-2h-.02l-.64 2.5z"/></svg> Waze</a>
+                  <button type="button" class="dep-action-icon" onclick="editIv(${iv.id})" title="Modifier" aria-label="Modifier l'intervention">✏️</button>
                 </div>
               </div>
             </div>
@@ -3414,15 +4036,17 @@ function rPlan(){
 // ── Header avec sélecteur de vue ──────────────────────
 function planHdr(navHtml){
   const views=[["jour","Jour"],["semaine","Semaine"],["mois","Mois"],["annee","Année"]]
-  return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
-    <div style="display:flex;background:var(--bg);border-radius:8px;padding:3px;gap:2px">
-      ${views.map(([v,l])=>`<button onclick="planView='${v}';rPlan()" style="padding:7px 16px;border-radius:6px;border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:${planView===v?600:400};background:${planView===v?"#fff":"transparent"};color:${planView===v?"var(--blue)":"var(--gray)"};box-shadow:${planView===v?"0 1px 4px rgba(0,0,0,.1)":"none"};transition:all .15s">${l}</button>`).join("")}
+  return `<div class="plan-header">
+    <div class="plan-header-row">
+      <div class="plan-view-switch">
+        ${views.map(([v,l])=>`<button onclick="planView='${v}';rPlan()" aria-pressed="${planView===v}" class="btn btn-sm ${planView===v?"btn-primary":"btn-secondary"}">${l}</button>`).join("")}
+      </div>
+      <div class="plan-nav">${navHtml||""}</div>
     </div>
-    <div style="display:flex;align-items:center;gap:6px;margin-left:4px">${navHtml||""}</div>
-    <div style="display:flex;gap:6px;margin-left:auto">
-      <button class="bb bsm" onclick="openAIPlan()" style="background:#1B5E20;border-color:#1B5E20">🤖 Planif. IA</button>
-      <button class="bb bsm" onclick="SV('depart')">🚀 Départ</button>
-      <button class="bb bsm" onclick="mapDate=selDate;SV('carte')">🗺️ Carte</button>
+    <div class="plan-header-row plan-actions">
+      <button class="btn btn-sm btn-secondary" onclick="openAIPlan()">🤖 Planif. IA</button>
+      <button class="btn btn-sm btn-secondary" onclick="SV('depart')">🚀 Départ</button>
+      <button class="btn btn-sm btn-secondary" onclick="mapDate=selDate;SV('carte')">🗺️ Carte</button>
     </div>
   </div>`
 }
@@ -3431,7 +4055,7 @@ function planHdr(navHtml){
 function ivCard(iv, idx, showNum){
   const tc=TB(iv.techId)
   const done=depValidated[iv.id],fail=depFailed[iv.id]
-  return `<div class="ivc" style="border-left-color:${(TYPES[iv.type]||TYPES.maintenance_simple).color};${done?"opacity:.55":fail?"opacity:.55":""}" onclick="editIv(${iv.id})">
+  return `<div class="ivc" tabindex="0" role="button" aria-label="Ouvrir l'intervention ${iv.client}" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();editIv(${iv.id})}" style="border-left-color:${(TYPES[iv.type]||TYPES.maintenance_simple).color};${done?"opacity:.55":fail?"opacity:.55":""}" onclick="editIv(${iv.id})">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:5px">
       <div style="min-width:0;display:flex;align-items:center;gap:6px">
         ${showNum?`<span style="font-weight:700;color:var(--blue);font-size:12px;flex-shrink:0">#${idx+1}</span>`:""}
@@ -3440,13 +4064,13 @@ function ivCard(iv, idx, showNum){
       <div style="display:flex;gap:4px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;align-items:center">
         ${sBdg(iv.status)}
         ${done?bdg("✓ Fait","#2E7D32","#E8F5E9"):""}
-        ${fail?bdg("✗ Échec","#C62828","#FFEBEE"):""}
+        ${fail?`<span class="badge badge-danger">✗ Échec</span>`:""}
       </div>
     </div>
     <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">
-      ${tBdg(iv.type)}${iv.form?bdg("+Formation","#6A1B9A","#F3E5F5"):""}
-      <span style="font-size:11px;color:var(--gray)">⏱ ${fmtMin(dur(iv.type,iv.form))}</span>
-      <span style="display:flex;align-items:center;gap:3px;font-size:11px;color:var(--gray)">${ava(tc.init,16)} ${tc.name}</span>
+      ${tBdg(iv.type)}${iv.form?`<span class="badge badge-purple">+Formation</span>`:""}
+      <span style="font-size:var(--text-caption-size);color:var(--gray)">⏱ ${fmtMin(dur(iv.type,iv.form))}</span>
+      <span style="display:flex;align-items:center;gap:3px;font-size:var(--text-caption-size);color:var(--gray)">${ava(tc.init,16)} ${tc.name}</span>
     </div>
     ${iv.notes?`<div class="note-preview">📝 ${iv.notes}</div>`:""}
     ${iv.contact?`<div style="font-size:11px;color:#6A1B9A;background:#F3E5F5;padding:3px 8px;border-radius:5px;margin-top:4px">👤 ${iv.contact}${iv.cphone?" · "+iv.cphone:""}</div>`:""}
@@ -3583,7 +4207,7 @@ function dayArchive(date){
   let html='<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;background:var(--bg);border-radius:10px;padding:10px 14px;margin-bottom:14px">'
   html+='<span style="font-size:12px;color:var(--gray)">📋 <strong>'+dayIvs.length+'</strong> intervention'+(dayIvs.length>1?'s':'')+'</span>'
   html+='<span style="font-size:12px;color:#1B5E20;font-weight:600">✅ '+doneCnt+' validée'+(doneCnt>1?'s':'')+'</span>'
-  if(failCnt) html+='<span style="font-size:12px;color:#C62828;font-weight:600">❌ '+failCnt+' échec'+(failCnt>1?'s':'')+'</span>'
+  if(failCnt) html+='<span style="font-size:12px;color:var(--danger);font-weight:600">❌ '+failCnt+' échec'+(failCnt>1?'s':'')+'</span>'
   if(pendCnt) html+='<span style="font-size:12px;color:var(--gray)">⏳ '+pendCnt+' en attente</span>'
   if(fromNotion) html+='<span style="font-size:11px;color:var(--gray);margin-left:auto;background:#F3E5F5;padding:2px 8px;border-radius:100px">📦 Notion</span>'
   html+='</div>'
@@ -3631,12 +4255,12 @@ function dayArchive(date){
 // ── VUE JOUR ─────────────────────────────────────────
 function rPlanDay(el){
   const isPast=selDate<TODAY
-  const nav=`<button onclick="shiftDay(-1)" class="bg bsm">◀</button>
-    <input type="date" value="${selDate}" onchange="setSelDate(this.value)" style="width:auto;padding:5px 10px;font-size:13px"/>
-    <button onclick="shiftDay(1)" class="bg bsm">▶</button>
-    <button onclick="setSelDate(TODAY)" class="bg bsm">Aujourd'hui</button>`
+  const nav=`<button onclick="shiftDay(-1)" class="btn btn-sm btn-secondary" aria-label="Jour précédent">◀</button>
+    <input type="date" value="${selDate}" onchange="setSelDate(this.value)" aria-label="Choisir une date" style="width:auto;padding:5px 10px;font-size:13px"/>
+    <button onclick="shiftDay(1)" class="btn btn-sm btn-secondary" aria-label="Jour suivant">▶</button>
+    <button onclick="setSelDate(TODAY)" class="btn btn-sm btn-secondary">Aujourd'hui</button>`
   el.innerHTML=planHdr(nav)+
-    `<h2 style="font-size:15px;font-weight:600;margin-bottom:12px">${fdl(selDate)}${isPast?' <span style="font-size:12px;font-weight:400;color:var(--gray)">· Archive</span>':''}</h2>`+
+    `<h2 class="plan-period-label">${fdl(selDate)}${isPast?' <span class="plan-period-sub">· Archive</span>':''}</h2>`+
     (isPast?dayArchive(selDate):daySection(selDate))
 }
 function shiftDay(n){
@@ -3655,13 +4279,14 @@ function rPlanWeek(el){
   // Auto-charge les mois passés visibles dans la semaine
   const _weekPastYMs=new Set(week.filter(d=>d<TODAY).map(d=>d.substring(0,7)))
   _weekPastYMs.forEach(ym=>{if(!_notionFetchedMonths.has(ym))_fetchNotionMonth(ym).then(()=>rPlan())})
-  const nav=`<button onclick="shiftWeek(-7)" class="bg bsm">◀ Préc.</button>
-    <span style="font-size:13px;font-weight:600;padding:0 6px">${fd(week[0])} — ${fd(week[6])}</span>
-    <button onclick="shiftWeek(7)" class="bg bsm">Suiv. ▶</button>
-    <button onclick="setSelDate(TODAY)" class="bg bsm">Aujourd'hui</button>`
+  const nav=`<button onclick="shiftWeek(-7)" class="btn btn-sm btn-secondary" aria-label="Semaine précédente">◀ Préc.</button>
+    <span class="plan-period-inline">${fd(week[0])} — ${fd(week[6])}</span>
+    <button onclick="shiftWeek(7)" class="btn btn-sm btn-secondary" aria-label="Semaine suivante">Suiv. ▶</button>
+    <button onclick="setSelDate(TODAY)" class="btn btn-sm btn-secondary">Aujourd'hui</button>`
   const DNAMES=["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"]
   el.innerHTML=planHdr(nav)+`
-  <div class="wkg" style="margin-bottom:16px">
+  <div class="plan-week-scroll" style="margin-bottom:16px">
+  <div class="wkg">
     ${week.map((d,i)=>{
       const isPastD=d<TODAY
       const _wymD=d.substring(0,7)
@@ -3671,16 +4296,17 @@ function rPlanWeek(el){
       const done=_aiD!==null?_aiD.filter(iv=>iv.status==='completed').length:ivs.filter(iv=>iv.date===d&&(depValidated[iv.id]||iv.status==="completed")).length
       const techCount=_aiD!==null?new Set(_aiD.map(iv=>iv.tech).filter(Boolean)).size:new Set(ivs.filter(iv=>iv.date===d).map(iv=>iv.techId)).size
       const isSel=d===selDate,isT=d===TODAY
-      return `<div class="db ${isSel?"on":isT?"td":""}" onclick="selDate='${d}';rPlan()" style="${isPastD&&!isSel?"background:#F2F2F2;":""}">
+      return `<button class="db ${isSel?"on":isT?"td":""}" onclick="selDate='${d}';rPlan()" aria-pressed="${isSel}" aria-label="${DNAMES[i]} ${d.split("-")[2]}${cnt?", "+cnt+" intervention"+(cnt>1?"s":""):""}" style="${isPastD&&!isSel?"background:#F2F2F2;":""}">
         <div class="dl" style="${isPastD&&!isSel?"color:#BDBDBD":""}">${DNAMES[i]}</div>
         <div class="dn" style="${isPastD&&!isSel?"color:#9E9E9E":""}">${d.split("-")[2]}</div>
         ${cnt?`<span class="dc" style="${isPastD&&!isSel?"background:#ECEFF1;color:#78909C":""}">${cnt}</span>`:""}
         ${techCount>0&&!isSel?`<div style="font-size:9px;color:${isPastD?"#607D8B":"var(--blue)"};margin-top:1px">👷${techCount}</div>`:""}
         ${done&&!isSel?`<div style="font-size:9px;color:#2E7D32;margin-top:1px">✓${done}</div>`:""}
         ${!cnt&&isPastD&&!isSel?`<div style="font-size:9px;color:#D0D0D0;margin-top:2px">${_afD?"—":"⏳"}</div>`:""}
-      </div>`}).join("")}
+      </button>`}).join("")}
   </div>
-  <h3 style="font-size:14px;font-weight:600;margin-bottom:10px">${fdl(selDate)}${selDate<TODAY?' <span style="font-size:12px;font-weight:400;color:var(--gray)">· Archive</span>':''}</h3>
+  </div>
+  <h3 class="plan-day-heading">${fdl(selDate)}${selDate<TODAY?' <span class="plan-period-sub">· Archive</span>':''}</h3>
   ${selDate<TODAY?dayArchive(selDate):daySection(selDate)}`
 }
 function shiftWeek(n){
@@ -3701,10 +4327,10 @@ function rPlanMonth(el){
   }
   while(cells.length%7!==0) cells.push(null)
 
-  const nav=`<button onclick="shiftMonth(-1)" class="bg bsm">◀ Préc.</button>
-    <span style="font-size:14px;font-weight:600;padding:0 6px">${MNAMES[m-1]} ${y}</span>
-    <button onclick="shiftMonth(1)" class="bg bsm">Suiv. ▶</button>
-    <button onclick="setSelDate(TODAY)" class="bg bsm">Aujourd'hui</button>`
+  const nav=`<button onclick="shiftMonth(-1)" class="btn btn-sm btn-secondary" aria-label="Mois précédent">◀ Préc.</button>
+    <span class="plan-period-inline">${MNAMES[m-1]} ${y}</span>
+    <button onclick="shiftMonth(1)" class="btn btn-sm btn-secondary" aria-label="Mois suivant">Suiv. ▶</button>
+    <button onclick="setSelDate(TODAY)" class="btn btn-sm btn-secondary">Aujourd'hui</button>`
 
   // Auto-charge le mois affiché si passé (une seule fois) puis re-render
   const _displayYM=`${y}-${String(m).padStart(2,"0")}`
@@ -3713,8 +4339,9 @@ function rPlanMonth(el){
   }
 
   el.innerHTML=planHdr(nav)+`
-  <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:12px">
-    ${DNAMES_FULL.map(d=>`<div style="text-align:center;font-size:11px;font-weight:600;color:var(--gray);padding:5px 0">${d}</div>`).join("")}
+  <div class="plan-month-scroll">
+  <div class="plan-month-grid">
+    ${DNAMES_FULL.map(d=>`<div class="plan-month-weekday">${d}</div>`).join("")}
     ${cells.map(date=>{
       if(!date) return`<div></div>`
       const isPast=date<TODAY
@@ -3726,17 +4353,18 @@ function rPlanMonth(el){
       const techCount=_archIvs!==null?new Set(_archIvs.map(iv=>iv.tech).filter(Boolean)).size:new Set(ivs.filter(i=>i.date===date).map(i=>i.techId)).size
       const isSel=date===selDate,isT=date===TODAY
       const dayNum=date.split("-")[2]
-      return `<div onclick="selDate='${date}';rPlan()" style="min-height:56px;background:${isSel?"var(--blue)":isT?"#DBEAFE":isPast?"#F2F2F2":"var(--bg)"};border-radius:8px;padding:5px 6px;cursor:pointer;border:1.5px solid ${isSel?"var(--blue)":isT?"var(--blue)":"transparent"};transition:all .1s" onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.1)'" onmouseout="this.style.boxShadow='none'">
+      return `<button class="plan-month-cell" onclick="selDate='${date}';rPlan()" aria-pressed="${isSel}" aria-label="${dayNum}${cnt?", "+cnt+" intervention"+(cnt>1?"s":""):""}" style="min-height:56px;background:${isSel?"var(--blue)":isT?"#DBEAFE":isPast?"#F2F2F2":"var(--bg)"};border:1.5px solid ${isSel?"var(--blue)":isT?"var(--blue)":"transparent"}">
           <div style="font-size:13px;font-weight:${isT||isSel?700:400};color:${isSel?"#fff":isT?"var(--blue)":isPast?"#9E9E9E":"var(--dark)"}">${dayNum}</div>
           ${cnt?`<div style="display:flex;flex-direction:column;gap:2px;margin-top:2px">
             <span style="font-size:10px;font-weight:600;background:${isSel?"rgba(255,255,255,.25)":isPast?"#78909C":"var(--blue)"};color:#fff;border-radius:3px;padding:1px 5px;display:inline-block">${cnt} interv.</span>
             ${techCount>0?`<span style="font-size:10px;color:${isSel?"rgba(255,255,255,.7)":isPast?"#607D8B":"var(--blue)"}">👷 ${techCount} tech${techCount>1?"s":""}</span>`:""}
             ${done>0?`<span style="font-size:10px;color:${isSel?"rgba(255,255,255,.8)":"#2E7D32"}">✓ ${done} faite${done>1?"s":""}</span>`:""}
           </div>`:isPast?`<span style="font-size:9px;color:${_archFetched?"#D0D0D0":"#BDBDBD"};margin-top:3px;display:block">${_archFetched?"—":"⏳"}</span>`:""}
-        </div>`}).join("")}
+        </button>`}).join("")}
+  </div>
   </div>
   <div style="border-top:1px solid var(--border);padding-top:14px">
-    <h3 style="font-size:14px;font-weight:600;margin-bottom:10px">${fdl(selDate)}${selDate<TODAY?' <span style="font-size:12px;font-weight:400;color:var(--gray)">· Archive</span>':''}</h3>
+    <h3 class="plan-day-heading">${fdl(selDate)}${selDate<TODAY?' <span class="plan-period-sub">· Archive</span>':''}</h3>
     ${selDate<TODAY?dayArchive(selDate):daySection(selDate)}
   </div>`
 }
@@ -3748,10 +4376,10 @@ function shiftMonth(n){
 // ── VUE ANNÉE ─────────────────────────────────────────
 function rPlanYear(el){
   const y=parseInt(selDate.split("-")[0])
-  const nav=`<button onclick="shiftYear(-1)" class="bg bsm">◀ ${y-1}</button>
-    <span style="font-size:15px;font-weight:700;padding:0 8px">${y}</span>
-    <button onclick="shiftYear(1)" class="bg bsm">${y+1} ▶</button>
-    <button onclick="setSelDate(TODAY)" class="bg bsm">Aujourd'hui</button>`
+  const nav=`<button onclick="shiftYear(-1)" class="btn btn-sm btn-secondary" aria-label="Année précédente">◀ ${y-1}</button>
+    <span class="plan-period-inline" style="font-size:var(--text-h2-size);font-weight:var(--text-h2-weight)">${y}</span>
+    <button onclick="shiftYear(1)" class="btn btn-sm btn-secondary" aria-label="Année suivante">${y+1} ▶</button>
+    <button onclick="setSelDate(TODAY)" class="btn btn-sm btn-secondary">Aujourd'hui</button>`
 
   // Auto-charge les mois passés de l'année affichée
   const _todayYN=parseInt(TODAY.split("-")[0]),_todayMN=parseInt(TODAY.split("-")[1])
@@ -3799,7 +4427,7 @@ function rPlanYear(el){
       }
       const isCur=m===curM&&y===curY
       const isTodayM=m===todayM&&y===todayY
-      return `<div onclick="selDate='${ym}-01';planView='mois';rPlan()" class="card" style="cursor:pointer;border-left:3px solid ${isCur?"var(--blue)":isTodayM?"var(--orange)":"var(--border)"};background:${isCur?"var(--blueLight)":isPastM&&!mCnt?"#F5F5F5":"#fff"};transition:all .12s" onmouseover="this.style.boxShadow='0 2px 10px rgba(0,0,0,.1)'" onmouseout="this.style.boxShadow='none'">
+      return `<button onclick="selDate='${ym}-01';planView='mois';rPlan()" aria-label="${mn} ${y}${mCnt?", "+mCnt+" interventions":""}" class="card plan-year-card" style="border-left:3px solid ${isCur?"var(--blue)":isTodayM?"var(--orange)":"var(--border)"};background:${isCur?"var(--blueLight)":isPastM&&!mCnt?"#F5F5F5":"#fff"}">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
             <span style="font-weight:700;font-size:14px;color:${isCur?"var(--blue)":isTodayM?"var(--orange)":isPastM&&!mCnt?"#BDBDBD":"var(--dark)"}">${mn}</span>
             ${mCnt?`<span class="bdg" style="background:${isPastM?"#ECEFF1":"var(--blueLight)"};color:${isPastM?"#78909C":"var(--blue)"}">${mCnt}</span>`:isPastM?`<span style="font-size:11px;color:${archFetched?"#D0D0D0":"#BDBDBD"}">${archFetched?"—":"⏳"}</span>`:`<span style="font-size:11px;color:var(--gray)">—</span>`}
@@ -3809,9 +4437,9 @@ function rPlanYear(el){
           <div style="display:flex;gap:8px;font-size:11px">
             ${done?`<span style="color:#2E7D32">✓ ${done}</span>`:""}
             ${pending?`<span style="color:var(--orange)">⏳ ${pending}</span>`:""}
-            ${fail?`<span style="color:#C62828">✗ ${fail}</span>`:""}
+            ${fail?`<span style="color:var(--danger)">✗ ${fail}</span>`:""}
           </div>`:`<div style="font-size:11px;color:${isPastM?"#D0D0D0":"var(--gray)"}">Aucune intervention</div>`}
-        </div>`}).join("")}
+        </button>`}).join("")}
   </div>`
 }
 function shiftYear(n){
@@ -3837,36 +4465,36 @@ function rIv(){
   if(sd)list=list.filter(i=>i.date>=sd)
   if(ed)list=list.filter(i=>i.date<=ed)
   const filtersActive=fMode!=="all"||fStatus!=="all"||fTech>0||!!fClient||!!sq||!!sd||!!ed
-  const activeF=(fClient||fTech>0)&&`<span style="font-size:12px;color:var(--blue);background:var(--blueLight);padding:3px 10px;border-radius:100px">🔍 ${fClient||TB(fTech).name} <span onclick="fClient='';fTech=0;rIv()" style="cursor:pointer">✕</span></span>`
+  const activeF=(fClient||fTech>0)&&`<span style="font-size:12px;color:var(--blue);background:var(--blueLight);padding:3px 10px;border-radius:100px">🔍 ${fClient||TB(fTech).name} <button type="button" onclick="fClient='';fTech=0;rIv()" aria-label="Supprimer le filtre actif" style="cursor:pointer;background:none;border:none;padding:0;font:inherit;color:inherit">✕</button></span>`
 
   document.getElementById("d-iv").innerHTML=`
-  <div class="fbar" style="margin-bottom:6px">
-    <button class="${fMode==="all"?"bb":"bg"} bsm" onclick="fMode='all';rIv()">📋 Toutes${fMode!=="all"?" ✕":""}</button>
-    <button class="${fMode==="physique"?"bb":"bg"} bsm" onclick="fMode='physique';rIv()" style="${fMode==="physique"?"":"border-color:#1565C0;color:#1565C0"}">🔧 Physique</button>
-    <button class="${fMode==="tele"?"bb":"bg"} bsm" onclick="fMode='tele';rIv()" style="${fMode==="tele"?"background:#00897B;border-color:#00897B":"border-color:#00897B;color:#00897B"}">📱 Télémaintenance</button>
+  <div class="filter-bar" style="margin-bottom:6px">
+    <button type="button" class="btn ${fMode==="all"?"btn-primary":"btn-secondary"} btn-sm" aria-pressed="${fMode==="all"}" onclick="fMode='all';rIv()">📋 Toutes${fMode!=="all"?" ✕":""}</button>
+    <button type="button" class="btn ${fMode==="physique"?"btn-primary":"btn-secondary"} btn-sm" aria-pressed="${fMode==="physique"}" onclick="fMode='physique';rIv()" style="${fMode==="physique"?"":"border-color:var(--primary);color:var(--primary)"}">🔧 Physique</button>
+    <button type="button" class="btn ${fMode==="tele"?"btn-primary":"btn-secondary"} btn-sm" aria-pressed="${fMode==="tele"}" onclick="fMode='tele';rIv()" style="${fMode==="tele"?"background:#00897B;border-color:#00897B":"border-color:#00897B;color:#00897B"}">📱 Télémaintenance</button>
   </div>
-  <div class="fbar">
-    <input id="iv-sq" value="${sq}" placeholder="🔍 Rechercher..." style="max-width:220px;font-size:13px;padding:6px 10px" oninput="rIv()"/>
-    ${["all","completed","confirmed","pending","not_responded"].map((v,i)=>{const labels=["Toutes","Terminées","Confirmées","En attente","Non répondu"];return `<button class="${fStatus===v&&!fClient&&!fTech?"bb":"bg"} bsm" onclick="fStatus='${v}';fClient='';fTech=0;rIv()">${labels[i]}</button>`}).join("")}
+  <div class="filter-bar" style="margin-bottom:14px">
+    <input id="iv-sq" class="form-control search-control" value="${sq}" placeholder="🔍 Rechercher..." aria-label="Rechercher une intervention" style="max-width:220px;font-size:13px;padding:6px 10px" oninput="rIv()"/>
+    ${["all","completed","confirmed","pending","not_responded"].map((v,i)=>{const labels=["Toutes","Terminées","Confirmées","En attente","Non répondu"];const active=fStatus===v&&!fClient&&!fTech;return `<button type="button" class="btn ${active?"btn-primary":"btn-secondary"} btn-sm" aria-pressed="${active}" onclick="fStatus='${v}';fClient='';fTech=0;rIv()">${labels[i]}</button>`}).join("")}
     ${activeF||""}
-    <input id="iv-sd" type="date" value="${sd}" title="Du" style="width:auto;font-size:12px;padding:5px 8px" onchange="rIv()"/>
+    <input id="iv-sd" type="date" class="form-control" value="${sd}" title="Du" aria-label="Date de début" style="width:auto;font-size:12px;padding:5px 8px" onchange="rIv()"/>
     <span style="font-size:12px;color:var(--gray)">→</span>
-    <input id="iv-ed" type="date" value="${ed}" title="Au" style="width:auto;font-size:12px;padding:5px 8px" onchange="rIv()"/>
+    <input id="iv-ed" type="date" class="form-control" value="${ed}" title="Au" aria-label="Date de fin" style="width:auto;font-size:12px;padding:5px 8px" onchange="rIv()"/>
     <span style="font-size:12px;color:var(--gray);margin-left:4px">${list.length} résultat${list.length>1?"s":""}</span>
-    <button class="bg bsm" onclick="exportCSV()" title="Exporter toutes les interventions en CSV" style="margin-left:auto">⬇️ Export CSV</button>
+    <button type="button" class="btn btn-secondary btn-sm" onclick="exportCSV()" title="Exporter toutes les interventions en CSV" style="margin-left:auto">⬇️ Export CSV</button>
   </div>
-  ${!list.length?`<div class="card" style="text-align:center;color:var(--gray);padding:36px">Aucune intervention trouvée${filtersActive?`<br><button class="bg bsm" style="margin-top:10px" onclick="resetIvFilters()">↩ Réinitialiser les filtres</button>`:" (aucune intervention créée)"}</div>`:""}
+  ${!list.length?`<div class="card" style="text-align:center;color:var(--gray);padding:36px">Aucune intervention trouvée${filtersActive?`<br><button type="button" class="btn btn-secondary btn-sm" style="margin-top:10px" onclick="resetIvFilters()">↩ Réinitialiser les filtres</button>`:" (aucune intervention créée)"}</div>`:""}
   ${list.map(iv=>{
     const tc=TB(iv.techId)
-    return `<div class="ivc" style="border-left-color:${(TYPES[iv.type]||TYPES.maintenance_simple).color};display:flex;align-items:center;gap:12px;justify-content:space-between" onclick="editIv(${iv.id})">
+    return `<div class="ivc" tabindex="0" role="button" aria-label="Ouvrir l'intervention ${iv.client}" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();editIv(${iv.id})}" style="border-left-color:${(TYPES[iv.type]||TYPES.maintenance_simple).color};display:flex;align-items:center;gap:12px;justify-content:space-between" onclick="editIv(${iv.id})">
       <div style="flex:1;min-width:0"><div class="cn">${iv.client}</div><div class="ca">${iv.addr}</div>
       ${iv.notes?`<div style="font-size:11px;color:var(--orange);margin-top:3px">📝 ${iv.notes.substring(0,60)}${iv.notes.length>60?"...":""}</div>`:""}
       </div>
-      <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
+      <div class="iv-card-actions" style="display:flex;gap:6px;align-items:center">
         <span style="font-size:11px;color:var(--gray)">${fd(iv.date)}</span>
         ${tBdg(iv.type)}<div onclick="event.stopPropagation();fTech=${iv.techId};rIv()">${ava(tc.init,24)}</div>
         ${sBdg(iv.status)}
-        <select onclick="event.stopPropagation()" onchange="updSt(${iv.id},this.value)" style="width:auto;padding:3px 7px;font-size:11px">
+        <select onclick="event.stopPropagation()" onkeydown="event.stopPropagation()" onchange="updSt(${iv.id},this.value)" aria-label="Statut de l'intervention ${iv.client}" style="width:auto;padding:3px 7px;font-size:11px">
           ${Object.entries(STATUSES).map(([k,v])=>`<option value="${k}"${iv.status==k?" selected":""}>${v.label}</option>`).join("")}
         </select>
       </div>
@@ -6724,22 +7352,28 @@ function rZones(){
   let saved=null
   try{const s=localStorage.getItem("optiq_zones_params");if(s)saved=JSON.parse(s)}catch(e){}
   el.innerHTML=`
-    <div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <div class="card zone-header">
       <div style="flex:1;min-width:0">
         <div style="font-size:15px;font-weight:700;margin-bottom:4px">🗂️ Regroupement par zone géographique</div>
         <div style="font-size:12px;color:var(--gray)">L'algorithme regroupe les interventions de la période choisie par proximité. Tu choisis quel technicien fait chaque zone. <span id="z-live-badge" style="display:none;color:#2E7D32;font-weight:600">🔄 Mise à jour auto activée</span></div>
       </div>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <input type="date" id="z-from" value="${saved?.from||today}" style="font-size:13px;padding:6px 10px;width:auto"/>
-        <input type="date" id="z-to"   value="${saved?.to||end}"   style="font-size:13px;padding:6px 10px;width:auto"/>
-        <div style="display:flex;align-items:center;gap:6px;font-size:13px">
-          <label style="color:var(--gray)">Zones :</label>
-          <input type="number" id="z-k" value="${saved?.k||Math.min(TECHS.length,4)}" min="1" max="${TECHS.length}" style="width:60px;padding:6px 10px;font-size:13px"/>
+      <div class="zone-controls">
+        <div class="zone-control">
+          <label for="z-from">Du</label>
+          <input type="date" id="z-from" class="form-control" value="${saved?.from||today}" style="width:auto;min-height:auto;padding:6px 10px;font-size:13px"/>
         </div>
-        <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--gray);cursor:pointer">
+        <div class="zone-control">
+          <label for="z-to">Au</label>
+          <input type="date" id="z-to" class="form-control" value="${saved?.to||end}" style="width:auto;min-height:auto;padding:6px 10px;font-size:13px"/>
+        </div>
+        <div class="zone-control">
+          <label for="z-k">Zones</label>
+          <input type="number" id="z-k" class="form-control" value="${saved?.k||Math.min(TECHS.length,4)}" min="1" max="${TECHS.length}" style="width:70px;min-height:auto;padding:6px 10px;font-size:13px"/>
+        </div>
+        <label for="z-incl-completed" class="zone-control-checkbox">
           <input type="checkbox" id="z-incl-completed" ${saved?.inclCompleted?"checked":""}/> Inclure les terminées (parc entier)
         </label>
-        <button class="bb" onclick="analyserZones()">🔍 Analyser</button>
+        <button type="button" class="btn btn-primary" onclick="analyserZones()">🔍 Analyser</button>
       </div>
     </div>
     <div id="z-progress" style="display:none" class="card">
@@ -6848,11 +7482,11 @@ function renderZoneResult(clusters,allPts,poolCount,failed){
   let notice=""
   if(poolCount!==undefined && failed && failed.length){
     const listId="z-failed-list"
-    notice=`<div class="card" style="background:#FFF3E0;border-left:4px solid #E65100;margin-bottom:12px">
-      <div style="font-size:13px;color:#E65100;font-weight:600">
+    notice=`<div class="alert alert-warning" style="margin-bottom:12px;flex-direction:column;align-items:stretch">
+      <div style="font-size:13px;font-weight:600">
         ⚠️ ${poolCount} intervention${poolCount>1?"s":""} sur la période · ${allPts.length} placée${allPts.length>1?"s":""} sur la carte · ${failed.length} non géolocalisée${failed.length>1?"s":""} (adresse introuvable)
       </div>
-      <div style="font-size:12px;color:var(--gray);margin-top:4px;cursor:pointer;text-decoration:underline" onclick="const e=document.getElementById('${listId}');e.style.display=e.style.display==='none'?'block':'none'">Voir la liste</div>
+      <button type="button" class="zone-toggle-list" aria-expanded="false" aria-controls="${listId}" onclick="const e=document.getElementById('${listId}');const open=e.style.display==='none';e.style.display=open?'block':'none';this.setAttribute('aria-expanded',open)">Voir la liste</button>
       <div id="${listId}" style="display:none;margin-top:8px;max-height:160px;overflow-y:auto">
         ${failed.map(iv=>`<div style="font-size:12px;padding:4px 0;border-top:1px solid var(--border)">
           <strong>${iv.client}</strong> — <span style="color:var(--gray)">${iv.addr||"(adresse vide)"}</span>
@@ -6893,7 +7527,7 @@ function renderZoneResult(clusters,allPts,poolCount,failed){
   }).filter(c=>c.pts.length>0)
 
   // Construire la carte Leaflet
-  const mapDiv=`<div id="z-mapid" style="height:360px;border-radius:10px;border:1px solid var(--border)"></div>`
+  const mapDiv=`<div id="z-mapid" style="height:360px"></div>`
 
   // Cartes de clusters
   const cards=clusterInfo.map(({ci,pts,radiusKm,distDepot,coherent,doneCount,pendingCount})=>{
@@ -6907,8 +7541,8 @@ function renderZoneResult(clusters,allPts,poolCount,failed){
     const rowHtml=(p,done)=>{
       const late=!done&&p.iv.date<TODAY
       const dateSpan=`<span style="color:var(--gray);font-weight:400"> · ${fd(p.iv.date)}</span>`
-      const lateBadge=late?`<span style="color:#C62828;font-weight:700;margin-left:5px">⏰ retard</span>`:""
-      return`<div style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${done?"var(--gray)":"var(--dark)"};cursor:pointer;padding:2px 4px;margin:0 -4px;border-radius:4px" onclick="editIv(${p.iv.id})" title="Cliquer pour voir / modifier ${p.iv.client}" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='transparent'">${done?"✓":`<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${col};margin-right:5px"></span>`}${p.iv.client}${dateSpan}${lateBadge}</div>`
+      const lateBadge=late?`<span style="color:var(--danger);font-weight:700;margin-left:5px">⏰ retard</span>`:""
+      return`<button type="button" class="zone-intervention" style="color:${done?"var(--gray)":"var(--dark)"}" onclick="editIv(${p.iv.id})" title="Cliquer pour voir / modifier ${p.iv.client}" aria-label="Modifier l'intervention de ${p.iv.client}" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='transparent'">${done?"✓":`<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${col};margin-right:5px"></span>`}${p.iv.client}${dateSpan}${lateBadge}</button>`
     }
     const pending=pts.filter(p=>p.iv.status!=="completed")
     const done=pts.filter(p=>p.iv.status==="completed")
@@ -6919,18 +7553,18 @@ function renderZoneResult(clusters,allPts,poolCount,failed){
       return`<div style="font-size:10px;font-weight:700;color:${isDone?"var(--gray)":col};text-transform:uppercase;letter-spacing:.3px;margin:${isDone?"8px":"0"} 0 2px">${label} (${list.length})</div>${shown}${more}`
     }
     const clientsHtml=block(pending,"🔧 À faire",false)+block(done,"✓ Terminées",true)
-    return`<div class="card" style="border-left:4px solid ${col};padding:14px 16px">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:2px">
-        <div style="width:14px;height:14px;border-radius:50%;background:${col};flex-shrink:0"></div>
-        <div style="font-size:15px;font-weight:700;flex:1">Zone ${ci+1} — ${pts.length} intervention${pts.length>1?"s":""}</div>
+    return`<div class="zone-card" style="border-left-color:${col}">
+      <div class="zone-card-header">
+        <div class="zone-card-color" style="background:${col}"></div>
+        <div class="zone-card-title">Zone ${ci+1}</div>
         ${coherent?"":'<span title="Zone géographiquement étalée" style="font-size:13px">⚠️</span>'}
-        <div style="font-size:11px;color:var(--gray)">${distDepot}km du dépôt</div>
+        <div class="zone-card-count">${pts.length} intervention${pts.length>1?"s":""}</div>
       </div>
-      <div style="font-size:11px;color:var(--gray);margin:0 0 8px 24px">${pendingCount} à faire · ${doneCount} terminée${doneCount>1?"s":""}</div>
-      <div style="margin-bottom:10px;max-height:230px;overflow-y:auto">${clientsHtml}</div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <label style="font-size:12px;color:var(--gray);font-weight:600;flex-shrink:0">Technicien :</label>
-        <select style="flex:1;font-size:13px;padding:6px 10px" onchange="zoneAssignments[${ci}]=parseInt(this.value);saveZoneAssignments()" data-ci="${ci}">
+      <div class="zone-card-meta">${distDepot}km du dépôt · ${pendingCount} à faire · ${doneCount} terminée${doneCount>1?"s":""}</div>
+      <div class="zone-card-body">${clientsHtml}</div>
+      <div class="zone-card-footer">
+        <label for="zone-tech-${ci}" style="font-size:12px;color:var(--gray);font-weight:600;flex-shrink:0">Technicien :</label>
+        <select id="zone-tech-${ci}" class="form-select" style="flex:1;font-size:13px;padding:6px 10px" onchange="zoneAssignments[${ci}]=parseInt(this.value);saveZoneAssignments()" data-ci="${ci}">
           <option value="">— Choisir —</option>
           ${TECHS.map(t=>`<option value="${t.id}" ${curTech==t.id?"selected":""}>${t.name}</option>`).join("")}
         </select>
@@ -6942,26 +7576,26 @@ function renderZoneResult(clusters,allPts,poolCount,failed){
   // la colonne de cartes à droite) avec des métriques concrètes pour ajuster le nb de zones.
   const scoreRows=clusterInfo.map(({ci,pts,maxSpreadKm,distDepot,totalMin,daysNeeded,coherent})=>{
     const col=CLUSTER_COLORS[ci%CLUSTER_COLORS.length]
-    return`<tr style="border-bottom:1px solid var(--border)">
-      <td style="padding:7px 8px;white-space:nowrap"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${col};margin-right:6px"></span>Zone ${ci+1}</td>
-      <td style="padding:7px 8px;text-align:center">${pts.length}</td>
-      <td style="padding:7px 8px;text-align:center">${maxSpreadKm} km</td>
-      <td style="padding:7px 8px;text-align:center">${distDepot} km</td>
-      <td style="padding:7px 8px;text-align:center">${fmtMin(totalMin)}</td>
-      <td style="padding:7px 8px;text-align:center">${daysNeeded} j</td>
-      <td style="padding:7px 8px;text-align:center">${coherent?'<span style="color:#2E7D32;font-weight:600">✓ Cohérente</span>':'<span style="color:#C62828;font-weight:600">⚠ Trop étalée</span>'}</td>
+    return`<tr>
+      <td style="white-space:nowrap"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${col};margin-right:6px"></span>Zone ${ci+1}</td>
+      <td style="text-align:center">${pts.length}</td>
+      <td style="text-align:center">${maxSpreadKm} km</td>
+      <td style="text-align:center">${distDepot} km</td>
+      <td style="text-align:center">${fmtMin(totalMin)}</td>
+      <td style="text-align:center">${daysNeeded} j</td>
+      <td style="text-align:center">${coherent?'<span style="color:#2E7D32;font-weight:600">✓ Cohérente</span>':'<span style="color:var(--danger);font-weight:600">⚠ Trop étalée</span>'}</td>
     </tr>`
   }).join("")
   const scorePanel=`<div class="card" style="margin-top:14px">
     <div style="font-size:13px;font-weight:700;margin-bottom:2px">📊 Score de cohérence par zone</div>
     <div style="font-size:11px;color:var(--gray);margin-bottom:10px">Dispersion = distance entre les 2 arrêts les plus éloignés de la zone · jours nécessaires = temps total ÷ ${window.dispatchCfg.maxDayHours}h/jour</div>
-    <div style="overflow-x:auto">
-    <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:480px">
-      <thead><tr style="color:var(--gray);text-align:center;border-bottom:2px solid var(--border)">
-        <th style="padding:6px 8px;text-align:left">Zone</th><th style="padding:6px 8px">Interv.</th>
-        <th style="padding:6px 8px">Dispersion</th><th style="padding:6px 8px">Dist. dépôt</th>
-        <th style="padding:6px 8px">Temps total</th><th style="padding:6px 8px">Jours néc.</th>
-        <th style="padding:6px 8px">Statut</th>
+    <div class="table-scroll">
+    <table class="table" style="min-width:480px">
+      <thead><tr>
+        <th scope="col">Zone</th><th scope="col" style="text-align:center">Interv.</th>
+        <th scope="col" style="text-align:center">Dispersion</th><th scope="col" style="text-align:center">Dist. dépôt</th>
+        <th scope="col" style="text-align:center">Temps total</th><th scope="col" style="text-align:center">Jours néc.</th>
+        <th scope="col" style="text-align:center">Statut</th>
       </tr></thead>
       <tbody>${scoreRows}</tbody>
     </table>
@@ -6974,7 +7608,7 @@ function renderZoneResult(clusters,allPts,poolCount,failed){
       <div>${mapDiv}${scorePanel}</div>
       <div style="display:flex;flex-direction:column;gap:10px">
         ${cards}
-        <button class="bb" style="width:100%" onclick="appliquerZones(${JSON.stringify(clusterInfo.map(c=>c.ci))})">✅ Appliquer les attributions</button>
+        <button type="button" class="btn btn-primary" style="width:100%" onclick="appliquerZones(${JSON.stringify(clusterInfo.map(c=>c.ci))})">✅ Appliquer les attributions</button>
       </div>
     </div>`
 
@@ -7912,78 +8546,83 @@ function rNotif(){
   const hasKey = !!notifCfg.brevoApiKey
 
   document.getElementById("d-notif").innerHTML=`
+  <div class="notif-header">
+    <h2>Notifications</h2>
+    <p>Suivi des notifications clients et actions d'envoi</p>
+  </div>
+
   <!-- Alerte clé API manquante -->
-  ${!hasKey?`<div style="background:#FFF3E0;border:1px solid #E65100;border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px">
-    <span style="font-size:24px">⚠️</span>
+  ${!hasKey?`<div class="alert alert-warning notif-key-alert">
+    <span class="notif-alert-icon">⚠️</span>
     <div>
-      <p style="font-weight:600;color:#E65100;margin-bottom:2px">Clé API Brevo manquante</p>
-      <p style="font-size:13px;color:var(--gray)">Configurez votre clé dans <button onclick="SV('parametres')" style="background:none;border:none;color:var(--blue);cursor:pointer;font-size:13px;font-weight:500;text-decoration:underline">Paramètres → Notifications</button> pour activer l'envoi.</p>
+      <p class="notif-alert-title">Clé API Brevo manquante</p>
+      <p class="notif-alert-text">Configurez votre clé dans <button type="button" onclick="SV('parametres')" class="notif-link-btn">Paramètres → Notifications</button> pour activer l'envoi.</p>
     </div>
   </div>`:""}
 
   <!-- Compteurs du jour -->
-  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px">
-    <div class="card" style="border-left:3px solid #1565C0;text-align:center">
-      <div style="font-size:28px;font-weight:700;color:#1565C0">${emailToday.length}</div>
-      <div style="font-size:12px;color:var(--gray)">📧 Emails J-7 à envoyer</div>
-      ${emailToday.length>0?`<button onclick="sendAllPending('email')" class="bb bsm" style="margin-top:8px" ${!hasKey?"disabled":""}>Envoyer tout</button>`:""}
+  <div class="notif-kpi-grid">
+    <div class="notif-kpi" style="border-left-color:var(--primary)">
+      <div class="notif-kpi-value" style="color:var(--primary)">${emailToday.length}</div>
+      <div class="notif-kpi-label">📧 Emails J-7 à envoyer</div>
+      ${emailToday.length>0?`<button type="button" onclick="sendAllPending('email')" class="btn btn-primary btn-sm notif-kpi-action" ${!hasKey?"disabled":""}>Envoyer tout</button>`:""}
     </div>
-    <div class="card" style="border-left:3px solid #6A1B9A;text-align:center">
-      <div style="font-size:28px;font-weight:700;color:#6A1B9A">${smsToday.length}</div>
-      <div style="font-size:12px;color:var(--gray)">💬 SMS J-2 à envoyer</div>
-      ${smsToday.length>0?`<button onclick="sendAllPending('sms')" class="bb bsm" style="margin-top:8px;background:#6A1B9A" ${!hasKey?"disabled":""}>Envoyer tout</button>`:""}
+    <div class="notif-kpi" style="border-left-color:var(--purple)">
+      <div class="notif-kpi-value" style="color:var(--purple)">${smsToday.length}</div>
+      <div class="notif-kpi-label">💬 SMS J-2 à envoyer</div>
+      ${smsToday.length>0?`<button type="button" onclick="sendAllPending('sms')" class="btn btn-sm notif-kpi-action" style="background:var(--purple);color:#fff;border-color:var(--purple)" ${!hasKey?"disabled":""}>Envoyer tout</button>`:""}
     </div>
-    <div class="card" style="border-left:3px solid var(--green);text-align:center">
-      <div style="font-size:28px;font-weight:700;color:var(--green)">${candidates.filter(i=>i.emailSent||i.smsSent).length}</div>
-      <div style="font-size:12px;color:var(--gray)">✅ Déjà notifiés</div>
+    <div class="notif-kpi" style="border-left-color:var(--success)">
+      <div class="notif-kpi-value" style="color:var(--success)">${candidates.filter(i=>i.emailSent||i.smsSent).length}</div>
+      <div class="notif-kpi-label">✅ Déjà notifiés</div>
     </div>
   </div>
 
   <!-- Zone aperçu -->
-  <div id="preview-box" style="margin-bottom:14px"></div>
+  <div id="preview-box" class="notif-preview" aria-live="polite"></div>
 
   <!-- Liste interventions à notifier (14 prochains jours) -->
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-    <h3 style="font-size:14px;font-weight:600">Interventions à notifier</h3>
-    <span style="font-size:12px;color:var(--gray)">${candidates.length} avec contact</span>
+  <div class="notif-list-header">
+    <h3>Interventions à notifier</h3>
+    <span class="notif-list-count">${candidates.length} avec contact</span>
   </div>
   ${!candidates.length?`<div class="card" style="text-align:center;color:var(--gray);padding:36px">Aucune intervention avec coordonnées client (email ou téléphone)</div>`:""}
-  ${candidates.some(i=>i._historical)?`<div style="background:#E3F2FD;border-radius:8px;padding:10px 14px;font-size:13px;color:#1565C0;margin-bottom:10px">ℹ️ Les interventions affichées sont passées — ajoutez des interventions futures pour activer les notifications automatiques.</div>`:""}
+  ${candidates.some(i=>i._historical)?`<div class="alert alert-info notif-historical-alert">ℹ️ Les interventions affichées sont passées — ajoutez des interventions futures pour activer les notifications automatiques.</div>`:""}
   ${candidates.map(iv=>{
     const tc=TB(iv.techId)
     const dLabel=iv.daysUntil===0?"Aujourd'hui":iv.daysUntil===1?"Demain":"Dans "+iv.daysUntil+"j"
-    const dColor=iv.daysUntil<=2?"#C62828":iv.daysUntil<=7?"#E65100":"var(--gray)"
-    return `<div class="card" style="margin-bottom:8px;border-left:3px solid ${iv.daysUntil<=2?"#C62828":iv.daysUntil<=7?"#E65100":"var(--border)"}">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px">
-        <div style="flex:1;min-width:0">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
-            <strong style="font-size:14px">${iv.client}</strong>
-            <span style="font-size:12px;font-weight:600;color:${dColor}">${dLabel}</span>
-            ${iv.emailSent?bdg("Email ✓","#2E7D32","#E8F5E9"):""}
-            ${iv.smsSent?bdg("SMS ✓","#6A1B9A","#F3E5F5"):""}
+    const dColor=iv.daysUntil<=2?"var(--danger)":iv.daysUntil<=7?"var(--warning)":"var(--gray)"
+    return `<div class="notif-card" style="border-left-color:${iv.daysUntil<=2?"var(--danger)":iv.daysUntil<=7?"var(--warning)":"var(--border)"}">
+      <div class="notif-card-row">
+        <div class="notif-card-main">
+          <div class="notif-card-title-row">
+            <strong class="notif-card-client">${iv.client}</strong>
+            <span class="notif-card-delay" style="color:${dColor}">${dLabel}</span>
+            ${iv.emailSent?`<span class="badge badge-success">Email ✓</span>`:""}
+            ${iv.smsSent?`<span class="badge badge-purple">SMS ✓</span>`:""}
           </div>
-          <div style="font-size:12px;color:var(--gray)">${fdl(iv.date)} · ${ava(tc.init,18)} ${tc.name}</div>
-          ${iv.contact?`<div style="font-size:12px;color:#6A1B9A;margin-top:3px">👤 ${iv.contact}</div>`:""}
-          <div style="display:flex;gap:12px;margin-top:3px;font-size:12px">
+          <div class="notif-card-meta">${fdl(iv.date)} · ${ava(tc.init,18)} ${tc.name}</div>
+          ${iv.contact?`<div class="notif-card-contact">👤 ${iv.contact}</div>`:""}
+          <div class="notif-card-channels">
             ${iv.cemail?`<span style="color:var(--blue)">📧 ${iv.cemail}</span>`:`<span style="color:var(--gray)">📧 —</span>`}
             ${iv.cphone?`<span style="color:var(--blue)">📞 ${iv.cphone}</span>`:`<span style="color:var(--gray)">📞 —</span>`}
           </div>
         </div>
-        <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0">
+        <div class="notif-card-actions">
           ${iv.cemail?`
-            <button onclick="sendEmail(ivs.find(i=>i.id===${iv.id}),true);document.getElementById('preview-box').scrollIntoView({behavior:'smooth'})" class="bg bsm">👁 Aperçu email</button>
-            <button onclick="sendEmail(ivs.find(i=>i.id===${iv.id}))" class="bb bsm" ${!hasKey?"disabled title='Clé API manquante'":iv.emailSent?"style='background:#4CAF50;border-color:#4CAF50'":""}>
+            <button type="button" onclick="sendEmail(ivs.find(i=>i.id===${iv.id}),true);document.getElementById('preview-box').scrollIntoView({behavior:'smooth'})" class="btn btn-secondary btn-sm">👁 Aperçu email</button>
+            <button type="button" onclick="sendEmail(ivs.find(i=>i.id===${iv.id}))" class="btn btn-primary btn-sm" ${!hasKey?"disabled title='Clé API manquante'":iv.emailSent?"style='background:var(--success);border-color:var(--success)'":""}>
               ${iv.emailSent?"📧 Renvoyé":"📧 Email J-7"}
             </button>`:`<span style="font-size:11px;color:var(--gray)">Pas d'email</span>`}
           ${iv.cphone?`
-            <button onclick="sendSMS(ivs.find(i=>i.id===${iv.id}),true);document.getElementById('preview-box').scrollIntoView({behavior:'smooth'})" class="bg bsm">👁 Aperçu SMS</button>
-            <button onclick="sendSMS(ivs.find(i=>i.id===${iv.id}))" class="bb bsm" style="background:#6A1B9A;border-color:#6A1B9A;${!hasKey?"opacity:.5;cursor:not-allowed":""}" ${!hasKey?"disabled":""}>
+            <button type="button" onclick="sendSMS(ivs.find(i=>i.id===${iv.id}),true);document.getElementById('preview-box').scrollIntoView({behavior:'smooth'})" class="btn btn-secondary btn-sm">👁 Aperçu SMS</button>
+            <button type="button" onclick="sendSMS(ivs.find(i=>i.id===${iv.id}))" class="btn btn-sm" style="background:var(--purple);border-color:var(--purple);color:#fff" ${!hasKey?"disabled":""}>
               ${iv.smsSent?"💬 Renvoyé":"💬 SMS J-2"}
             </button>`:`<span style="font-size:11px;color:var(--gray)">Pas de tél.</span>`}
-          <button onclick="editIv(${iv.id})" class="bg bsm">✏️ Fiche</button>
+          <button type="button" onclick="editIv(${iv.id})" class="btn btn-secondary btn-sm">✏️ Fiche</button>
         </div>
       </div>
-      ${iv.notes?`<div style="font-size:11px;color:var(--orange);background:#FFF3E0;padding:4px 8px;border-radius:5px">📝 ${iv.notes}</div>`:""}
+      ${iv.notes?`<div class="notif-card-note">📝 ${iv.notes}</div>`:""}
     </div>`
   }).join("")}`
 }
@@ -8087,62 +8726,62 @@ function renderLiveFeed(){
   const tourDates = Object.keys(techTournees).sort().reverse().slice(0,5)
 
   el.innerHTML = `
-  <div style="padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;background:#fff">
-    <span style="font-weight:700;font-size:13px">🟢 En direct</span>
-    <span id="live-ts" style="font-size:11px;color:var(--gray)">${new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}</span>
+  <div class="analyse-live-header">
+    <span class="analyse-live-title">🟢 En direct</span>
+    <span id="live-ts" class="analyse-live-ts">${new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}</span>
   </div>
 
   <!-- Terminées aujourd'hui -->
-  <div style="padding:10px 14px 6px;font-size:12px;font-weight:600;color:var(--gray);text-transform:uppercase;letter-spacing:.5px">
+  <div class="analyse-live-section-label">
     Terminées aujourd'hui (${todayDone.length})
   </div>
-  <div style="padding:0 14px 10px;display:flex;flex-direction:column;gap:6px">
+  <div class="analyse-live-list">
     ${todayDone.length ? todayDone.map(i=>{
       const tc = TB(i.techId)
-      return `<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px 10px;border-left:3px solid #16a34a">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <span style="font-weight:600;font-size:13px">${i.client}</span>
-          <span style="font-size:10px;color:#16a34a;font-weight:600">✓ OK</span>
+      return `<div class="analyse-live-item" style="border-left:3px solid var(--success)">
+        <div class="analyse-live-item-header">
+          <span class="analyse-live-item-title">${i.client}</span>
+          <span class="analyse-live-item-status" style="color:var(--success)">✓ OK</span>
         </div>
-        <div style="font-size:11px;color:var(--gray);margin-top:2px">${tc.name} · ${i.addr||"—"}</div>
+        <div class="analyse-live-item-meta">${tc.name} · ${i.addr||"—"}</div>
       </div>`
-    }).join("") : `<div style="color:var(--gray);font-size:12px;text-align:center;padding:12px">Aucune intervention terminée aujourd'hui</div>`}
+    }).join("") : `<div class="analyse-live-empty">Aucune intervention terminée aujourd'hui</div>`}
   </div>
 
   <!-- Dernières 20 terminées (toutes dates) -->
-  <div style="padding:10px 14px 6px;font-size:12px;font-weight:600;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;border-top:1px solid var(--border)">
+  <div class="analyse-live-section-label analyse-live-section-label-bordered">
     Récentes (${Math.min(completed.length,20)}/${completed.length})
   </div>
-  <div style="padding:0 14px 10px;display:flex;flex-direction:column;gap:4px">
+  <div class="analyse-live-list">
     ${completed.slice(0,20).map(i=>{
       const tc = TB(i.techId)
       const dateStr = new Date(i.date+"T12:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"short"})
-      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--bg)">
+      return `<div class="analyse-live-recent">
         <div>
-          <span style="font-size:12px;font-weight:500">${i.client}</span>
-          <span style="font-size:10px;color:var(--gray);margin-left:4px">${tc.init}</span>
+          <span class="analyse-live-recent-name">${i.client}</span>
+          <span class="analyse-live-recent-init">${tc.init}</span>
         </div>
-        <span style="font-size:11px;color:var(--gray);flex-shrink:0">${dateStr}</span>
+        <span class="analyse-live-recent-date">${dateStr}</span>
       </div>`
     }).join("")}
   </div>
 
   <!-- Tournées techniciens (depuis tech.html localStorage) -->
   ${tourDates.length ? `
-  <div style="padding:10px 14px 6px;font-size:12px;font-weight:600;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;border-top:1px solid var(--border)">
+  <div class="analyse-live-section-label analyse-live-section-label-bordered">
     Tournées techniciens
   </div>
-  <div style="padding:0 14px 10px;display:flex;flex-direction:column;gap:6px">
+  <div class="analyse-live-list">
     ${tourDates.map(date=>{
       const t = techTournees[date]
       const dateStr = new Date(date+"T12:00:00").toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"})
       const rate = (t.validated+t.failed)>0 ? Math.round(t.validated/(t.validated+t.failed)*100) : 0
-      return `<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px 10px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-          <span style="font-weight:600;font-size:12px">${dateStr}</span>
-          <span style="font-size:12px;font-weight:700;color:${rate>=80?"#16a34a":rate>=60?"#E65100":"#C62828"}">${rate}%</span>
+      return `<div class="analyse-live-tour">
+        <div class="analyse-live-tour-header">
+          <span class="analyse-live-tour-date">${dateStr}</span>
+          <span class="analyse-live-tour-rate" style="color:${rate>=80?"var(--success)":rate>=60?"#E65100":"var(--danger)"}">${rate}%</span>
         </div>
-        <div style="font-size:11px;color:var(--gray)">${t.startTime||""} → ${t.endTime||""} · ✓${t.validated} ✗${t.failed} / ${t.totalClients} clients</div>
+        <div class="analyse-live-tour-meta">${t.startTime||""} → ${t.endTime||""} · ✓${t.validated} ✗${t.failed} / ${t.totalClients} clients</div>
       </div>`
     }).join("")}
   </div>` : ""}
@@ -8223,76 +8862,78 @@ function renderAnalyseMois(el){
 
   el.innerHTML=`
   <!-- Header navigation -->
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap">
-    <div style="display:flex;background:var(--bg);border-radius:8px;padding:3px;gap:2px">
-      <button onclick="analyseView='mois';rAnalyse()" style="padding:7px 18px;border-radius:6px;border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:${analyseView==="mois"?600:400};background:${analyseView==="mois"?"#fff":"transparent"};color:${analyseView==="mois"?"var(--blue)":"var(--gray)"}">Mois</button>
-      <button onclick="analyseView='annee';rAnalyse()" style="padding:7px 18px;border-radius:6px;border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:${analyseView==="annee"?600:400};background:${analyseView==="annee"?"#fff":"transparent"};color:${analyseView==="annee"?"var(--blue)":"var(--gray)"}">Année</button>
+  <div class="analyse-header">
+    <div class="analyse-view-toggle">
+      <button type="button" onclick="analyseView='mois';rAnalyse()" aria-pressed="${analyseView==="mois"}" class="btn btn-sm ${analyseView==="mois"?"btn-primary":"btn-secondary"}">Mois</button>
+      <button type="button" onclick="analyseView='annee';rAnalyse()" aria-pressed="${analyseView==="annee"}" class="btn btn-sm ${analyseView==="annee"?"btn-primary":"btn-secondary"}">Année</button>
     </div>
-    <button onclick="shiftAnalyseMonth(-1)" class="bg bsm">◀</button>
-    <strong style="font-size:15px">${MOIS_FULL[m-1]} ${y}</strong>
-    <button onclick="shiftAnalyseMonth(1)" class="bg bsm">▶</button>
-    <button onclick="analyseMonth=TODAY.substring(0,7);rAnalyse()" class="bg bsm">Ce mois</button>
-    <button onclick="openAnalyseCfg()" class="bg bsm" style="margin-left:auto">⚙️ Config tarifs</button>
+    <div class="analyse-nav">
+      <button type="button" onclick="shiftAnalyseMonth(-1)" class="btn btn-secondary btn-sm" aria-label="Mois précédent">◀</button>
+      <strong class="analyse-period">${MOIS_FULL[m-1]} ${y}</strong>
+      <button type="button" onclick="shiftAnalyseMonth(1)" class="btn btn-secondary btn-sm" aria-label="Mois suivant">▶</button>
+      <button type="button" onclick="analyseMonth=TODAY.substring(0,7);rAnalyse()" class="btn btn-secondary btn-sm">Ce mois</button>
+    </div>
+    <button type="button" onclick="openAnalyseCfg()" class="btn btn-secondary btn-sm analyse-actions">⚙️ Config tarifs</button>
   </div>
 
   <!-- KPI globaux -->
-  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:20px">
+  <div class="analyse-kpi-grid">
     ${[
-      {l:"Interventions",     v:mDone.length+"/"+mIvs.length, c:"#1565C0", sub:"réalisées"},
-      {l:"Jours terrain",     v:daysActive,                    c:"#6A1B9A", sub:"jours actifs"},
+      {l:"Interventions",     v:mDone.length+"/"+mIvs.length, c:"var(--primary)", sub:"réalisées"},
+      {l:"Jours terrain",     v:daysActive,                    c:"var(--purple)", sub:"jours actifs"},
       {l:"Km parcourus",      v:"~"+Math.round(totalKm)+" km", c:"#1B5E20", sub:"estimés"},
       {l:"Coût carburant",    v:totalFuel.toFixed(0)+" €",     c:"#E65100", sub:"total mois"},
-      {l:"Coût hôtels",       v:totalHotel+" €",               c:"#C62828", sub:"découchages"},
-    ].map(k=>`<div class="card" style="text-align:center;border-top:3px solid ${k.c}">
-      <div style="font-size:22px;font-weight:700;color:${k.c}">${k.v}</div>
-      <div style="font-size:11px;color:var(--gray)">${k.l}</div>
-      <div style="font-size:10px;color:var(--gray)">${k.sub}</div>
+      {l:"Coût hôtels",       v:totalHotel+" €",               c:"var(--danger)", sub:"découchages"},
+    ].map(k=>`<div class="analyse-kpi" style="border-top-color:${k.c}">
+      <div class="analyse-kpi-value" style="color:${k.c}">${k.v}</div>
+      <div class="analyse-kpi-label">${k.l}</div>
+      <div class="analyse-kpi-meta">${k.sub}</div>
     </div>`).join("")}
   </div>
 
   <!-- Techniciens cards -->
-  <div style="display:grid;grid-template-columns:repeat(${Math.min(TECHS.length,3)},1fr);gap:14px;margin-bottom:20px">
+  <div class="analyse-tech-grid">
     ${techStats.map(s=>`
-    <div class="card" style="border-left:3px solid ${s.tc.avail?"#1565C0":"#BDBDBD"}">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-        ${ava(s.tc.init,36,s.tc.avail?"#1565C0":"#BDBDBD")}
+    <div class="analyse-tech-card" style="border-left-color:${s.tc.avail?"var(--primary)":"#BDBDBD"}">
+      <div class="analyse-tech-header">
+        ${ava(s.tc.init,36,s.tc.avail?"var(--primary)":"#BDBDBD")}
         <div>
-          <strong style="font-size:15px">${s.tc.name}</strong>
-          <div style="font-size:11px;color:var(--gray)">${s.tc.vehicle} · ${s.tc.conso}L/100km</div>
+          <strong class="analyse-tech-name">${s.tc.name}</strong>
+          <div class="analyse-tech-meta">${s.tc.vehicle} · ${s.tc.conso}L/100km</div>
         </div>
-        <div style="margin-left:auto;text-align:right">
-          <div style="font-size:22px;font-weight:700;color:${s.rendement>=80?"#1B5E20":s.rendement>=60?"#E65100":"#C62828"}">${s.rendement}%</div>
-          <div style="font-size:10px;color:var(--gray)">rendement</div>
+        <div class="analyse-tech-rendement">
+          <div class="analyse-tech-rendement-value" style="color:${s.rendement>=80?"#1B5E20":s.rendement>=60?"#E65100":"var(--danger)"}">${s.rendement}%</div>
+          <div class="analyse-tech-rendement-label">rendement</div>
         </div>
       </div>
-      ${bar(s.done/maxDone*100,"#1565C0","Interventions réalisées",s.done+" / "+s.all+" planifiées")}
+      ${bar(s.done/maxDone*100,"var(--primary)","Interventions réalisées",s.done+" / "+s.all+" planifiées")}
       ${bar(s.rendement,"#1B5E20","Taux de réussite",s.rendement+"%")}
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--bg)">
-        <div style="text-align:center">
-          <div style="font-size:16px;font-weight:700;color:#1B5E20">~${Math.round(s.km)}</div>
-          <div style="font-size:10px;color:var(--gray)">km estimés</div>
+      <div class="analyse-tech-substats">
+        <div class="analyse-tech-substat">
+          <div class="analyse-tech-substat-value" style="color:#1B5E20">~${Math.round(s.km)}</div>
+          <div class="analyse-tech-substat-label">km estimés</div>
         </div>
-        <div style="text-align:center">
-          <div style="font-size:16px;font-weight:700;color:#E65100">${s.fuelCost.toFixed(0)} €</div>
-          <div style="font-size:10px;color:var(--gray)">carburant</div>
+        <div class="analyse-tech-substat">
+          <div class="analyse-tech-substat-value" style="color:#E65100">${s.fuelCost.toFixed(0)} €</div>
+          <div class="analyse-tech-substat-label">carburant</div>
         </div>
-        <div style="text-align:center">
-          <div style="font-size:16px;font-weight:700;color:#C62828">${s.failed}</div>
-          <div style="font-size:10px;color:var(--gray)">échecs</div>
+        <div class="analyse-tech-substat">
+          <div class="analyse-tech-substat-value" style="color:var(--danger)">${s.failed}</div>
+          <div class="analyse-tech-substat-label">échecs</div>
         </div>
       </div>
-      ${s.hotelCost>0?`<div style="margin-top:8px;padding:6px 10px;background:#FFF3E0;border-radius:6px;font-size:12px;color:#E65100">🏨 ${s.hotels.length} nuit${s.hotels.length>1?"s":""} · ${s.hotelCost} € découchage</div>`:""}
-      ${s.unplannedCount>0?`<div style="margin-top:6px;padding:6px 10px;background:#FFEBEE;border-radius:6px;font-size:12px;color:#C62828;cursor:pointer" onclick="showUnplannedDetail(${s.tc.id},'${analyseMonth}')">
-        🔀 ${s.unplannedCount} détour${s.unplannedCount>1?"s":""} non prévu${s.unplannedCount>1?"s":""} · ~${Math.round(s.detourEstKm)} km · ${s.detourCost.toFixed(0)} € <span style="float:right">▼</span>
-      </div>`:""}
-      ${s.surchargedDays>0&&!s.unplannedCount?`<div style="margin-top:6px;padding:6px 10px;background:#FFF3E0;border-radius:6px;font-size:12px;color:#E65100">⚠ ${s.surchargedDays} jour${s.surchargedDays>1?"s":""} surchargé${s.surchargedDays>1?"s":""}</div>`:""}
+      ${s.hotelCost>0?`<div class="analyse-tech-banner" style="background:var(--warning-light);color:#E65100">🏨 ${s.hotels.length} nuit${s.hotels.length>1?"s":""} · ${s.hotelCost} € découchage</div>`:""}
+      ${s.unplannedCount>0?`<button type="button" class="analyse-tech-banner analyse-tech-banner-btn" style="background:var(--danger-light);color:var(--danger)" onclick="showUnplannedDetail(${s.tc.id},'${analyseMonth}')">
+        🔀 ${s.unplannedCount} détour${s.unplannedCount>1?"s":""} non prévu${s.unplannedCount>1?"s":""} · ~${Math.round(s.detourEstKm)} km · ${s.detourCost.toFixed(0)} € <span style="float:right" aria-hidden="true">▼</span>
+      </button>`:""}
+      ${s.surchargedDays>0&&!s.unplannedCount?`<div class="analyse-tech-banner" style="background:var(--warning-light);color:#E65100">⚠ ${s.surchargedDays} jour${s.surchargedDays>1?"s":""} surchargé${s.surchargedDays>1?"s":""}</div>`:""}
     </div>`).join("")}
   </div>
 
   <!-- Graphique interventions par jour du mois -->
-  <div class="card" style="margin-bottom:16px">
-    <h3 style="font-size:14px;font-weight:600;margin-bottom:14px">Activité quotidienne — ${MOIS_FULL[m-1]} ${y}</h3>
-    <div style="display:flex;align-items:flex-end;gap:3px;height:80px">
+  <div class="analyse-chart">
+    <h3 class="analyse-chart-title">Activité quotidienne — ${MOIS_FULL[m-1]} ${y}</h3>
+    <div class="analyse-chart-body">
       ${(()=>{
         const daysInMonth=new Date(y,m,0).getDate()
         const maxPerDay=Math.max(1,...Array.from({length:daysInMonth},(_,i)=>{
@@ -8306,58 +8947,58 @@ function renderAnalyseMois(el){
           const wd=new Date(date+"T12:00:00").getDay()
           const isWE=wd===0||wd===6
           const h=Math.round(cnt/maxPerDay*70)+5
-          return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;cursor:pointer" onclick="analyseMonth='${analyseMonth}';analyseView='mois'" title="${date}: ${cnt} interv.">
-            ${cnt>0?`<div style="font-size:8px;color:var(--blue);margin-bottom:1px">${cnt}</div>`:""}
-            <div style="width:100%;background:${isWE?"#F5F5F5":cnt>0?"#1565C0":"#E0E0E0"};height:${cnt>0?h:4}px;border-radius:3px 3px 0 0;opacity:${isWE?0.4:1}"></div>
-            <div style="font-size:8px;color:var(--gray);margin-top:2px">${i+1}</div>
-          </div>`}).join("")
+          return `<button type="button" class="analyse-chart-bar-wrap" onclick="analyseMonth='${analyseMonth}';analyseView='mois'" title="${date}: ${cnt} interv." aria-label="${date} : ${cnt} intervention${cnt>1?"s":""} terminée${cnt>1?"s":""}">
+            ${cnt>0?`<div class="analyse-chart-bar-count">${cnt}</div>`:""}
+            <div class="analyse-chart-bar" style="background:${isWE?"var(--background)":cnt>0?"var(--primary)":"var(--border)"};height:${cnt>0?h:4}px;opacity:${isWE?0.4:1}"></div>
+            <div class="analyse-chart-bar-label">${i+1}</div>
+          </button>`}).join("")
       })()}
     </div>
-    <div style="display:flex;gap:14px;margin-top:8px;font-size:11px;color:var(--gray)">
-      <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#1565C0;border-radius:2px;display:inline-block"></span>Terminées</span>
-      <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#E0E0E0;border-radius:2px;display:inline-block"></span>Vide</span>
+    <div class="analyse-chart-legend">
+      <span class="analyse-chart-legend-item"><span class="analyse-chart-legend-swatch" style="background:var(--primary)"></span>Terminées</span>
+      <span class="analyse-chart-legend-item"><span class="analyse-chart-legend-swatch" style="background:var(--border)"></span>Vide</span>
     </div>
   </div>
 
   <!-- Hôtels / découchages -->
-  <div class="card" style="margin-bottom:16px">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <h3 style="font-size:14px;font-weight:600">🏨 Découchages — ${MOIS_FULL[m-1]}</h3>
-      <button onclick="addHotel('${analyseMonth}')" class="bb bsm">➕ Ajouter nuit</button>
+  <div class="card analyse-hotel-section">
+    <div class="analyse-hotel-header">
+      <h3 class="analyse-hotel-title">🏨 Découchages — ${MOIS_FULL[m-1]}</h3>
+      <button type="button" onclick="addHotel('${analyseMonth}')" class="btn btn-primary btn-sm">➕ Ajouter nuit</button>
     </div>
     ${Object.values(window.hotelEntries).filter(h=>h.date.startsWith(prefix)).length===0
-      ?`<p style="font-size:13px;color:var(--gray)">Aucun découchage enregistré ce mois</p>`
-      :`<table style="width:100%;font-size:13px;border-collapse:collapse">
-        <thead><tr style="border-bottom:2px solid var(--border)">
-          ${["Date","Technicien","Ville","Coût",""].map(h=>`<th style="text-align:left;padding:5px 8px;font-size:11px;color:var(--gray)">${h}</th>`).join("")}
+      ?`<p class="analyse-hotel-empty">Aucun découchage enregistré ce mois</p>`
+      :`<div class="table-scroll"><table class="analyse-hotel-table">
+        <thead><tr>
+          ${["Date","Technicien","Ville","Coût",""].map(h=>`<th scope="col">${h}</th>`).join("")}
         </tr></thead>
         <tbody>
           ${Object.entries(window.hotelEntries).filter(([,h])=>h.date.startsWith(prefix)).map(([hid,h])=>{
             const tc=TB(h.techId)
-            return `<tr style="border-bottom:1px solid var(--bg)">
-              <td style="padding:6px 8px">${fd(h.date)}</td>
-              <td style="padding:6px 8px">${ava(tc.init,20)} ${tc.name}</td>
-              <td style="padding:6px 8px">${h.city||"—"}</td>
-              <td style="padding:6px 8px;font-weight:600;color:#E65100">${h.cost} €</td>
-              <td style="padding:6px 8px"><button onclick="delHotel('${hid}')" style="background:none;border:none;cursor:pointer;color:#C62828;font-size:14px">✕</button></td>
+            return `<tr>
+              <td>${fd(h.date)}</td>
+              <td>${ava(tc.init,20)} ${tc.name}</td>
+              <td>${h.city||"—"}</td>
+              <td style="font-weight:600;color:#E65100">${h.cost} €</td>
+              <td><button type="button" onclick="delHotel('${hid}')" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:14px" aria-label="Supprimer le découchage du ${fd(h.date)}">✕</button></td>
             </tr>`}).join("")}
         </tbody>
-        <tfoot><tr style="border-top:2px solid var(--border)">
-          <td colspan="3" style="padding:6px 8px;font-weight:600">Total</td>
-          <td style="padding:6px 8px;font-weight:700;color:#E65100">${totalHotel} €</td><td></td>
+        <tfoot><tr>
+          <td colspan="3" style="font-weight:600">Total</td>
+          <td style="font-weight:700;color:#E65100">${totalHotel} €</td><td></td>
         </tr></tfoot>
-      </table>`}
+      </table></div>`}
   </div>
 
   <!-- Top clients du mois -->
-  <div class="card">
-    <h3 style="font-size:14px;font-weight:600;margin-bottom:12px">Top clients — ${MOIS_FULL[m-1]}</h3>
+  <div class="analyse-chart">
+    <h3 class="analyse-chart-title" style="margin-bottom:12px">Top clients — ${MOIS_FULL[m-1]}</h3>
     ${(()=>{
       const cc={}
       mDone.forEach(i=>{if(!cc[i.client])cc[i.client]=0;cc[i.client]++})
       const sorted=Object.entries(cc).sort((a,b)=>b[1]-a[1]).slice(0,8)
       const max=sorted[0]?.[1]||1
-      return sorted.map(([c,n])=>bar(n/max*100,"#1565C0",c,n+" intervention"+(n>1?"s":""))).join("")
+      return sorted.map(([c,n])=>bar(n/max*100,"var(--primary)",c,n+" intervention"+(n>1?"s":""))).join("")
     })()}
   </div>`
 }
@@ -8380,39 +9021,41 @@ function renderAnalyseAnnee(el){
 
   el.innerHTML=`
   <!-- Header -->
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap">
-    <div style="display:flex;background:var(--bg);border-radius:8px;padding:3px;gap:2px">
-      <button onclick="analyseView='mois';rAnalyse()" style="padding:7px 18px;border-radius:6px;border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:400;background:transparent;color:var(--gray)">Mois</button>
-      <button onclick="analyseView='annee';rAnalyse()" style="padding:7px 18px;border-radius:6px;border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;background:#fff;color:var(--blue)">Année</button>
+  <div class="analyse-header">
+    <div class="analyse-view-toggle">
+      <button type="button" onclick="analyseView='mois';rAnalyse()" aria-pressed="${analyseView==="mois"}" class="btn btn-sm ${analyseView==="mois"?"btn-primary":"btn-secondary"}">Mois</button>
+      <button type="button" onclick="analyseView='annee';rAnalyse()" aria-pressed="${analyseView==="annee"}" class="btn btn-sm ${analyseView==="annee"?"btn-primary":"btn-secondary"}">Année</button>
     </div>
-    <button onclick="shiftAnalyseYear(-1)" class="bg bsm">◀</button>
-    <strong style="font-size:15px">${y}</strong>
-    <button onclick="shiftAnalyseYear(1)" class="bg bsm">▶</button>
-    <button onclick="analyseYear=TODAY.substring(0,4);rAnalyse()" class="bg bsm">Cette année</button>
-    <button onclick="openAnalyseCfg()" class="bg bsm" style="margin-left:auto">⚙️ Config tarifs</button>
+    <div class="analyse-nav">
+      <button type="button" onclick="shiftAnalyseYear(-1)" class="btn btn-secondary btn-sm" aria-label="Année précédente">◀</button>
+      <strong class="analyse-period">${y}</strong>
+      <button type="button" onclick="shiftAnalyseYear(1)" class="btn btn-secondary btn-sm" aria-label="Année suivante">▶</button>
+      <button type="button" onclick="analyseYear=TODAY.substring(0,4);rAnalyse()" class="btn btn-secondary btn-sm">Cette année</button>
+    </div>
+    <button type="button" onclick="openAnalyseCfg()" class="btn btn-secondary btn-sm analyse-actions">⚙️ Config tarifs</button>
   </div>
 
   <!-- KPI annuels avec évolution -->
-  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:20px">
+  <div class="analyse-kpi-grid">
     ${[
-      {l:"Interventions",v:totalDone,prev:totalPrev,c:"#1565C0",unit:""},
+      {l:"Interventions",v:totalDone,prev:totalPrev,c:"var(--primary)",unit:""},
       {l:"Km parcourus", v:Math.round(totalKm),prev:null,c:"#1B5E20",unit:" km"},
       {l:"Carburant",    v:totalFuel.toFixed(0),prev:null,c:"#E65100",unit:" €"},
-      {l:"Découchages",  v:totalHotel,prev:null,c:"#C62828",unit:" €"},
-      {l:"Rendement moy.",v:Math.round(techStats.reduce((a,s)=>a+s.rendement,0)/Math.max(1,techStats.length)),prev:null,c:"#6A1B9A",unit:"%"},
+      {l:"Découchages",  v:totalHotel,prev:null,c:"var(--danger)",unit:" €"},
+      {l:"Rendement moy.",v:Math.round(techStats.reduce((a,s)=>a+s.rendement,0)/Math.max(1,techStats.length)),prev:null,c:"var(--purple)",unit:"%"},
     ].map(k=>{
       const evo=k.prev!=null&&k.prev>0?Math.round((k.v-k.prev)/k.prev*100):null
-      return `<div class="card" style="text-align:center;border-top:3px solid ${k.c}">
-        <div style="font-size:22px;font-weight:700;color:${k.c}">${k.v}${k.unit}</div>
-        <div style="font-size:11px;color:var(--gray)">${k.l}</div>
-        ${evo!==null?`<div style="font-size:11px;font-weight:600;color:${evo>=0?"#1B5E20":"#C62828"};margin-top:2px">${evo>=0?"▲":"▼"} ${Math.abs(evo)}% vs ${y-1}</div>`:""}
+      return `<div class="analyse-kpi" style="border-top-color:${k.c}">
+        <div class="analyse-kpi-value" style="color:${k.c}">${k.v}${k.unit}</div>
+        <div class="analyse-kpi-label">${k.l}</div>
+        ${evo!==null?`<div class="analyse-kpi-meta" style="font-size:11px;font-weight:600;color:${evo>=0?"#1B5E20":"var(--danger)"}">${evo>=0?"▲":"▼"} ${Math.abs(evo)}% vs ${y-1}</div>`:""}
       </div>`}).join("")}
   </div>
 
   <!-- Graphique 12 mois -->
-  <div class="card" style="margin-bottom:16px">
-    <h3 style="font-size:14px;font-weight:600;margin-bottom:14px">Interventions par mois — ${y} vs ${y-1}</h3>
-    <div style="display:flex;gap:6px;align-items:flex-end;height:100px">
+  <div class="analyse-chart">
+    <h3 class="analyse-chart-title">Interventions par mois — ${y} vs ${y-1}</h3>
+    <div class="analyse-chart-body" style="height:100px">
       ${MOIS_SHORT.map((mn,mi)=>{
         const prefix=y+"-"+String(mi+1).padStart(2,"0")+"-"
         const prefixP=(y-1)+"-"+String(mi+1).padStart(2,"0")+"-"
@@ -8426,69 +9069,69 @@ function renderAnalyseAnnee(el){
         const h=Math.round(cnt/maxAll*85)+2
         const hp=Math.round(cntP/maxAll*85)+2
         const isNow=TODAY.startsWith(y+"-"+String(mi+1).padStart(2,"0"))
-        return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer" onclick="analyseMonth='${y}-${String(mi+1).padStart(2,"0")}';analyseView='mois';rAnalyse()">
-          <div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:90px">
-            <div style="flex:1;background:${cntP>0?"rgba(21,101,192,.25)":"var(--bg)"};height:${hp}px;border-radius:3px 3px 0 0" title="${y-1}: ${cntP}"></div>
-            <div style="flex:1;background:${cnt>0?"#1565C0":"var(--bg)"};height:${h}px;border-radius:3px 3px 0 0" title="${y}: ${cnt}"></div>
+        return `<button type="button" class="analyse-chart-bar-wrap" style="gap:2px" onclick="analyseMonth='${y}-${String(mi+1).padStart(2,"0")}';analyseView='mois';rAnalyse()" aria-label="Voir ${mn} ${y} : ${cnt} intervention${cnt>1?"s":""} terminée${cnt>1?"s":""}, contre ${cntP} en ${y-1}">
+          <div class="analyse-chart-bar-pair">
+            <div class="analyse-chart-bar" style="background:${cntP>0?"rgba(21,101,192,.25)":"var(--bg)"};height:${hp}px" title="${y-1}: ${cntP}"></div>
+            <div class="analyse-chart-bar" style="background:${cnt>0?"var(--primary)":"var(--bg)"};height:${h}px" title="${y}: ${cnt}"></div>
           </div>
-          ${cnt>0?`<div style="font-size:9px;font-weight:600;color:var(--blue)">${cnt}</div>`:""}
-          <div style="font-size:9px;color:${isNow?"var(--blue)":"var(--gray)"};font-weight:${isNow?700:400}">${mn}</div>
-        </div>`}).join("")}
+          ${cnt>0?`<div class="analyse-chart-bar-count" style="font-size:9px;font-weight:600;margin-bottom:0">${cnt}</div>`:""}
+          <div class="analyse-chart-bar-label" style="color:${isNow?"var(--blue)":"var(--gray)"};font-weight:${isNow?700:400}">${mn}</div>
+        </button>`}).join("")}
     </div>
-    <div style="display:flex;gap:14px;margin-top:6px;font-size:11px;color:var(--gray)">
-      <span><span style="display:inline-block;width:10px;height:10px;background:#1565C0;border-radius:2px;margin-right:4px"></span>${y}</span>
-      <span><span style="display:inline-block;width:10px;height:10px;background:rgba(21,101,192,.25);border-radius:2px;margin-right:4px"></span>${y-1}</span>
+    <div class="analyse-chart-legend">
+      <span class="analyse-chart-legend-item"><span class="analyse-chart-legend-swatch" style="background:var(--primary)"></span>${y}</span>
+      <span class="analyse-chart-legend-item"><span class="analyse-chart-legend-swatch" style="background:rgba(21,101,192,.25)"></span>${y-1}</span>
     </div>
   </div>
 
   <!-- Par technicien annuel -->
-  <div style="display:grid;grid-template-columns:repeat(${Math.min(TECHS.length,3)},1fr);gap:12px;margin-bottom:16px">
+  <div class="analyse-tech-grid">
     ${techStats.map((s,idx)=>{
       const prev=techStatsPrev[idx]
       const evo=prev.done>0?Math.round((s.done-prev.done)/prev.done*100):null
-      return `<div class="card" style="border-left:3px solid ${s.tc.avail?"#1565C0":"#BDBDBD"}">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-          ${ava(s.tc.init,32,s.tc.avail?"#1565C0":"#BDBDBD")}
-          <div><strong>${s.tc.name}</strong><div style="font-size:11px;color:var(--gray)">${s.tc.vehicle}</div></div>
-          ${evo!==null?`<span style="margin-left:auto;font-size:12px;font-weight:700;color:${evo>=0?"#1B5E20":"#C62828"}">${evo>=0?"▲":"▼"}${Math.abs(evo)}%</span>`:""}
+      return `<div class="analyse-tech-card" style="border-left-color:${s.tc.avail?"var(--primary)":"#BDBDBD"}">
+        <div class="analyse-tech-header">
+          ${ava(s.tc.init,32,s.tc.avail?"var(--primary)":"#BDBDBD")}
+          <div><strong class="analyse-tech-name">${s.tc.name}</strong><div class="analyse-tech-meta">${s.tc.vehicle}</div></div>
+          ${evo!==null?`<span class="analyse-tech-evo" style="color:${evo>=0?"#1B5E20":"var(--danger)"}">${evo>=0?"▲":"▼"}${Math.abs(evo)}%</span>`:""}
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px">
-          <div class="surf"><div style="font-weight:700;font-size:18px;color:#1565C0">${s.done}</div><div style="color:var(--gray)">interventions</div></div>
+        <div class="analyse-tech-stats2">
+          <div class="surf"><div style="font-weight:700;font-size:18px;color:var(--primary)">${s.done}</div><div style="color:var(--gray)">interventions</div></div>
           <div class="surf"><div style="font-weight:700;font-size:18px;color:#1B5E20">${s.rendement}%</div><div style="color:var(--gray)">rendement</div></div>
           <div class="surf"><div style="font-weight:700;font-size:16px;color:#E65100">~${Math.round(s.km)} km</div><div style="color:var(--gray)">parcourus</div></div>
           <div class="surf"><div style="font-weight:700;font-size:16px;color:#E65100">${s.fuelCost.toFixed(0)} €</div><div style="color:var(--gray)">carburant</div></div>
         </div>
-        ${s.hotelCost>0?`<div style="margin-top:8px;padding:6px 10px;background:#FFF3E0;border-radius:6px;font-size:12px;color:#E65100">🏨 ${s.hotelCost} € découchages</div>`:""}
-        ${s.failed>0?`<div style="margin-top:6px;padding:6px 10px;background:#FFEBEE;border-radius:6px;font-size:12px;color:#C62828">✗ ${s.failed} échec${s.failed>1?"s":""}</div>`:""}
+        ${s.hotelCost>0?`<div class="analyse-tech-banner" style="background:var(--warning-light);color:#E65100">🏨 ${s.hotelCost} € découchages</div>`:""}
+        ${s.failed>0?`<div class="analyse-tech-banner" style="background:var(--danger-light);color:var(--danger)">✗ ${s.failed} échec${s.failed>1?"s":""}</div>`:""}
       </div>`}).join("")}
   </div>
 
   <!-- Bilan financier année -->
   <div class="card">
-    <h3 style="font-size:14px;font-weight:600;margin-bottom:12px">Bilan coûts terrain — ${y}</h3>
-    <table style="width:100%;font-size:13px;border-collapse:collapse">
-      <thead><tr style="border-bottom:2px solid var(--border)">
-        ${["Technicien","Interventions","Km estimés","Carburant","Hôtels","Total terrain"].map(h=>`<th style="text-align:left;padding:6px 8px;font-size:11px;color:var(--gray)">${h}</th>`).join("")}
+    <h3 class="analyse-finance-title">Bilan coûts terrain — ${y}</h3>
+    <div class="table-scroll"><table class="analyse-finance-table">
+      <thead><tr>
+        ${["Technicien","Interventions","Km estimés","Carburant","Hôtels","Total terrain"].map(h=>`<th scope="col">${h}</th>`).join("")}
       </tr></thead>
       <tbody>
-        ${techStats.map(s=>`<tr style="border-bottom:1px solid var(--bg)">
-          <td style="padding:7px 8px;font-weight:500">${s.tc.name}</td>
-          <td style="padding:7px 8px;color:var(--blue);font-weight:600">${s.done}</td>
-          <td style="padding:7px 8px">~${Math.round(s.km)} km</td>
-          <td style="padding:7px 8px;color:#E65100">${s.fuelCost.toFixed(0)} €</td>
-          <td style="padding:7px 8px;color:#C62828">${s.hotelCost} €</td>
-          <td style="padding:7px 8px;font-weight:700">${s.totalCost.toFixed(0)} €</td>
+        ${techStats.map(s=>`<tr>
+          <td style="font-weight:500">${s.tc.name}</td>
+          <td style="color:var(--primary);font-weight:600">${s.done}</td>
+          <td>~${Math.round(s.km)} km</td>
+          <td style="color:#E65100">${s.fuelCost.toFixed(0)} €</td>
+          <td style="color:var(--danger)">${s.hotelCost} €</td>
+          <td style="font-weight:700">${s.totalCost.toFixed(0)} €</td>
         </tr>`).join("")}
       </tbody>
-      <tfoot><tr style="border-top:2px solid var(--border);background:var(--blueLight)">
-        <td style="padding:7px 8px;font-weight:700">TOTAL</td>
-        <td style="padding:7px 8px;font-weight:700;color:var(--blue)">${totalDone}</td>
-        <td style="padding:7px 8px;font-weight:700">~${Math.round(totalKm)} km</td>
-        <td style="padding:7px 8px;font-weight:700;color:#E65100">${totalFuel.toFixed(0)} €</td>
-        <td style="padding:7px 8px;font-weight:700;color:#C62828">${totalHotel} €</td>
-        <td style="padding:7px 8px;font-weight:700">${(totalFuel+totalHotel).toFixed(0)} €</td>
+      <tfoot><tr>
+        <td style="font-weight:700">TOTAL</td>
+        <td style="font-weight:700;color:var(--primary)">${totalDone}</td>
+        <td style="font-weight:700">~${Math.round(totalKm)} km</td>
+        <td style="font-weight:700;color:#E65100">${totalFuel.toFixed(0)} €</td>
+        <td style="font-weight:700;color:var(--danger)">${totalHotel} €</td>
+        <td style="font-weight:700">${(totalFuel+totalHotel).toFixed(0)} €</td>
       </tr></tfoot>
-    </table>
+    </table></div>
   </div>`
 }
 
@@ -8501,52 +9144,102 @@ function shiftAnalyseMonth(n){
 }
 function shiftAnalyseYear(n){ analyseYear=String(parseInt(analyseYear)+n); rAnalyse() }
 
+// ── Accessibilité modales Analyse (PASS 10C.7) ───────
+// Utilisé par openAnalyseCfg()/addHotel()/showUnplannedDetail() uniquement.
+// N'altère ni les calculs ni les données : gère focus/Escape/focus-trap.
+function _analyseModalFocusables(root){
+  return [...root.querySelectorAll('button,a[href],input,select,textarea,[tabindex]:not([tabindex="-1"])')]
+    .filter(el=>!el.disabled && el.offsetParent!==null)
+}
+function _openAnalyseModalFocus(id, opener){
+  if(!window._analyseModalOpener) window._analyseModalOpener={}
+  window._analyseModalOpener[id]=opener
+  const modal=document.getElementById(id)
+  if(!modal) return
+  const items=_analyseModalFocusables(modal)
+  const field=items.find(el=>el.tagName==="INPUT"||el.tagName==="SELECT"||el.tagName==="TEXTAREA")
+  const target=field||items[0]
+  if(target) target.focus()
+}
+function _closeAnalyseModal(id, opts){
+  const restoreFocus=!opts||opts.restoreFocus!==false
+  const el=document.getElementById(id)
+  if(el) el.remove()
+  const opener=window._analyseModalOpener&&window._analyseModalOpener[id]
+  if(window._analyseModalOpener) delete window._analyseModalOpener[id]
+  if(restoreFocus&&opener&&document.body.contains(opener)&&typeof opener.focus==="function") opener.focus()
+}
+;(function(){
+  let ready=false
+  function openAnalyseOverlay(){
+    return document.getElementById("cfg-overlay")||document.getElementById("hotel-overlay")||document.getElementById("unplan-overlay")
+  }
+  function onKeydown(e){
+    const modal=openAnalyseOverlay()
+    if(!modal) return
+    if(e.key==="Escape"){ e.stopPropagation(); _closeAnalyseModal(modal.id); return }
+    if(e.key==="Tab"){
+      const items=_analyseModalFocusables(modal)
+      if(!items.length) return
+      const first=items[0], last=items[items.length-1]
+      if(e.shiftKey && document.activeElement===first){ e.preventDefault(); last.focus() }
+      else if(!e.shiftKey && document.activeElement===last){ e.preventDefault(); first.focus() }
+    }
+  }
+  function attach(){ if(ready)return; ready=true; document.addEventListener("keydown", onKeydown, true) }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", attach)
+  else attach()
+})()
+
 // ── Configuration tarifs ─────────────────────────────
 function openAnalyseCfg(){
-  const html=`<div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:700;display:flex;align-items:center;justify-content:center" id="cfg-overlay" onclick="if(event.target===this)this.remove()">
+  const opener=document.activeElement
+  const html=`<div class="analyse-modal" style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:700;display:flex;align-items:center;justify-content:center" id="cfg-overlay" role="dialog" aria-modal="true" aria-labelledby="cfg-modal-title" onclick="if(event.target===this)_closeAnalyseModal('cfg-overlay')">
     <div class="md" style="max-width:420px;width:100%">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-        <h3 style="font-size:15px;font-weight:700">⚙️ Configuration des tarifs</h3>
-        <button onclick="document.getElementById('cfg-overlay').remove()" class="bicon">✕</button>
+        <h3 id="cfg-modal-title" style="font-size:15px;font-weight:700">⚙️ Configuration des tarifs</h3>
+        <button type="button" onclick="_closeAnalyseModal('cfg-overlay')" class="bicon" aria-label="Fermer">✕</button>
       </div>
       <div style="display:grid;gap:12px">
-        <div><label class="lbl">Prix carburant (€/litre)</label>
-          <input type="number" step=".01" min="1" max="3" value="${window.analyseCfg.fuelPrice}" style="font-size:14px" onchange="window.analyseCfg.fuelPrice=parseFloat(this.value);saveAnalyseCfg()"/></div>
-        <div><label class="lbl">Coût hôtel par défaut (€/nuit)</label>
-          <input type="number" step="5" min="30" max="300" value="${window.analyseCfg.hotelCost}" style="font-size:14px" onchange="window.analyseCfg.hotelCost=parseInt(this.value);saveAnalyseCfg()"/></div>
-        <div><label class="lbl">Km moyen estimé par intervention (aller simple)</label>
-          <input type="number" step="1" min="5" max="200" value="${window.analyseCfg.kmPerIv}" style="font-size:14px" onchange="window.analyseCfg.kmPerIv=parseInt(this.value);saveAnalyseCfg()"/></div>
+        <div><label class="lbl" for="cfg-fuel-price">Prix carburant (€/litre)</label>
+          <input type="number" id="cfg-fuel-price" step=".01" min="1" max="3" value="${window.analyseCfg.fuelPrice}" style="font-size:14px" onchange="window.analyseCfg.fuelPrice=parseFloat(this.value);saveAnalyseCfg()"/></div>
+        <div><label class="lbl" for="cfg-hotel-cost">Coût hôtel par défaut (€/nuit)</label>
+          <input type="number" id="cfg-hotel-cost" step="5" min="30" max="300" value="${window.analyseCfg.hotelCost}" style="font-size:14px" onchange="window.analyseCfg.hotelCost=parseInt(this.value);saveAnalyseCfg()"/></div>
+        <div><label class="lbl" for="cfg-km-per-iv">Km moyen estimé par intervention (aller simple)</label>
+          <input type="number" id="cfg-km-per-iv" step="1" min="5" max="200" value="${window.analyseCfg.kmPerIv}" style="font-size:14px" onchange="window.analyseCfg.kmPerIv=parseInt(this.value);saveAnalyseCfg()"/></div>
         <div style="background:var(--blueLight);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--blue)">
           ℹ️ Les km parcourus sont estimés (pas de GPS intégré). Vous pouvez ajuster la moyenne selon vos zones d'intervention.
         </div>
-        <button class="bb" onclick="saveAnalyseCfg();document.getElementById('cfg-overlay').remove();rAnalyse()">✓ Enregistrer</button>
+        <button type="button" class="btn btn-primary" onclick="saveAnalyseCfg();_closeAnalyseModal('cfg-overlay');rAnalyse()">✓ Enregistrer</button>
       </div>
     </div>
   </div>`
   document.body.insertAdjacentHTML("beforeend", html)
+  _openAnalyseModalFocus('cfg-overlay', opener)
 }
 
 // ── Gestion hôtels ────────────────────────────────────
 function addHotel(month){
   const today=month?month+"-"+TODAY.split("-")[2]:TODAY
-  const html=`<div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:700;display:flex;align-items:center;justify-content:center" id="hotel-overlay">
+  const opener=document.activeElement
+  const html=`<div class="analyse-modal" style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:700;display:flex;align-items:center;justify-content:center" id="hotel-overlay" role="dialog" aria-modal="true" aria-labelledby="hotel-modal-title">
     <div class="md" style="max-width:380px;width:100%">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-        <h3 style="font-size:15px;font-weight:700">🏨 Ajouter un découchage</h3>
-        <button onclick="document.getElementById('hotel-overlay').remove()" class="bicon">✕</button>
+        <h3 id="hotel-modal-title" style="font-size:15px;font-weight:700">🏨 Ajouter un découchage</h3>
+        <button type="button" onclick="_closeAnalyseModal('hotel-overlay')" class="bicon" aria-label="Fermer">✕</button>
       </div>
       <div style="display:grid;gap:12px">
-        <div><label class="lbl">Technicien</label>
+        <div><label class="lbl" for="h-tech">Technicien</label>
           <select id="h-tech" style="font-size:14px">${TECHS.map(t=>`<option value="${t.id}">${t.name}</option>`).join("")}</select></div>
-        <div><label class="lbl">Date</label><input type="date" id="h-date" value="${today}" style="font-size:14px"/></div>
-        <div><label class="lbl">Ville / Hôtel</label><input id="h-city" placeholder="Ex: Chartres — Hôtel Mercure" style="font-size:14px"/></div>
-        <div><label class="lbl">Coût (€)</label><input type="number" id="h-cost" value="${window.analyseCfg.hotelCost}" min="0" style="font-size:14px"/></div>
+        <div><label class="lbl" for="h-date">Date</label><input type="date" id="h-date" value="${today}" style="font-size:14px"/></div>
+        <div><label class="lbl" for="h-city">Ville / Hôtel</label><input id="h-city" placeholder="Ex: Chartres — Hôtel Mercure" style="font-size:14px"/></div>
+        <div><label class="lbl" for="h-cost">Coût (€)</label><input type="number" id="h-cost" value="${window.analyseCfg.hotelCost}" min="0" style="font-size:14px"/></div>
         <div style="display:flex;gap:10px;justify-content:flex-end">
-          <button class="bg" onclick="document.getElementById('hotel-overlay').remove()">Annuler</button>
-          <button class="bb" onclick="
+          <button type="button" class="btn btn-secondary" onclick="_closeAnalyseModal('hotel-overlay')">Annuler</button>
+          <button type="button" class="btn btn-primary" onclick="
             const hid='h'+Date.now()
             window.hotelEntries[hid]={techId:parseInt(document.getElementById('h-tech').value),date:document.getElementById('h-date').value,city:document.getElementById('h-city').value,cost:parseFloat(document.getElementById('h-cost').value)||0}
-            saveHotels();document.getElementById('hotel-overlay').remove();rAnalyse()">
+            saveHotels();_closeAnalyseModal('hotel-overlay');rAnalyse()">
             ➕ Enregistrer
           </button>
         </div>
@@ -8554,6 +9247,7 @@ function addHotel(month){
     </div>
   </div>`
   document.body.insertAdjacentHTML("beforeend", html)
+  _openAnalyseModalFocus('hotel-overlay', opener)
 }
 
 function delHotel(hid){
@@ -8771,31 +9465,33 @@ function showUnplannedDetail(techId, month){
   const filter = d=>d.startsWith(prefix)
   const unplanned = ivs.filter(i=>i.techId===techId&&i.unplanned&&filter(i.date))
   const tc = TB(techId)
-  const html=`<div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:700;display:flex;align-items:center;justify-content:center;padding:20px" id="unplan-overlay" onclick="if(event.target===this)this.remove()">
+  const opener=document.activeElement
+  const html=`<div class="analyse-modal" style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:700;display:flex;align-items:center;justify-content:center;padding:20px" id="unplan-overlay" role="dialog" aria-modal="true" aria-labelledby="unplan-modal-title" onclick="if(event.target===this)_closeAnalyseModal('unplan-overlay')">
     <div class="md" style="max-width:560px;width:100%">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-        <h3 style="font-size:15px;font-weight:700">🔀 Détours non prévus — ${tc.name}</h3>
-        <button onclick="document.getElementById('unplan-overlay').remove()" class="bicon">✕</button>
+        <h3 id="unplan-modal-title" style="font-size:15px;font-weight:700">🔀 Détours non prévus — ${tc.name}</h3>
+        <button type="button" onclick="_closeAnalyseModal('unplan-overlay')" class="bicon" aria-label="Fermer">✕</button>
       </div>
       ${!unplanned.length?`<p style="color:var(--gray);padding:20px;text-align:center">Aucun détour enregistré ce mois</p>`:`
-      <div style="margin-bottom:12px;padding:10px 12px;background:#FFEBEE;border-radius:8px;font-size:13px">
-        <strong>${unplanned.length} intervention${unplanned.length>1?"s":""} non prévue${unplanned.length>1?"s":""}</strong> · 
-        km supplémentaires estimés : <strong>~${Math.round(unplanned.reduce((a,i)=>a+kmFromDepot(i.addr)*0.4,0))} km</strong> · 
+      <div style="margin-bottom:12px;padding:10px 12px;background:var(--danger-light);border-radius:8px;font-size:13px">
+        <strong>${unplanned.length} intervention${unplanned.length>1?"s":""} non prévue${unplanned.length>1?"s":""}</strong> ·
+        km supplémentaires estimés : <strong>~${Math.round(unplanned.reduce((a,i)=>a+kmFromDepot(i.addr)*0.4,0))} km</strong> ·
         coût supplémentaire : <strong>~${Math.round(unplanned.reduce((a,i)=>a+kmFromDepot(i.addr)*0.4/100*tc.conso*window.analyseCfg.fuelPrice,0))} €</strong>
       </div>
       <div style="max-height:320px;overflow-y:auto">
-        ${unplanned.map(iv=>`<div style="padding:8px 10px;background:var(--bg);border-radius:7px;margin-bottom:5px;border-left:3px solid #C62828;cursor:pointer" onclick="editIv(${iv.id});document.getElementById('unplan-overlay').remove()">
+        ${unplanned.map(iv=>`<button type="button" class="analyse-unplan-row" onclick="editIv(${iv.id});_closeAnalyseModal('unplan-overlay',{restoreFocus:false})" aria-label="Voir l'intervention de ${iv.client} du ${fd(iv.date)}, ${iv.addr}">
           <div style="font-weight:600;font-size:13px">${iv.client}</div>
           <div style="font-size:11px;color:var(--gray)">📍 ${iv.addr}</div>
           <div style="font-size:11px;color:var(--gray);margin-top:2px">${fd(iv.date)} · ~+${Math.round(kmFromDepot(iv.addr)*0.4)} km hors trajet prévu</div>
-        </div>`).join("")}
+        </button>`).join("")}
       </div>`}
       <div style="margin-top:12px;text-align:right">
-        <button class="bg bsm" onclick="document.getElementById('unplan-overlay').remove()">Fermer</button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="_closeAnalyseModal('unplan-overlay')">Fermer</button>
       </div>
     </div>
   </div>`
   document.body.insertAdjacentHTML("beforeend", html)
+  _openAnalyseModalFocus('unplan-overlay', opener)
 }
 
 function bufferDesc(pct){
