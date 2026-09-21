@@ -1240,6 +1240,7 @@ function refreshLiveETAs(){
   let delayAccum=0 // retard cumulé vs circulation fluide
   _routeOrderedPts.forEach((p,idx)=>{
     const leg=techRouteLegDurations[idx]
+    const prevLeaveMin=curMin // heure de départ de l'arrêt précédent (ou départ tournée) AVANT ce leg
     const isGpsAnchor=idx===_gpsAnchorIdx&&p.iv.id===_gpsAnchorId&&_gpsAnchorPtsRef===_routeOrderedPts
     if(isGpsAnchor){
       // Cette étape a une durée de trajet fraîche depuis la position GPS réelle :
@@ -1256,8 +1257,11 @@ function refreshLiveETAs(){
     }
     delayAccum+=Math.max(0,(leg?.trafficDurationMin||0)-(leg?.durationMin??(leg?.trafficDurationMin||0)))
     if(tourRunning&&curMin<nowMin&&!validated[p.iv.id]&&!failed[p.iv.id]) curMin=nowMin
-    // travelMin = même durée de leg (route + trafic) que celle utilisée pour l'ETA — comme côté admin
-    techETAs[p.iv.id]={eta:toHHMM(curMin),leave:toHHMM(curMin+dur(p.iv.type,p.iv.form)),travelMin:leg?.trafficDurationMin||0,delayMin:Math.round(delayAccum)}
+    // travelMin = écart réel entre cette arrivée et le départ précédent — comme côté admin
+    // (Math.max(0,etaMin-prevLeaveMin)) : reste cohérent avec les heures affichées même
+    // quand l'ancrage GPS ou un créneau imposé change la base de calcul de l'ETA.
+    const travelMin=Math.max(0,curMin-prevLeaveMin)
+    techETAs[p.iv.id]={eta:toHHMM(curMin),leave:toHHMM(curMin+dur(p.iv.type,p.iv.form)),travelMin,delayMin:Math.round(delayAccum)}
     curMin+=dur(p.iv.type,p.iv.form)
     if(!validated[p.iv.id]&&!failed[p.iv.id]) lastLeaveMin=curMin
   })
@@ -1845,13 +1849,16 @@ async function _calcETAsHeadless(){
       let curMin=sh*60+sm
       let delayAccum=0 // retard cumulé vs circulation fluide
       ordered.forEach((p,idx)=>{
+        const prevLeaveMin=curMin // heure de départ de l'arrêt précédent (ou départ tournée) AVANT ce leg
         const leg=data.legs[idx]
         curMin+=leg?.trafficDurationMin||0
         delayAccum+=Math.max(0,(leg?.trafficDurationMin||0)-(leg?.durationMin??(leg?.trafficDurationMin||0)))
         if(p.iv.timeStart){const[th,tm]=p.iv.timeStart.split(':').map(Number);if(curMin<th*60+tm)curMin=th*60+tm}
         if(tourRunning&&curMin<nowMin&&!validated[p.iv.id]&&!failed[p.iv.id]) curMin=nowMin
         const wm=dur(p.iv.type,p.iv.form)
-        techETAs[p.iv.id]={eta:toHHMM(curMin),leave:toHHMM(curMin+wm),travelMin:leg?.trafficDurationMin||0,delayMin:Math.round(delayAccum)}
+        // travelMin = écart réel entre cette arrivée et le départ précédent — comme côté admin
+        const travelMin=Math.max(0,curMin-prevLeaveMin)
+        techETAs[p.iv.id]={eta:toHHMM(curMin),leave:toHHMM(curMin+wm),travelMin,delayMin:Math.round(delayAccum)}
         curMin+=wm
       })
     }
@@ -2961,24 +2968,23 @@ async function calcMap(){
           const nowMin=nowMinParis()
           let delayAccum=0 // retard cumulé vs circulation fluide (legs avec données trafic seulement)
           orderedPts.forEach((p,idx)=>{
+            const prevLeaveMin=curMin // heure de départ de l'arrêt précédent (ou départ tournée) AVANT ce leg
             // Sécurité : si moins de legs que de stops, utiliser Haversine pour les derniers
-            let legMin
             if(idx<data.legs.length){
               const leg=data.legs[idx]
-              legMin=leg?.trafficDurationMin||0
-              curMin+=legMin
+              curMin+=leg?.trafficDurationMin||0
               delayAccum+=Math.max(0,(leg?.trafficDurationMin||0)-(leg?.durationMin??(leg?.trafficDurationMin||0)))
             } else {
               const prev=idx>0?orderedPts[idx-1].c:dc
               const dLat=(p.c.lat-prev.lat)*Math.PI/180,dLng=(p.c.lng-prev.lng)*Math.PI/180
               const a=Math.sin(dLat/2)**2+Math.cos(prev.lat*Math.PI/180)*Math.cos(p.c.lat*Math.PI/180)*Math.sin(dLng/2)**2
-              legMin=Math.round(6371*2*Math.asin(Math.sqrt(a))*1.3/50*60)
-              curMin+=legMin
+              curMin+=Math.round(6371*2*Math.asin(Math.sqrt(a))*1.3/50*60)
             }
             if(p.iv.timeStart){const[th,tm]=p.iv.timeStart.split(':').map(Number);if(curMin<th*60+tm)curMin=th*60+tm}
             if(tourRunning&&curMin<nowMin&&!validated[p.iv.id]&&!failed[p.iv.id]) curMin=nowMin
-            // travelMin = même durée de leg (route + trafic) que celle utilisée pour l'ETA — comme côté admin
-            techETAs[p.iv.id]={eta:toHHMM(curMin),leave:toHHMM(curMin+dur(p.iv.type,p.iv.form)),travelMin:legMin,delayMin:Math.round(delayAccum)}
+            // travelMin = écart réel entre cette arrivée et le départ précédent — comme côté admin
+            const travelMin=Math.max(0,curMin-prevLeaveMin)
+            techETAs[p.iv.id]={eta:toHHMM(curMin),leave:toHHMM(curMin+dur(p.iv.type,p.iv.form)),travelMin,delayMin:Math.round(delayAccum)}
             curMin+=dur(p.iv.type,p.iv.form)
           })
         }
