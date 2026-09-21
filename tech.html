@@ -9,9 +9,9 @@
 <title>OptiTechX Tech — Technicien</title>
 <link rel="manifest" href="/manifest.json">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" integrity="sha384-NElt3Op+9NBMCYaef5HxeJmU4Xeard/Lku8ek6hoPTvYkQPh3zLIrJP7KiRocsxO" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" integrity="sha384-c9d8RFSL+u3exBOJ4Yp3HUJXS4znl9f+z66d1y54ig+ea249SpqR+w1wyvXz/lk+" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0" integrity="sha384-JBR+x8blGwjDRO63aHCGiZMD4VNiTR4ZUGA+N6ZKLf3zNt1fK8IBpcgPaMrxqWBp" crossorigin="anonymous"></script>
 <script src="/supabase-config.js"></script>
 <script src="/hybrid-sync.js"></script>
 <script src="/stock-module.js"></script>
@@ -1047,6 +1047,11 @@ button:disabled{opacity:.45;cursor:not-allowed}
 </div>
 
 <script>
+// SÉCURITÉ (audit 2026-09, F-02) : échappement HTML des données externes (Notion, Kizeo,
+// scanner, blobs partagés) avant insertion dans innerHTML / bindPopup. À utiliser pour tout
+// texte dynamique inséré dans du HTML — jamais pour du texte brut (alert, confirm, Notion).
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
 // ════════════════════════════════════════════
 // DONNÉES — synchronisées avec l'app admin
 // ════════════════════════════════════════════
@@ -1235,6 +1240,7 @@ function refreshLiveETAs(){
   let delayAccum=0 // retard cumulé vs circulation fluide
   _routeOrderedPts.forEach((p,idx)=>{
     const leg=techRouteLegDurations[idx]
+    const prevLeaveMin=curMin // heure de départ de l'arrêt précédent (ou départ tournée) AVANT ce leg
     const isGpsAnchor=idx===_gpsAnchorIdx&&p.iv.id===_gpsAnchorId&&_gpsAnchorPtsRef===_routeOrderedPts
     if(isGpsAnchor){
       // Cette étape a une durée de trajet fraîche depuis la position GPS réelle :
@@ -1251,7 +1257,11 @@ function refreshLiveETAs(){
     }
     delayAccum+=Math.max(0,(leg?.trafficDurationMin||0)-(leg?.durationMin??(leg?.trafficDurationMin||0)))
     if(tourRunning&&curMin<nowMin&&!validated[p.iv.id]&&!failed[p.iv.id]) curMin=nowMin
-    techETAs[p.iv.id]={eta:toHHMM(curMin),leave:toHHMM(curMin+dur(p.iv.type,p.iv.form)),delayMin:Math.round(delayAccum)}
+    // travelMin = écart réel entre cette arrivée et le départ précédent — comme côté admin
+    // (Math.max(0,etaMin-prevLeaveMin)) : reste cohérent avec les heures affichées même
+    // quand l'ancrage GPS ou un créneau imposé change la base de calcul de l'ETA.
+    const travelMin=Math.max(0,curMin-prevLeaveMin)
+    techETAs[p.iv.id]={eta:toHHMM(curMin),leave:toHHMM(curMin+dur(p.iv.type,p.iv.form)),travelMin,delayMin:Math.round(delayAccum)}
     curMin+=dur(p.iv.type,p.iv.form)
     if(!validated[p.iv.id]&&!failed[p.iv.id]) lastLeaveMin=curMin
   })
@@ -1839,13 +1849,16 @@ async function _calcETAsHeadless(){
       let curMin=sh*60+sm
       let delayAccum=0 // retard cumulé vs circulation fluide
       ordered.forEach((p,idx)=>{
+        const prevLeaveMin=curMin // heure de départ de l'arrêt précédent (ou départ tournée) AVANT ce leg
         const leg=data.legs[idx]
         curMin+=leg?.trafficDurationMin||0
         delayAccum+=Math.max(0,(leg?.trafficDurationMin||0)-(leg?.durationMin??(leg?.trafficDurationMin||0)))
         if(p.iv.timeStart){const[th,tm]=p.iv.timeStart.split(':').map(Number);if(curMin<th*60+tm)curMin=th*60+tm}
         if(tourRunning&&curMin<nowMin&&!validated[p.iv.id]&&!failed[p.iv.id]) curMin=nowMin
         const wm=dur(p.iv.type,p.iv.form)
-        techETAs[p.iv.id]={eta:toHHMM(curMin),leave:toHHMM(curMin+wm),travelMin:leg?.trafficDurationMin||0,delayMin:Math.round(delayAccum)}
+        // travelMin = écart réel entre cette arrivée et le départ précédent — comme côté admin
+        const travelMin=Math.max(0,curMin-prevLeaveMin)
+        techETAs[p.iv.id]={eta:toHHMM(curMin),leave:toHHMM(curMin+wm),travelMin,delayMin:Math.round(delayAccum)}
         curMin+=wm
       })
     }
@@ -2259,7 +2272,9 @@ function renderDepart(){
     const done=validated[iv.id], fail=failed[iv.id]
     const col=done?"var(--success)":fail?"var(--danger)":(TYPES[iv.type]||TYPES.maintenance_simple).color
     const lbl=done?"✓":fail?"✗":(idx+1)
-    // Temps de trajet = ETA(ce stop) - leave(stop précédent ou départ)
+    // Temps de trajet : lu directement depuis techETAs[iv.id].travelMin, calculé au
+    // même endroit et de la même façon (leg route + trafic) que côté admin (depETAs.travelMin)
+    // — jamais redérivé ici, pour ne pas afficher une "attente" fictive par simple écart d'estimation.
     let travelMin=null, waitMin=null, travelStatus=null
     const etaThis=tToMin(techETAs[iv.id]?.eta)
     if(etaThis!==null){
@@ -2269,18 +2284,14 @@ function renderDepart(){
         : tToMin(techETAs[prevIv?.id]?.leave)
       if(prevLeave!==null){
         const totalGap=Math.max(0,etaThis-prevLeave)
-        const prevCoord=idx===0?null:gCache[prevIv?.addr]
-        const curCoord=gCache[iv.addr]
-        if(prevCoord&&curCoord){
-          // Haversine × facteur route → temps trajet estimé
-          const dLat=(curCoord.lat-prevCoord.lat)*Math.PI/180,dLng=(curCoord.lng-prevCoord.lng)*Math.PI/180
-          const a=Math.sin(dLat/2)**2+Math.cos(prevCoord.lat*Math.PI/180)*Math.cos(curCoord.lat*Math.PI/180)*Math.sin(dLng/2)**2
-          travelMin=Math.round(6371*2*Math.asin(Math.sqrt(a))*1.3/50*60)
+        const tm=techETAs[iv.id]?.travelMin
+        if(tm!=null){
+          travelMin=Math.round(tm)
           waitMin=Math.max(0,totalGap-travelMin)
         } else if(iv.timeStart){
-          // Pas de coords mais créneau connu → tout le gap = attente + trajet inconnu
+          // Pas de donnée de trajet mais créneau connu → tout le gap = attente + trajet inconnu
           waitMin=totalGap
-          travelMin=null // trajet inconnu, ne pas afficher
+          travelMin=null
         } else {
           travelMin=totalGap
         }
@@ -2317,12 +2328,12 @@ function renderDepart(){
         <div class="dc-num" style="background:${col}">${lbl}</div>
         <div class="dc-info">
           <div style="display:flex;align-items:center;gap:6px">
-            <div class="dc-client" style="flex:1">${iv.client}</div>
+            <div class="dc-client" style="flex:1">${esc(iv.client)}</div>
             ${!_mini&&idx===0&&!done&&!fail?`<span style="font-size:11px;font-weight:700;color:#f59e0b">⭐</span>`
               :!_mini&&!done&&!fail?`<button onclick="event.stopPropagation();setFirstTechIv(${iv.id})" style="background:none;border:1.5px solid #f59e0b;border-radius:6px;padding:1px 6px;font-size:10px;cursor:pointer;color:#f59e0b;font-family:inherit;white-space:nowrap">☆ 1er</button>`:""}
           </div>
-          <div class="dc-addr"><svg class="ico"><use href="#ico-pin"/></svg> ${iv.addr}</div>
-          ${!_mini&&iv.contact?`<div style="font-size:11px;color:var(--blue);margin-top:2px;display:flex;align-items:center;gap:4px"><svg class="ico"><use href="#ico-user"/></svg> ${iv.contact}${iv.cphone?` <a href="tel:${iv.cphone}" onclick="event.stopPropagation()" style="color:var(--blue);display:inline-flex"><svg class="ico"><use href="#ico-phone"/></svg></a>`:""}</div>`:""}
+          <div class="dc-addr"><svg class="ico"><use href="#ico-pin"/></svg> ${esc(iv.addr)}</div>
+          ${!_mini&&iv.contact?`<div style="font-size:11px;color:var(--blue);margin-top:2px;display:flex;align-items:center;gap:4px"><svg class="ico"><use href="#ico-user"/></svg> ${esc(iv.contact)}${iv.cphone?` <a href="tel:${esc(iv.cphone)}" onclick="event.stopPropagation()" style="color:var(--blue);display:inline-flex"><svg class="ico"><use href="#ico-phone"/></svg></a>`:""}</div>`:""}
         </div>
         ${!_mini?`<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0" onclick="event.stopPropagation()">
           <a href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(iv.addr)}"
@@ -2362,7 +2373,7 @@ function renderDepart(){
       </div>
       <div class="dc-extra">
         ${equipHTML(iv)}
-        ${iv.notes?`<div style="padding:2px 10px 5px;font-size:11px;color:var(--orange);background:#FFF8E1;margin:0 6px;border-radius:6px">📝 ${iv.notes}</div>`:""}
+        ${iv.notes?`<div style="padding:2px 10px 5px;font-size:11px;color:var(--orange);background:#FFF8E1;margin:0 6px;border-radius:6px">📝 ${esc(iv.notes)}</div>`:""}
       </div>
       <!-- BOUTONS VALIDATION — toujours visibles -->
       <div class="dc-btns" onclick="event.stopPropagation()">
@@ -2376,12 +2387,12 @@ function renderDepart(){
       <!-- Détail dépliable -->
       <div class="dc-detail" id="dcd-${iv.id}">
         <div style="display:flex;gap:6px;flex-wrap:wrap">
-          ${iv.cemail?`<a href="mailto:${iv.cemail}" style="font-size:12px;color:var(--blue)">✉️ ${iv.cemail}</a>`:""}
+          ${iv.cemail?`<a href="mailto:${esc(iv.cemail)}" style="font-size:12px;color:var(--blue)">✉️ ${esc(iv.cemail)}</a>`:""}
           <button onclick="openContactModal(${iv.id})" class="btn btn-gray" style="padding:5px 10px;font-size:11px"><svg class="ico"><use href="#ico-edit"/></svg> Modifier contact</button>
         </div>
         ${iv.padPak&&iv.padPakDate?`<div style="margin-top:6px;font-size:12px;color:var(--orange)">⚡ Péremption Pad Pak : ${fd(iv.padPakDate)}</div>`:""}
         ${(iv.commercial||iv.nSerie||iv.kizeoVille)?`<div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;font-size:11px;color:#555;background:#F8F9FA;border-radius:6px;padding:5px 8px">
-          ${iv.commercial?`<span>💼 <strong>${iv.commercial}</strong></span>`:""}
+          ${iv.commercial?`<span>💼 <strong>${esc(iv.commercial)}</strong></span>`:""}
           ${iv.nSerie?`<span>🔢 S/N <strong>${iv.nSerie}</strong></span>`:""}
           ${iv.kizeoVille?`<span>📮 ${iv.kizeoCodePostal?iv.kizeoCodePostal+' ':''}<strong>${iv.kizeoVille}</strong></span>`:""}
         </div>`:""}
@@ -2895,7 +2906,7 @@ async function calcMap(){
     const a=Math.sin(dLat/2)**2+Math.cos(dc.lat*Math.PI/180)*Math.cos(p.c.lat*Math.PI/180)*Math.sin(dLng/2)**2
     const tMin=Math.round(6371*2*Math.asin(Math.sqrt(a))*1.3/50*60)
     const eta=`${String(Math.floor((sh*60+sm+tMin)/60)).padStart(2,'0')}:${String((sh*60+sm+tMin)%60).padStart(2,'0')}`
-    techETAs[p.iv.id]={eta,leave:addMinToTime(eta,dur(p.iv.type,p.iv.form))}
+    techETAs[p.iv.id]={eta,leave:addMinToTime(eta,dur(p.iv.type,p.iv.form)),travelMin:tMin}
   }
 
   // Stocker l'ordre et re-rendre la liste
@@ -2909,7 +2920,7 @@ async function calcMap(){
     const col=done?"#2E7D32":fail?"#C62828":TYPES[p.iv.type].color
     const lbl=done?"✓":fail?"✗":(idx+1)
     const mk=L.marker([p.c.lat,p.c.lng],{icon:mkIcon(lbl,col)}).addTo(mapObj)
-    mk.bindPopup(`<strong>${idx+1}. ${p.iv.client}</strong><br><small>${p.iv.addr}</small>${p.iv.padPak?"<br><small style='color:#E65100'>⚡ Pad Pak à changer</small>":""}`)
+    mk.bindPopup(`<strong>${idx+1}. ${esc(p.iv.client)}</strong><br><small>${esc(p.iv.addr)}</small>${p.iv.padPak?"<br><small style='color:#E65100'>⚡ Pad Pak à changer</small>":""}`)
     mk.on("click",()=>focusClient(p.iv.id))
     mapMarkers[p.iv.id]=mk
   })
@@ -2957,6 +2968,7 @@ async function calcMap(){
           const nowMin=nowMinParis()
           let delayAccum=0 // retard cumulé vs circulation fluide (legs avec données trafic seulement)
           orderedPts.forEach((p,idx)=>{
+            const prevLeaveMin=curMin // heure de départ de l'arrêt précédent (ou départ tournée) AVANT ce leg
             // Sécurité : si moins de legs que de stops, utiliser Haversine pour les derniers
             if(idx<data.legs.length){
               const leg=data.legs[idx]
@@ -2970,7 +2982,9 @@ async function calcMap(){
             }
             if(p.iv.timeStart){const[th,tm]=p.iv.timeStart.split(':').map(Number);if(curMin<th*60+tm)curMin=th*60+tm}
             if(tourRunning&&curMin<nowMin&&!validated[p.iv.id]&&!failed[p.iv.id]) curMin=nowMin
-            techETAs[p.iv.id]={eta:toHHMM(curMin),leave:toHHMM(curMin+dur(p.iv.type,p.iv.form)),delayMin:Math.round(delayAccum)}
+            // travelMin = écart réel entre cette arrivée et le départ précédent — comme côté admin
+            const travelMin=Math.max(0,curMin-prevLeaveMin)
+            techETAs[p.iv.id]={eta:toHHMM(curMin),leave:toHHMM(curMin+dur(p.iv.type,p.iv.form)),travelMin,delayMin:Math.round(delayAccum)}
             curMin+=dur(p.iv.type,p.iv.form)
           })
         }
@@ -3207,9 +3221,9 @@ function renderPlanning(){
         <div class="dc-top" onclick="focusClient(${iv.id})">
           <div class="dc-num" style="background:${col}">${done?"✓":fail?"✗":(idx+1)}</div>
           <div class="dc-info">
-            <div class="dc-client">${iv.client}</div>
-            <div class="dc-addr"><svg class="ico"><use href="#ico-pin"/></svg> ${iv.addr}</div>
-            ${iv.contact?`<div style="font-size:11px;color:var(--blue);margin-top:2px;display:flex;align-items:center;gap:4px"><svg class="ico"><use href="#ico-user"/></svg> ${iv.contact}${iv.cphone?` — <a href="tel:${iv.cphone}" style="color:var(--blue)">${iv.cphone}</a>`:""}</div>`:""}
+            <div class="dc-client">${esc(iv.client)}</div>
+            <div class="dc-addr"><svg class="ico"><use href="#ico-pin"/></svg> ${esc(iv.addr)}</div>
+            ${iv.contact?`<div style="font-size:11px;color:var(--blue);margin-top:2px;display:flex;align-items:center;gap:4px"><svg class="ico"><use href="#ico-user"/></svg> ${esc(iv.contact)}${iv.cphone?` — <a href="tel:${esc(iv.cphone)}" style="color:var(--blue)">${esc(iv.cphone)}</a>`:""}</div>`:""}
           </div>
           <a href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(iv.addr)}" target="_blank" style="text-decoration:none;color:var(--blue);padding:4px" title="Google Maps"><svg class="ico" style="width:1.3em;height:1.3em"><use href="#ico-map"/></svg></a>
         </div>
@@ -3218,7 +3232,7 @@ function renderPlanning(){
           <span class="tag tag-info">${fmin(dur(iv.type,iv.form))} · ${(TYPES[iv.type]||TYPES.maintenance_simple).label}</span>
         </div>
         ${equipHTML(iv)}
-        ${iv.notes?`<div style="padding:2px 10px 5px;font-size:11px;color:var(--orange)">📝 ${iv.notes}</div>`:""}
+        ${iv.notes?`<div style="padding:2px 10px 5px;font-size:11px;color:var(--orange)">📝 ${esc(iv.notes)}</div>`:""}
         <div class="dc-btns">
           <button class="vbtn vbtn-v ${done?"active":""}" onclick="validated[${iv.id}]=!validated[${iv.id}];if(validated[${iv.id}]){failed[${iv.id}]=false;updIvStatus(${iv.id},'completed');autoNextMaintenance(${iv.id});pushToKizeo(${iv.id},'completed');pushStatusToNotion(${iv.id},'completed');toast('✅ Validé — sync Kizeo + Notion','#2E7D32')}else{updIvStatus(${iv.id},'pending');pushStatusToNotion(${iv.id},'pending')};saveVF();renderPlanning()">
             ${done?"✅ Validé":"✓ Valider"}
@@ -3276,7 +3290,7 @@ function renderMateriel(){
   const al=document.getElementById("mat-alert")
   if(padpaks.length){
     al.style.display="block"
-    al.innerHTML=`⚡ ${padpaks.length} Pad Pak à changer :<br>${padpaks.map(i=>"• "+i.client+(i.padPakDate?" (périmé "+fd(i.padPakDate)+")":"")).join("<br>")}`
+    al.innerHTML=`⚡ ${padpaks.length} Pad Pak à changer :<br>${padpaks.map(i=>"• "+esc(i.client)+(i.padPakDate?" (périmé "+esc(fd(i.padPakDate))+")":"")).join("<br>")}`
   } else al.style.display="none"
   const rows=[
     installs.length?{i:"🫀",n:installs.length,l:"DAE neufs",s:installs.map(i=>(i.dea&&i.dea!=="0"?i.dea:"standard")).join(", "),c:"var(--green)"}:null,
@@ -3299,8 +3313,8 @@ function renderMateriel(){
       <div class="dc-top">
         <div style="font-size:18px">${iv.type==="installation"?"🏥":iv.padPak||iv.type==="maintenance_complex"?"⚡":"🔧"}</div>
         <div class="dc-info">
-          <div class="dc-client">${iv.client}</div>
-          <div class="dc-addr" style="font-size:11px">${TYPES[iv.type].label}${iv.addr?" · "+iv.addr.split(",")[0]:""}</div>
+          <div class="dc-client">${esc(iv.client)}</div>
+          <div class="dc-addr" style="font-size:11px">${TYPES[iv.type].label}${iv.addr?" · "+esc(iv.addr.split(",")[0]):""}</div>
         </div>
         <div style="font-size:11px;color:#aaa;flex-shrink:0">›</div>
       </div>
@@ -3317,6 +3331,11 @@ function renderMateriel(){
 // via Supabase (clé optiq_dae_stock, même format {clé:valeur} que les autres).
 // ════════════════════════════════════════════
 let daeStock={}
+// SÉCURITÉ (audit 2026-09, F-04) : un numéro de série vient d'un code-barres ou d'une saisie —
+// donnée non fiable (étiquette piégée, requête modifiée). Longueur bornée, pas de caractère de
+// contrôle ni de chevrons, et jamais de clé réservée utilisable comme nom de propriété.
+function daeSerialOk(s){ return typeof s==='string' && s.length>0 && s.length<=64 && !/[\u0000-\u001f<>]/.test(s) && !['__proto__','constructor','prototype'].includes(s) }
+const DAE_SERIAL_ERR='Numéro de série invalide (64 caractères max, sans chevrons ni caractère de contrôle).'
 let _daeScanner=null
 const DAE_MODELS=['HS500P','HS360P','HS350P','HS300P','CR2','Rotaid','Autre']
 
@@ -3351,8 +3370,8 @@ function renderDaeStockList(){
     .sort((a,b)=>(b.outTs||0)-(a.outTs||0))
   if(!mine.length){ el.innerHTML='Aucun matériel scanné' ; return }
   el.innerHTML=mine.map(u=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-top:1px solid #F0F0F0">
-    <div><strong style="color:var(--dark)">${u.model||'?'}</strong> <span style="color:var(--gray)">· ${u.serial}</span></div>
-    <button onclick="returnDaeToStock('${u.serial.replace(/'/g,"\\'")}')" style="padding:5px 10px;background:#F5F5F5;color:var(--dark);border:none;border-radius:14px;font-size:11px;font-weight:600;cursor:pointer">↩ Retour stock</button>
+    <div><strong style="color:var(--dark)">${esc(u.model||'?')}</strong> <span style="color:var(--gray)">· ${esc(u.serial)}</span></div>
+    <button data-serial="${esc(u.serial)}" onclick="returnDaeToStock(this.dataset.serial)" style="padding:5px 10px;background:#F5F5F5;color:var(--dark);border:none;border-radius:14px;font-size:11px;font-weight:600;cursor:pointer">↩ Retour stock</button>
   </div>`).join('')
 }
 
@@ -3512,6 +3531,7 @@ function daeScanRescan(){
 async function onDaeScanSuccess(serial){
   serial=(serial||'').trim()
   if(!serial) return
+  if(!daeSerialOk(serial)){ alert(DAE_SERIAL_ERR); return }
   // Éviter les doubles déclenchements pendant qu'un scan continu tourne
   if(_daeScanner){ try{ await _daeScanner.pause(true) }catch(e){} }
 
@@ -3526,7 +3546,7 @@ async function onDaeScanSuccess(serial){
 
   let model=existing?.model
   if(!model){
-    model=prompt('Modèle du DAE (ex: HS500P) :', DAE_MODELS[0]) || 'Inconnu'
+    model=(prompt('Modèle du DAE (ex: HS500P) :', DAE_MODELS[0]) || 'Inconnu').slice(0,40)
   }
 
   const now=Date.now()
@@ -3734,7 +3754,7 @@ function stkRenderInterventionPicker(){
   wrap.innerHTML=`<label style="font-size:12px;color:var(--gray);display:block;margin-bottom:4px">Intervention liée (optionnel)</label>
     <select id="stk-interv-select" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;margin-bottom:10px">
       <option value="">— Sortie générale (aucune) —</option>
-      ${candidates.map(i=>`<option value="${i.id}">${fd(i.date)} · ${i.client}</option>`).join('')}
+      ${candidates.map(i=>`<option value="${i.id}">${fd(i.date)} · ${esc(i.client)}</option>`).join('')}
     </select>`
 }
 
@@ -4027,7 +4047,7 @@ function showMatFiche(ivId){
     <div style="display:flex;align-items:center;gap:12px;padding-bottom:14px;border-bottom:2px solid #F0F0F0;margin-bottom:4px">
       <div style="width:48px;height:48px;border-radius:12px;background:${typeCol}22;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0">${inst?"🏥":iv.padPak||iv.type==="maintenance_complex"?"⚡":"🔧"}</div>
       <div style="min-width:0">
-        <div style="font-size:16px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${iv.client}</div>
+        <div style="font-size:16px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(iv.client)}</div>
         <div style="font-size:12px;color:${typeCol};font-weight:600">${TYPES[iv.type].label}</div>
         <div style="font-size:11px;color:#999;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📍 ${iv.addr||"—"}</div>
       </div>
@@ -4749,6 +4769,7 @@ async function _submitPin(){
     localStorage.setItem('optiq_session',JSON.stringify({token:d.token,nom:d.nom,role:'tech',savedAt:Date.now(),remember}))
     curTech=_loginTechId
     localStorage.setItem('tech_id',_loginTechId)
+    loadTechSettings() // récupère le dépôt du technicien maintenant qu'un jeton existe (F-06)
     hideLogin()
     _restoreTourState()
     updateTopbar();updateBadges();goTab(curTab)
@@ -4790,8 +4811,19 @@ try{const s=localStorage.getItem("tech_id");if(s)curTech=parseInt(s)}catch(e){}
 if(techCfg.startTime){const te=document.getElementById("dep-time");if(te)te.value=techCfg.startTime}
 
 // Charger les paramètres depuis Netlify (noms techs, véhicules, dépôts)
-if(isDeployedApp){
-  fetch('/api/settings').then(r=>r.ok?r.json():null).then(s=>{
+// SÉCURITÉ (F-06) : sans jeton, /api/settings ne renvoie plus les adresses de dépôt des
+// techniciens ; avec le jeton du technicien connecté, il renvoie SON dépôt (point de départ
+// de tournée). Le jeton peut être dans tech_auth (connexion tech.html) ou optiq_session
+// (connexion via login.html) — rappelé aussi après connexion par PIN (_submitPin).
+function _settingsAuthHeaders(){
+  try{
+    const t=_getAuth()?.token||JSON.parse(localStorage.getItem('optiq_session')||'null')?.token
+    return t?{'Authorization':'Bearer '+t}:{}
+  }catch(e){ return {} }
+}
+function loadTechSettings(){
+  if(!isDeployedApp) return
+  fetch('/api/settings',{headers:_settingsAuthHeaders()}).then(r=>r.ok?r.json():null).then(s=>{
     if(!s?.techs?.length) return
     s.techs.forEach(d=>{
       const t=TECHS.find(tc=>tc.id===d.id)
@@ -4816,6 +4848,7 @@ if(isDeployedApp){
     renderDepart()
   }).catch(()=>{})
 }
+loadTechSettings()
 
 // Restaurer l'onglet actif (sessionStorage prioritaire, sinon localStorage)
 try{
