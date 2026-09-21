@@ -1434,7 +1434,12 @@ async function _refreshRemainingLegFromGPS(){
   if(!dest) return
 
   const now=Date.now()
-  if(_lastGpsEtaRecalc){
+  // Nouvel arrêt ciblé (client précédent validé/échoué, itinéraire recalculé) : la
+  // dernière lecture GPS concerne un autre arrêt — on recalcule sans attendre la
+  // limitation d'appels, pour que les minutes perdues chez le client précédent
+  // soient intégrées à l'heure d'arrivée du suivant dès le prochain tick (30s).
+  const targetChanged=_gpsAnchorId!==_routeOrderedPts[nextIdx].iv.id||_gpsAnchorPtsRef!==_routeOrderedPts
+  if(_lastGpsEtaRecalc&&!targetChanged){
     const movedM=_distM(_lastPos,_lastGpsEtaRecalc)
     const sinceMs=now-_lastGpsEtaRecalc.ts
     const movingEnough=movedM>=150 && sinceMs>=60000   // déplacement réel, pas plus d'1 fois/min
