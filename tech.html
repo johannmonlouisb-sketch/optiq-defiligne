@@ -2349,6 +2349,7 @@ function renderDepart(){
         ${etaLate?`<span class="tag tag-err" style="font-weight:700">⚠️ Créneau serré (−30min)</span>`:""}
         <span class="tag tag-info">🔧 ${fmin(workMin)} · ${(TYPES[iv.type]||TYPES.maintenance_simple).label}</span>
         ${techETAs[iv.id]?`<span class="tag tag-ok">🕐 Arrivée ${techETAs[iv.id].eta} · fin ${techETAs[iv.id].leave}</span>`:""}
+        ${techETAs[iv.id]?.delayMin>1?`<span class="tag tag-warn" title="Retard potentiel cumulé vs circulation fluide">🐢 +${fmin(techETAs[iv.id].delayMin)} trafic</span>`:""}
         ${(()=>{ // avance/retard vs l'heure initiale du RDV (iv.timeStart, Notion) — référence
           // absolue, indépendante des recalculs. _plannedETAs n'intervient plus ici (reste
           // utilisé uniquement pour le bilan de fin de tournée, ailleurs).
