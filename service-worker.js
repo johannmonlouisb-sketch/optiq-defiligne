@@ -1,5 +1,5 @@
 // Service Worker pour OptiTechX Technicien
-const CACHE_NAME = 'optitechx-tech-v1'
+const CACHE_NAME = 'optitechx-tech-v2'
 const STATIC_ASSETS = [
   '/tech.html',
   '/manifest.json',
@@ -63,7 +63,22 @@ self.addEventListener('fetch', event => {
     return
   }
 
-  // Ressources statiques: cache-first
+  // Pages et scripts (navigations, .html/.js/.css) : network-first, repli sur le cache hors-ligne.
+  // Évite de resservir indéfiniment une ancienne version après un déploiement.
+  if (request.mode === 'navigate' || /\.(html|js|css)$/.test(url.pathname)) {
+    event.respondWith(
+      fetch(request).then(response => {
+        if (response.ok) {
+          const copy = response.clone()
+          caches.open(CACHE_NAME).then(cache => cache.put(request, copy))
+        }
+        return response
+      }).catch(() => caches.match(request).then(cached => cached || new Response('', { status: 504, statusText: 'Offline' })))
+    )
+    return
+  }
+
+  // Autres ressources statiques (manifest, images…): cache-first
   event.respondWith(
     caches.match(request).then(cached => {
       return cached || fetch(request).then(response => {
