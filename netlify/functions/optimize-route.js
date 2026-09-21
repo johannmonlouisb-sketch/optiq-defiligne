@@ -5,7 +5,8 @@
 // Fallback : estimation Haversine × facteur route si OSRM indisponible
 
 const CORS = {
-  'Access-Control-Allow-Origin':  '*',
+  'Cache-Control': 'no-store',
+  'Access-Control-Allow-Origin':  'https://optitechx.netlify.app',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Content-Type': 'application/json'
@@ -16,7 +17,7 @@ const CORS = {
 const crypto = require('crypto')
 async function verifyAdmin(authHeader) {
   const token = (authHeader || '').startsWith('Bearer ') ? authHeader.slice(7) : null
-  const SB_URL = process.env.SUPABASE_URL
+  const SB_URL = (process.env.SUPABASE_URL || '').replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '')
   const SB_ANON = process.env.SUPABASE_ANON_KEY
   if (!token || !SB_URL || !SB_ANON) return false
   try {

@@ -27,7 +27,7 @@ const COL_MAP = {
 // profiles.role = 'admin'), jamais à un technicien ni à un appelant anonyme.
 async function verifyAdmin(authHeader) {
   const token = (authHeader || '').startsWith('Bearer ') ? authHeader.slice(7) : null;
-  const SB_URL = process.env.SUPABASE_URL;
+  const SB_URL = (process.env.SUPABASE_URL || '').replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '')
   const SB_ANON = process.env.SUPABASE_ANON_KEY;
   if (!token || !SB_URL || !SB_ANON) return false;
   try {
@@ -44,8 +44,9 @@ async function verifyAdmin(authHeader) {
 
 exports.handler = async (event) => {
   const headers = {
+    'Cache-Control': 'no-store',
     'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': 'https://optitechx.netlify.app',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   };
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };

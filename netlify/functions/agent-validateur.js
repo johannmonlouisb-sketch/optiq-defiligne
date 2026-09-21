@@ -3,7 +3,8 @@
 // Valide email, téléphone (FR), code postal (FR) de chaque fiche
 
 const CORS = {
-  'Access-Control-Allow-Origin':  '*',
+  'Cache-Control': 'no-store',
+  'Access-Control-Allow-Origin':  'https://optitechx.netlify.app',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Content-Type': 'application/json'
@@ -94,14 +95,13 @@ function validateBatch(interventions) {
   }
 }
 
-module.exports = { validateIntervention, validateBatch, validateEmail, validatePhone, validateCP }
 
 // ── Handler HTTP ──────────────────────────────────────────────
 
 // SÉCURITÉ : réservé aux administrateurs (session Supabase Auth + profiles.role='admin').
 async function verifyAdmin(authHeader) {
   const token = (authHeader || '').startsWith('Bearer ') ? authHeader.slice(7) : null
-  const SB_URL = process.env.SUPABASE_URL
+  const SB_URL = (process.env.SUPABASE_URL || '').replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '')
   const SB_ANON = process.env.SUPABASE_ANON_KEY
   if (!token || !SB_URL || !SB_ANON) return false
   try {
@@ -138,3 +138,6 @@ exports.handler = async (event) => {
 
   return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: '"intervention" ou "interventions" requis' }) }
 }
+
+// (exports déplacés en fin de fichier — cf. commentaire dans geocode.js)
+Object.assign(module.exports, { validateIntervention, validateBatch, validateEmail, validatePhone, validateCP })

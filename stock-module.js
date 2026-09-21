@@ -25,9 +25,26 @@ const StockModule = (() => {
     return { ...h, ...extra }
   }
 
+  // PGRST205 = PostgREST ne trouve pas la table dans son cache de schéma — dans ce
+  // module ça veut dire quasi toujours que supabase-stock-articles-setup.sql n'a
+  // jamais été exécuté sur ce projet Supabase (tables absentes), pas une vraie
+  // erreur applicative. Sans ça, chaque appelant affichait un JSON brut illisible
+  // ("Stock GET 404: {"code":"PGRST205",...}") au technicien comme à l'admin.
+  function _friendlyError(status, rawText) {
+    let body = null
+    try { body = JSON.parse(rawText) } catch (e) {}
+    if (body?.code === 'PGRST205') {
+      const err = new Error("Module Stock pas encore configuré — contacte l'administrateur (tables Supabase manquantes).")
+      err.code = 'STOCK_NOT_SETUP'
+      return err
+    }
+    const err = new Error(`Stock ${status}: ${rawText.substring(0, 150)}`)
+    return err
+  }
+
   async function _get(path) {
     const r = await fetch(`${_baseUrl}/${path}`, { headers: await _headers(), signal: AbortSignal.timeout(10000) })
-    if (!r.ok) throw new Error(`Stock GET ${r.status}: ${(await r.text()).substring(0, 150)}`)
+    if (!r.ok) throw _friendlyError(r.status, await r.text())
     return r.json()
   }
 
@@ -38,7 +55,7 @@ const StockModule = (() => {
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(10000)
     })
-    if (!r.ok) throw new Error(`Stock POST ${r.status}: ${(await r.text()).substring(0, 150)}`)
+    if (!r.ok) throw _friendlyError(r.status, await r.text())
     const t = await r.text()
     return t ? JSON.parse(t) : null
   }

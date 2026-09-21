@@ -85,18 +85,21 @@ create trigger trg_apply_mouvement_stock
 alter table public.articles_stock enable row level security;
 alter table public.mouvements_stock enable row level security;
 
--- Admin (session Supabase Auth authentifiée) : accès complet
+-- Admin (session Supabase Auth authentifiée ET role='admin' réel dans profiles) :
+-- accès complet. "authenticated" seul ne suffit pas — n'importe quel compte
+-- connecté (même non-admin) aurait alors un accès total (même faille corrigée
+-- sur app_state/kizeo_sites dans supabase-rls-security-hardening.sql).
 drop policy if exists "admin full articles_stock" on public.articles_stock;
 create policy "admin full articles_stock"
   on public.articles_stock for all
-  using ( auth.role() = 'authenticated' )
-  with check ( auth.role() = 'authenticated' );
+  using ( exists (select 1 from public.profiles where id = auth.uid() and role = 'admin') )
+  with check ( exists (select 1 from public.profiles where id = auth.uid() and role = 'admin') );
 
 drop policy if exists "admin full mouvements_stock" on public.mouvements_stock;
 create policy "admin full mouvements_stock"
   on public.mouvements_stock for all
-  using ( auth.role() = 'authenticated' )
-  with check ( auth.role() = 'authenticated' );
+  using ( exists (select 1 from public.profiles where id = auth.uid() and role = 'admin') )
+  with check ( exists (select 1 from public.profiles where id = auth.uid() and role = 'admin') );
 
 -- Technicien (clé anon, pas de session) : lecture + création d'article,
 -- MAIS PAS de modification directe de quantite_stock (pas de droit UPDATE),
